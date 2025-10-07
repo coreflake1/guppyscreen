@@ -81,6 +81,14 @@ lv_obj_t *ButtonContainer::get_button() {
   return btn;
 }
 
+lv_obj_t *ButtonContainer::get_label() {
+  return label;
+}
+
+void ButtonContainer::set_text(const char *text) {
+  lv_label_set_text(label, text);
+}
+
 void ButtonContainer::disable() {
   lv_obj_add_state(btn, LV_STATE_DISABLED);
   lv_obj_add_state(btn_cont, LV_STATE_DISABLED);

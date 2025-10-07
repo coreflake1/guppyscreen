@@ -19,11 +19,13 @@ class ButtonContainer {
 
   lv_obj_t *get_container();
   lv_obj_t *get_button();
+  lv_obj_t *get_label();
   void disable();
   void enable();
   void hide();
 
   void set_image(const void *img);
+  void set_text(const char *text);
 
   void handle_callback(lv_event_t *event);
 
