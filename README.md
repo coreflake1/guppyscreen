@@ -1,7 +1,31 @@
 # GuppyScreen — ke-advanced-3d-bedmesh branch
 
 > **This is a custom branch** for the **Creality Ender-3 V3 KE**, adding an advanced interactive 3D bed mesh visualization.
-> Base: [probielodan/guppyscreen](https://github.com/probielodan/guppyscreen) — 3D feature cherry-picked from [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen) (commit `bced7f7`).
+
+## Fork lineage
+
+```
+ballaswag/guppyscreen          (original)
+    └── probielodan/guppyscreen (KE-focused fork, adds features below)
+            └── coreflake1/guppyscreen  ← this repo
+                    └── ke-advanced-3d-bedmesh  ← this branch (adds 3D bed mesh)
+```
+
+### What probielodan added over ballaswag
+
+- **Major UI rework** — prompt panel, sensor/slider containers, file panel, homing panel, print panel, and more, all reworked for reliability and the KE's display
+- **Better print status** — improved information display during a print
+- **Auto-reload file list** — file list refreshes automatically
+- **Absolute positioning display** — shows absolute axis coordinates
+- **Invert Z direction** option
+- **WiFi disconnect and forget-network buttons**
+- **Chamber temperature** shown on the print screen
+- **Default extruder temperatures** configurable
+- **Android support dropped** (the KE runs on a dedicated MIPS/ARM SoC, not Android)
+
+### What this branch adds on top
+
+- 3D feature cherry-picked from [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen) (commit `bced7f7`)
 
 ## What's different on this branch
 
