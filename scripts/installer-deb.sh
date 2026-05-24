@@ -98,17 +98,40 @@ restart_services() {
     service guppyscreen restart
 }
 
+uninstall_guppy() {
+    printf "${green}Uninstalling Guppy Screen ${white}\n"
+    sudo systemctl stop guppyscreen.service 2>/dev/null
+    sudo systemctl disable guppyscreen.service 2>/dev/null
+    sudo systemctl disable disable_blinking_cursor.service 2>/dev/null
+    sudo rm -f /etc/systemd/system/guppyscreen.service
+    sudo rm -f /etc/systemd/system/disable_blinking_cursor.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable KlipperScreen.service 2>/dev/null
+    printf "${yellow}Do you want to remove ~/guppyscreen? (y/n): ${white}"
+    read confirm
+    if [ "$confirm" = "y" -o "$confirm" = "Y" ]; then
+        rm -rf "${HOME}/guppyscreen"
+        printf "${green}Removed ~/guppyscreen ${white}\n"
+    fi
+    printf "${green}GuppyScreen uninstalled. Restart your printer to restore normal display. ${white}\n"
+}
+
 
 ARCH=`uname -m`
 echo "Found arch $ARCH"
 
 if [ "$ARCH" = "aarch64" ]; then
-    printf "${green}Installing Guppy Screen ${white}\n"
+    if [ "$1" = "uninstall" ]; then
+        uninstall_guppy
+        exit 0
+    fi
 
-    ASSET_URL="https://github.com/probielodan/guppyscreen/releases/latest/download/guppyscreen-arm.tar.gz"
+    printf "${green}Installing Guppy Screen (coreflake1 fork - ke-advanced-3d-bedmesh) ${white}\n"
+
+    ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/latest/download/guppyscreen-arm.tar.gz"
     if [ "$1" = "nightly" ]; then
         printf "${yellow}Installing nightly build ${white}\n"
-        ASSET_URL="https://github.com/probielodan/guppyscreen/releases/download/nightly/guppyscreen-arm.tar.gz"
+        ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/nightly/guppyscreen-arm.tar.gz"
     fi
 
     curl -s -L $ASSET_URL -o /tmp/guppyscreen.tar.gz
