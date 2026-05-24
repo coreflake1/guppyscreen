@@ -1,3 +1,72 @@
+# GuppyScreen — ke-advanced-3d-bedmesh branch
+
+> **This is a custom branch** for the **Creality Ender-3 V3 KE**, adding an advanced interactive 3D bed mesh visualization.
+> Base: [probielodan/guppyscreen](https://github.com/probielodan/guppyscreen) — 3D feature cherry-picked from [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen) (commit `bced7f7`).
+
+## What's different on this branch
+
+- Real-time 3D rendered mesh surface with colour-gradient height map
+- Interactive rotation, zoom (Z-scale and FOV), and pan via touch or mouse
+- Toggle between 2D and 3D views with a single button
+- Multitouch gesture support
+
+**Changed files vs base:**
+- `src/bedmesh_panel.cpp` — full 3D rendering engine
+- `src/bedmesh_panel.h` — new structs (`Point3D`, `Vertex3D`, `Quad3D`) and method declarations
+- `src/button_container.cpp` — added `get_label()` and `set_text()` helpers
+- `src/button_container.h` — corresponding declarations
+
+## Building from source
+
+### 1. Clone with submodules
+
+```bash
+git clone --recurse-submodules https://github.com/coreflake1/guppyscreen.git
+cd guppyscreen
+git checkout ke-advanced-3d-bedmesh
+```
+
+### 2. Build bundled libraries
+
+```bash
+make libhv.a
+make libspdlog.a
+make wpaclient
+```
+
+### 3a. Simulator build (Linux desktop, for testing)
+
+Install SDL2 dev headers:
+```bash
+# Fedora / Nobara
+sudo dnf install sdl2-compat-devel
+
+# Debian / Ubuntu / Raspbian
+sudo apt install libsdl2-dev
+```
+
+Build:
+```bash
+make -j$(nproc) \
+  CFLAGS="-O3 -g0 -MD -MP -I./ -I./lvgl/ -I/usr/include/SDL2 -D_GNU_SOURCE=1 -Wno-incompatible-pointer-types" \
+  LDFLAGS="-lm -Llibhv/lib -Lspdlog/build -l:libhv.a -latomic -lpthread -Lwpa_supplicant/wpa_supplicant/ -l:libwpa_client.a -lstdc++fs -l:libspdlog.a"
+```
+
+> The `-Wno-incompatible-pointer-types` flag is required on GCC 14+ due to a pre-existing upstream
+> strictness issue in `lv_touch_calibration`. It is unrelated to this branch's changes.
+
+Binary: `build/bin/guppyscreen`
+
+### 3b. Cross-compile for Ender-3 V3 KE (target hardware)
+
+```bash
+make -j$(nproc) CROSS_COMPILE=arm-linux-gnueabihf-
+```
+
+Replace the toolchain prefix to match your cross-compiler.
+
+---
+
 # Guppy Screen for Klipper
 
 Guppy Screen is a touch UI for Klipper using APIs exposed by Moonraker. It builds on LVGL as a standalone executable, has no dependency on any display servers such as X/Wayland.
