@@ -82,18 +82,22 @@ rm -rf /root/.cache
 wget -q --no-check-certificate https://raw.githubusercontent.com/ballaswag/k1-discovery/main/bin/curl -O /tmp/curl
 chmod +x /tmp/curl
 
-ASSET_URL="https://github.com/probielodan/guppyscreen/releases/latest/download/$ASSET_NAME.tar.gz"
-
-if [ "$1" = "nightly" ] || [ "$2" = "nightly" ]; then
-    printf "${yellow}Installing nightly build ${white}\n"
-    ASSET_URL="https://github.com/probielodan/guppyscreen/releases/download/nightly/$ASSET_NAME.tar.gz"
-fi
+PINNED_RELEASE="v0.1.0-ke-bedmesh"
+ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_RELEASE}/$ASSET_NAME.tar.gz"
 
 printf "${green} Downloading asset: $ASSET_NAME.tar.gz ${white}\n"
 
 # download/extract latest guppyscreen
 /tmp/curl -s -L $ASSET_URL -o /tmp/guppyscreen.tar.gz
 tar xf /tmp/guppyscreen.tar.gz -C /usr/data/
+
+# substitute paths in guppyconfig.json
+if [ -f "$K1_GUPPY_DIR/debian/guppyconfig.json" ]; then
+    PRINTER_DATA_DIR=$(dirname "$K1_CONFIG_DIR")
+    sed -i "s|<GUPPY_DIR>|$K1_GUPPY_DIR|g; s|<PRINTER_DATA_DIR>|$PRINTER_DATA_DIR|g" "$K1_GUPPY_DIR/debian/guppyconfig.json"
+    cp "$K1_GUPPY_DIR/debian/guppyconfig.json" "$K1_GUPPY_DIR/guppyconfig.json"
+fi
+mkdir -p "$K1_GUPPY_DIR/thumbnails"
 
 if [ ! -f "$K1_GUPPY_DIR/guppyscreen" ]; then
     printf "${red}Did not find guppyscreen in $K1_GUPPY_DIR. GuppyScreen must be extracted in $K1_GUPPY_DIR ${white}\n"
