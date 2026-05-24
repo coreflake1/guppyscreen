@@ -140,26 +140,50 @@ Guppy Screen is a touch UI for Klipper using APIs exposed by Moonraker. It build
 
 ## Installation / Update
 
+> **Build status**: aarch64 cross-compiled binary verified in this repository.
+> Printer install is **untested on hardware** as of this writing. Back up your
+> printer config before proceeding.
+
 SSH into your Ender-3 V3 KE and run:
 
 ```sh
 sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer-deb.sh)"
 ```
 
-Pass `nightly` to install from the nightly release:
-```sh
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer-deb.sh)" nightly
-```
+> **Do not use probielodan's installer** — it downloads from probielodan's
+> releases and does not include the 3D bed mesh feature.
+
+The installer downloads release `v0.1.0-ke-bedmesh` (pinned tag — not `latest`).
+
+**What the installer changes on your printer:**
+
+| Change | Rolled back by uninstall? |
+|---|---|
+| Extracts `~/guppyscreen/` | Optional (prompts) |
+| Installs + enables `guppyscreen.service` | Yes |
+| Installs + enables `disable_blinking_cursor.service` | Yes |
+| Disables `KlipperScreen.service` | Yes — re-enabled |
+| Modifies `wpa_supplicant.service` (adds `GROUP=netdev`) | Yes — restored from backup |
+| Adds `[include GuppyScreen/*.cfg]` to `printer.cfg` | Yes — line removed |
+| Creates `~/printer_data/config/GuppyScreen/` | Yes — directory removed |
+| Copies `gcode_shell_command.py` to Klipper extras | **No** |
+| Copies `calibrate_shaper_config.py` to Klipper extras | **No** |
+
+A timestamped backup is saved to `~/guppyscreen-backup-YYYYMMDD-HHMMSS/`
+before any changes, containing `printer.cfg`, `wpa_supplicant.service`, and
+the GuppyScreen config directory (if upgrading).
 
 ## Uninstall
-
-SSH into your KE and run:
 
 ```sh
 sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer-deb.sh)" uninstall
 ```
 
-This stops and disables the GuppyScreen services and optionally removes `~/guppyscreen`.
+Uninstall removes services, restores `wpa_supplicant.service`, removes
+`[include GuppyScreen/*.cfg]` from `printer.cfg`, removes the GuppyScreen
+config directory, and re-enables KlipperScreen. The only things **not**
+automatically removed are Klipper extras (`gcode_shell_command.py`,
+`calibrate_shaper_config.py`) — remove those manually if needed.
 
 ## Features
 :white_check_mark: Console/Macro Shell\
