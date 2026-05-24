@@ -81,38 +81,26 @@ make -j$(nproc) \
 
 Binary: `build/bin/guppyscreen`
 
-### 3b. Cross-compile for Ender-3 V3 KE (aarch64 target hardware)
+### 3b. Cross-compile for Ender-3 V3 KE (MIPS target hardware)
 
-The KE target requires the `ballaswag/guppydev` Docker image, which contains the
-official `aarch64-none-linux-gnu-` toolchain.
+The Ender-3 V3 KE runs an **Ingenic XBurst2 X2000 SoC (MIPS, mipsel little-endian, kernel 4.4.94)**.
+The `ballaswag/guppydev` Docker image contains the required `mipsel-linux-` musl toolchain.
 
-**One-time setup** — rebuild `libwpa_client.a` for aarch64 (only needed after a
-clean clone or `make clean`):
+Use the provided script (handles library rebuilds automatically):
+
 ```bash
-docker run --rm -u $(id -u):$(id -g) \
-  -v "$PWD:$PWD" -w "$PWD" \
-  -e PATH="/toolchains/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/bin:/usr/bin:/bin" \
-  ballaswag/guppydev:latest \
-  sh -c "make -C wpa_supplicant/wpa_supplicant clean && \
-         make -C wpa_supplicant/wpa_supplicant \
-           CC=aarch64-none-linux-gnu-gcc -j\$(nproc) libwpa_client.a"
+bash scripts/build-mips.sh
 ```
 
-**Main build:**
-```bash
-docker run --rm -u $(id -u):$(id -g) \
-  -v "$PWD:$PWD" -w "$PWD" \
-  -e CROSS_COMPILE=aarch64-none-linux-gnu- \
-  -e PATH="/toolchains/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/bin:/usr/bin:/bin" \
-  ballaswag/guppydev:latest \
-  sh -c "make -j\$(nproc)"
-```
+Binary: `build/bin/guppyscreen` — verified as `ELF 32-bit LSB executable, MIPS, MIPS32 version 1 (SYSV), statically linked`.
 
-Binary: `build/bin/guppyscreen` — verified as `ELF 64-bit LSB executable, ARM aarch64, statically linked`.
+> **Note**: `installer-deb.sh` targets aarch64/systemd/Debian and will immediately exit with
+> `"Found arch mips / Terminating"` on this printer. The correct installer for the KE is
+> `installer.sh` (K1/MIPS/BusyBox init path).
 
-**Package a release tarball** (creates `guppyscreen-arm.tar.gz`):
+**Package a release tarball** (creates `guppyscreen-smallscreen.tar.gz`):
 ```bash
-GUPPYSCREEN_VERSION=0.1.0-ke-bedmesh GUPPY_THEME=blue bash scripts/release.sh guppyscreen-arm
+GUPPYSCREEN_VERSION=0.1.0-ke-bedmesh GUPPY_THEME=blue bash scripts/release.sh guppyscreen-smallscreen
 ```
 
 ---
@@ -140,16 +128,19 @@ Guppy Screen is a touch UI for Klipper using APIs exposed by Moonraker. It build
 
 ## Installation / Update
 
-> **Build status**: aarch64 cross-compiled binary verified in this repository.
-> Printer install is **untested on hardware** as of this writing. Back up your
-> printer config before proceeding.
+> **Hardware**: Ender-3 V3 KE — Ingenic XBurst2 X2000, MIPS (mipsel), kernel 4.4.94.
+> This installer targets the K1/MIPS/BusyBox-init path. It is **untested on hardware** as
+> of this writing. **Back up your printer config before proceeding.**
 
 SSH into your Ender-3 V3 KE and run:
 
 ```sh
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer-deb.sh)"
+sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer.sh)"
 ```
 
+> **Do not use `installer-deb.sh`** — it targets aarch64/systemd/Debian and will immediately
+> exit with `"Found arch mips / Terminating"` on the Ender-3 V3 KE.
+>
 > **Do not use probielodan's installer** — it downloads from probielodan's
 > releases and does not include the 3D bed mesh feature.
 
@@ -159,31 +150,36 @@ The installer downloads release `v0.1.0-ke-bedmesh` (pinned tag — not `latest`
 
 | Change | Rolled back by uninstall? |
 |---|---|
-| Extracts `~/guppyscreen/` | Optional (prompts) |
-| Installs + enables `guppyscreen.service` | Yes |
-| Installs + enables `disable_blinking_cursor.service` | Yes |
-| Disables `KlipperScreen.service` | Yes — re-enabled |
-| Modifies `wpa_supplicant.service` (adds `GROUP=netdev`) | Yes — restored from backup |
+| Extracts `/usr/data/guppyscreen/` | Optional (prompts) |
+| Installs `/etc/init.d/S99guppyscreen` | Yes — removed |
+| Copies `S50dropbear` SSH init script | **No** — original saved to `/usr/data/guppyify-backup/` |
+| Moves `S12boot_display` to backup (disables boot display) | Partially — restored from backup |
+| Removes or backs up `S99start_app` (optional) | Partially — restored from backup if present |
+| Renames `Monitor` + `display-server` to `.disable` (if Creality kept) | **No** — restore manually |
 | Adds `[include GuppyScreen/*.cfg]` to `printer.cfg` | Yes — line removed |
-| Creates `~/printer_data/config/GuppyScreen/` | Yes — directory removed |
-| Copies `gcode_shell_command.py` to Klipper extras | **No** |
-| Copies `calibrate_shaper_config.py` to Klipper extras | **No** |
+| Creates `printer_data/config/GuppyScreen/` | Yes — directory removed |
+| Copies `gcode_shell_command.py` to Klipper extras | **No** — not removed |
+| Overwrites `calibrate_shaper_config.py` in Klipper extras | **No** — original saved to backup |
+| Symlinks `guppy_module_loader.py`, `guppy_config_helper.py`, `tmcstatus.py` | Yes — removed |
+| Replaces `ft2font.so` (if matplotlib installed) | Partially — original moved to backup |
 
-A timestamped backup is saved to `~/guppyscreen-backup-YYYYMMDD-HHMMSS/`
-before any changes, containing `printer.cfg`, `wpa_supplicant.service`, and
-the GuppyScreen config directory (if upgrading).
+Backup files are saved to `/usr/data/guppyify-backup/` before any destructive change,
+including a copy of `printer.cfg` taken **before** the include line is added.
 
 ## Uninstall
 
 ```sh
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer-deb.sh)" uninstall
+sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer.sh)" uninstall
 ```
 
-Uninstall removes services, restores `wpa_supplicant.service`, removes
-`[include GuppyScreen/*.cfg]` from `printer.cfg`, removes the GuppyScreen
-config directory, and re-enables KlipperScreen. The only things **not**
-automatically removed are Klipper extras (`gcode_shell_command.py`,
-`calibrate_shaper_config.py`) — remove those manually if needed.
+Uninstall stops GuppyScreen, removes `/etc/init.d/S99guppyscreen`, restores
+`S12boot_display` and `S99start_app` from backup, removes `[include GuppyScreen/*.cfg]`
+from `printer.cfg`, removes the GuppyScreen config directory, and removes Klipper symlinks.
+Things **not** automatically restored:
+- `gcode_shell_command.py` and `calibrate_shaper_config.py` in Klipper extras
+- `Monitor` / `display-server` if renamed to `.disable` (restore manually)
+- `S50dropbear` (guppy version stays; original is in `/usr/data/guppyify-backup/`)
+- Reboot required to restore display services
 
 ## Features
 :white_check_mark: Console/Macro Shell\
