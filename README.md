@@ -81,13 +81,39 @@ make -j$(nproc) \
 
 Binary: `build/bin/guppyscreen`
 
-### 3b. Cross-compile for Ender-3 V3 KE (target hardware)
+### 3b. Cross-compile for Ender-3 V3 KE (aarch64 target hardware)
 
+The KE target requires the `ballaswag/guppydev` Docker image, which contains the
+official `aarch64-none-linux-gnu-` toolchain.
+
+**One-time setup** — rebuild `libwpa_client.a` for aarch64 (only needed after a
+clean clone or `make clean`):
 ```bash
-make -j$(nproc) CROSS_COMPILE=arm-linux-gnueabihf-
+docker run --rm -u $(id -u):$(id -g) \
+  -v "$PWD:$PWD" -w "$PWD" \
+  -e PATH="/toolchains/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/bin:/usr/bin:/bin" \
+  ballaswag/guppydev:latest \
+  sh -c "make -C wpa_supplicant/wpa_supplicant clean && \
+         make -C wpa_supplicant/wpa_supplicant \
+           CC=aarch64-none-linux-gnu-gcc -j\$(nproc) libwpa_client.a"
 ```
 
-Replace the toolchain prefix to match your cross-compiler.
+**Main build:**
+```bash
+docker run --rm -u $(id -u):$(id -g) \
+  -v "$PWD:$PWD" -w "$PWD" \
+  -e CROSS_COMPILE=aarch64-none-linux-gnu- \
+  -e PATH="/toolchains/gcc-arm-10.2-2020.11-x86_64-aarch64-none-linux-gnu/bin:/usr/bin:/bin" \
+  ballaswag/guppydev:latest \
+  sh -c "make -j\$(nproc)"
+```
+
+Binary: `build/bin/guppyscreen` — verified as `ELF 64-bit LSB executable, ARM aarch64, statically linked`.
+
+**Package a release tarball** (creates `guppyscreen-arm.tar.gz`):
+```bash
+GUPPYSCREEN_VERSION=0.1.0-ke-bedmesh GUPPY_THEME=blue bash scripts/release.sh guppyscreen-arm
+```
 
 ---
 
@@ -113,45 +139,27 @@ Guppy Screen is a touch UI for Klipper using APIs exposed by Moonraker. It build
 </p>
 
 ## Installation / Update
-Run the following interactive script via SSH on your K1/Max/CR-10 SE/Ender 3 V3 KE/Nebula Pad to install Guppy Screen.
 
-#### Material Design Theme
-```
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/probielodan/guppyscreen/main/scripts/installer.sh)"
-```
+SSH into your Ender-3 V3 KE and run:
 
-#### Z-Bolt Theme (Only for the K1/Max)
-```
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/probielodan/guppyscreen/main/scripts/installer.sh)" -s zbolt
+```sh
+sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer-deb.sh)"
 ```
 
-### Install on a PI (Debian/Raspbian)
-Tested on a BTT Pad 7. Please install with care and make sure you're okay with resetting your setup if things break.
-```
-wget -O - https://raw.githubusercontent.com/probielodan/guppyscreen/main/scripts/installer-deb.sh | bash
-```
-
-### Nightly Builds
-#### Material (Nightly)
-```
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/probielodan/guppyscreen/main/scripts/installer.sh)" -s nightly
-```
-
-#### Z-Bolt (Nightly)
-```
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/probielodan/guppyscreen/main/scripts/installer.sh)" -s zbolt nightly
-```
-
-#### Raspbian Variant (Nightly)
-```
-wget -O - https://raw.githubusercontent.com/probielodan/guppyscreen/main/scripts/installer-deb.sh | bash -s nightly
+Pass `nightly` to install from the nightly release:
+```sh
+sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer-deb.sh)" nightly
 ```
 
 ## Uninstall
-ssh into your K1/Max and run the following command:
+
+SSH into your KE and run:
+
+```sh
+sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer-deb.sh)" uninstall
 ```
-/usr/data/guppyscreen/reinstall-creality.sh
-```
+
+This stops and disables the GuppyScreen services and optionally removes `~/guppyscreen`.
 
 ## Features
 :white_check_mark: Console/Macro Shell\
