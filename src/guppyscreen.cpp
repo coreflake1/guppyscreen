@@ -216,6 +216,7 @@ void GuppyScreen::loop() {
           spdlog::debug("waking up display");
           fbdev_unblank();
           lv_obj_move_background(screen_saver);
+          lv_obj_invalidate(lv_scr_act());
           is_sleeping = false;
         }
       }
