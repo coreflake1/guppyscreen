@@ -22,7 +22,7 @@ ballaswag/guppyscreen          (original)
 | SoC | Ingenic XBurst2 X2000 |
 | Architecture | **MIPS (mipsel little-endian)** — NOT aarch64 |
 | Kernel | 4.4.94 |
-| Screen | 480×544 (smallscreen build) |
+| Screen | 480×272 physical (framebuffer geometry 480×544 — double-buffer, two 272-line halves) |
 | libc | /lib/ld-2.29.so (musl 2.29) |
 | Init system | /etc/init.d/ BusyBox-style (S##name scripts) |
 | systemctl | Present at /usr/bin/systemctl but NOT the primary init |
@@ -220,13 +220,97 @@ Hostname: `Ender3V3KE-4C14`
 - This is what enabled SSH (started dropbear directly; init.d start case is commented out)
 - `/usr/data/helper-script-backup/` also present
 
+---
+
+## Display orientation — confirmed fix (2026-05-25)
+
+The KE screen is physically mounted **upside-down (180° rotated)** inside the chassis.
+The kernel display driver compensates by rotating the framebuffer 180°.
+GuppyScreen/LVGL must therefore **pre-rotate 180°** so the kernel's rotation cancels out.
+
+**Fix**: `display_rotate: 2` in `debian/guppyconfig.json` (committed `8bed38d`).
+
+How it propagates:
+- `display_rotate: 2` → `sw_rotate=1`, `rotated=LV_DISP_ROT_180`
+- LVGL renders content upside-down into the framebuffer
+- Kernel rotates 180° → net 0° on the physical screen
+
+Debugging history:
+- `display_rotate:0` → screen upside-down (LVGL and kernel both unrotated, but hardware is inverted)
+- `display_rotate:1` → 90° rotated (wrong axis)
+- `display_rotate:2` → correct orientation ✓
+- White screen on restart (without full reboot) was a framebuffer state artefact — full reboot clears it
+
+`lv_disp_get_physical_hor_res()` returns **480** (not 272) for ROT_180 because a
+180° rotation does not swap width/height, unlike 90°/270°.
+
+---
+
+## Font and layout tuning (2026-05-25)
+
+### LVGL font architecture — critical lesson
+
+GuppyScreen is compiled with `GUPPY_SMALL_SCREEN=1`. Before the fix, all widget
+text rendered at **16 px** (`lv_font_montserrat_16`), which is too large for a
+272 px tall screen — labels wrapped, buttons truncated text, table cells were
+unreadable.
+
+**Root cause**: `LV_FONT_DEFAULT` in `lv_conf.h` was unconditionally
+`&lv_font_montserrat_16` — no `GUPPY_SMALL_SCREEN` guard existed.
+
+The `font` parameter passed to `lv_theme_default_init()` in `src/main.cpp` is
+almost irrelevant: the LVGL v8 default theme only applies that font to the
+checked-state marker of checkbox widgets (`cb_marker_checked`). It does **not**
+set a default `text_font` on labels, buttons, tables, or any other widget. Those
+all fall back to `LV_FONT_DEFAULT`.
+
+**Fix** (`lv_conf.h`, line ~379):
+```c
+// Before:
+#define LV_FONT_DEFAULT &lv_font_montserrat_16
+
+// After:
+#ifdef GUPPY_SMALL_SCREEN
+    #define LV_FONT_DEFAULT &lv_font_montserrat_12
+#else
+    #define LV_FONT_DEFAULT &lv_font_montserrat_16
+#endif
+```
+
+This is a 25% reduction (16 → 12 px) that propagates to every widget which does
+not have an explicit `lv_obj_set_style_text_font()` call.
+
+### Scale factors (reference)
+
+```
+width_scale  = hor_res  / 800.0 = 480/800 = 0.600
+height_scale = ver_res  / 480.0 = 272/480 = 0.567
+```
+
+Widgets with explicit hardcoded fonts (NOT affected by `LV_FONT_DEFAULT`):
+| File | Widget | Font |
+|---|---|---|
+| `console_panel.cpp` | keyboard, send button, log label | `montserrat_16` |
+| `macro_item.cpp` | run (play) button | `montserrat_16` |
+| `macros_panel.cpp` | keyboard | `montserrat_16` |
+| `bedmesh_panel.cpp` | 3D mesh labels | `montserrat_12` / `montserrat_16` |
+
+### Remaining layout issues (lower priority)
+
+| Screen | Issue | File | Notes |
+|---|---|---|---|
+| Temperature chart | Y-axis tick labels overlap at 6 ticks on 272px height | `src/main_panel.cpp` L227 | Reduce `major_cnt` 6→3 in `lv_chart_set_axis_tick`; set `LV_PART_TICKS` font to `montserrat_8` |
+| Limits sliders | 4 sliders in COLUMN layout overflow 272px; bottom slider(s) clipped | `src/limits_panel.cpp` | Switch `limit_cont` to 2×2 grid (2 FR cols × 2 FR rows) |
+| Bed mesh table | Cells ~35×25px, 5-char values unreadable | `src/bedmesh_panel.cpp` | Cell sizing independent of `LV_FONT_DEFAULT` |
+
+---
+
 ## KE-specific gotchas (resolved vs remaining)
 
 - ~~`[include gcode_macro.cfg]` may not be in the KE's printer.cfg~~ **CONFIRMED PRESENT**
 - ~~`S99start_app` may not exist on KE firmware~~ **CONFIRMED PRESENT**
 - ~~`/usr/bin/Monitor` and `/usr/bin/display-server` may not exist~~ **BOTH CONFIRMED PRESENT**
-- Hardware install is untested as of the last session; the smoke-test during install
-  will be the first real execution of the binary on the printer
+- ~~Hardware install is untested~~ **CONFIRMED WORKING** — GuppyScreen installed and running
 - `installer-deb.sh` is also present in the release tarball (stale, old version
   without safety fixes) — it won't be run by the standard install flow but could
   confuse someone who tries to run it from the extracted `/usr/data/guppyscreen/` dir
