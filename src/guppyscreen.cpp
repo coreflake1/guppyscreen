@@ -156,6 +156,7 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   screen_saver = lv_obj_create(lv_scr_act());
 
   lv_obj_set_size(screen_saver, LV_PCT(100), LV_PCT(100));
+  lv_obj_set_style_bg_color(screen_saver, lv_color_black(), 0);
   lv_obj_set_style_bg_opa(screen_saver, LV_OPA_100, 0);
   lv_obj_move_background(screen_saver);
 
@@ -206,7 +207,9 @@ void GuppyScreen::loop() {
       if (lv_disp_get_inactive_time(NULL) > display_sleep) {
         if (!is_sleeping.load()) {
           spdlog::debug("putting display to sleeping");
-          fbdev_blank();
+          // fbdev_blank() uses FB_BLANK_POWERDOWN which the Ingenic X2000
+          // kernel 4.4.94 DSI driver cannot recover from via FB_BLANK_UNBLANK.
+          // Use only the LVGL screen_saver (black) for the visual sleep effect.
           lv_obj_move_foreground(screen_saver);
           // spdlog::debug("screen saver foreground");
           is_sleeping = true;
