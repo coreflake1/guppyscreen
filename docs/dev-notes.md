@@ -102,9 +102,11 @@ script pins which tarball it downloads.
     - Copies `S99start_app` → backup (if file exists; KE may not have it)
 15. Backs up `ft2font.so` (moves to backup)
 16. **Overwrites** `/etc/init.d/S50dropbear` with guppy version
-    - **Why**: Stock Creality S50dropbear has dependencies on display-server/app services.
-      When those are removed, stock script can fail and leave the printer without SSH.
-      Guppy version is plain dropbear with no dependencies — starts unconditionally.
+    - **Why**: The KE's stock `S50dropbear` has the `start` call inside `case start)` **commented
+      out** (`#       start`). This means `S50dropbear start` is a no-op — SSH does **not**
+      auto-start on a clean reboot. Guppy's version has the `start` uncommented, so SSH reliably
+      starts on every boot after install. Currently SSH works on this printer because the
+      helper-script started dropbear directly (not via the init script).
 17. Interactive: disable all Creality services?
     - Y → removes `S99start_app` (guarded: only if exists)
     - N → renames `Monitor` and `display-server` to `.disable` (guarded: only if exist)
@@ -180,14 +182,53 @@ make -j$(nproc) \
 
 ---
 
-## KE-specific gotchas
+## Confirmed on-device state (verified via SSH 2026-05-25)
 
-- `[include gcode_macro.cfg]` may not be in the KE's printer.cfg — installer now
-  prepends the GuppyScreen include as a fallback instead of silently doing nothing
-- `S99start_app` may not exist on KE firmware — all references guarded with `[ -f ]`
-- `/usr/bin/Monitor` and `/usr/bin/display-server` may not exist — guarded
+Hostname: `Ender3V3KE-4C14`
+
+### printer.cfg
+- `[include gcode_macro.cfg]` **IS present** (line 8) — installer sed path will work; prepend fallback is unused but kept as insurance
+- Config dir confirmed: `/usr/data/printer_data/config/`
+- Klipper path confirmed: `/usr/share/klipper`
+- Has `[bed_mesh]`, `[input_shaper]`, `[bltouch]`, `[prtouch_v2]`, `[adxl345]`
+- Saved 5×5 bed mesh already present in `SAVE_CONFIG` block
+- Saved input shaper: X=ei/55.4Hz, Y=ei/37.6Hz
+
+### Init scripts — all confirmed present
+- `S12boot_display` — minimal: just runs `/usr/bin/boot_display display &`
+- `S50dropbear` — **start case is COMMENTED OUT** (see S50dropbear section above)
+- `S99start_app` — substantial script starting 8 Creality services (master-server, audio-server, wifi-server, app-server, display-server, upgrade-server, web-server, Monitor)
+
+### Binaries — all confirmed present
+- `/usr/bin/Monitor` — 45 KB
+- `/usr/bin/display-server` — 6.5 MB
+- `/usr/sbin/dropbear` — running as PID 2124 (started by helper-script, not by init.d)
+
+### Klipper extras — already present
+- `gcode_shell_command.py` — already installed (installer will skip, if-not-exists guard)
+- `calibrate_shaper_config.py` — already installed (will be backed up then overwritten)
+- No guppy modules yet (`guppy_module_loader`, `guppy_config_helper`, `tmcstatus`)
+
+### Matplotlib
+- **Version 2.2.3 installed** → `ft2font.so` replacement will fire
+- `ft2font.cpython-38-mipsel-linux-gnu.so` dated **Apr 15 2025** — post-firmware date,
+  meaning it was already replaced once (likely by helper-script). Our install will back
+  it up and replace it again with the guppy MIPS version.
+
+### Helper script
+- `/usr/data/helper-script/` is present (KIAUH-equivalent for K1/KE)
+- This is what enabled SSH (started dropbear directly; init.d start case is commented out)
+- `/usr/data/helper-script-backup/` also present
+
+## KE-specific gotchas (resolved vs remaining)
+
+- ~~`[include gcode_macro.cfg]` may not be in the KE's printer.cfg~~ **CONFIRMED PRESENT**
+- ~~`S99start_app` may not exist on KE firmware~~ **CONFIRMED PRESENT**
+- ~~`/usr/bin/Monitor` and `/usr/bin/display-server` may not exist~~ **BOTH CONFIRMED PRESENT**
 - Hardware install is untested as of the last session; the smoke-test during install
   will be the first real execution of the binary on the printer
 - `installer-deb.sh` is also present in the release tarball (stale, old version
   without safety fixes) — it won't be run by the standard install flow but could
   confuse someone who tries to run it from the extracted `/usr/data/guppyscreen/` dir
+- ft2font.so was already replaced once by helper-script (Apr 2025); our install will
+  replace it again — the backup step ensures the current version is preserved

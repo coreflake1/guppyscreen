@@ -152,16 +152,19 @@ The installer downloads release `v0.1.0-ke-bedmesh` (pinned tag — not `latest`
 |---|---|
 | Extracts `/usr/data/guppyscreen/` | Optional (prompts) |
 | Installs `/etc/init.d/S99guppyscreen` | Yes — removed |
-| Copies `S50dropbear` SSH init script | **No** — original saved to `/usr/data/guppyify-backup/` |
+| Replaces `S50dropbear` SSH init script¹ | **No** — original saved to `/usr/data/guppyify-backup/` |
 | Moves `S12boot_display` to backup (disables boot display) | Partially — restored from backup |
-| Removes or backs up `S99start_app` (optional) | Partially — restored from backup if present |
+| Backs up + removes `S99start_app` (optional, prompted) | Partially — restored from backup |
 | Renames `Monitor` + `display-server` to `.disable` (if Creality kept) | **No** — restore manually |
-| Adds `[include GuppyScreen/*.cfg]` to `printer.cfg` | Yes — line removed |
+| Adds `[include GuppyScreen/*.cfg]` to `printer.cfg` (after `gcode_macro` include) | Yes — line removed |
 | Creates `printer_data/config/GuppyScreen/` | Yes — directory removed |
-| Copies `gcode_shell_command.py` to Klipper extras | **No** — not removed |
+| Skips `gcode_shell_command.py` (already present on KE) | — |
 | Overwrites `calibrate_shaper_config.py` in Klipper extras | **No** — original saved to backup |
 | Symlinks `guppy_module_loader.py`, `guppy_config_helper.py`, `tmcstatus.py` | Yes — removed |
-| Replaces `ft2font.so` (if matplotlib installed) | Partially — original moved to backup |
+| Replaces `ft2font.so` (matplotlib 2.2.3 confirmed installed on KE) | Partially — original moved to backup |
+
+> ¹ The KE's stock `S50dropbear` has the `start` call **commented out**, so SSH does not
+> auto-start on a clean reboot. The guppy version fixes this — SSH will auto-start after install.
 
 Backup files are saved to `/usr/data/guppyify-backup/` before any destructive change,
 including a copy of `printer.cfg` taken **before** the include line is added.
