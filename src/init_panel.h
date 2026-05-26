@@ -17,6 +17,10 @@ class InitPanel {
   void connected(KWebSocketClient &ws);
   void disconnected(KWebSocketClient &ws);
   void set_message(const char *message);
+#ifdef SIMULATOR
+  /* Hide the "Waiting for printer..." overlay in simulator mode. */
+  void sim_hide();
+#endif
 
  private:
   lv_obj_t *cont;

@@ -845,7 +845,7 @@ void BedMeshPanel::draw_axes_and_labels(const std::vector<std::vector<BedMeshPan
   lv_draw_label_dsc_t label_dsc;
   lv_draw_label_dsc_init(&label_dsc);
   label_dsc.color = lv_color_white();
-  label_dsc.font = &lv_font_montserrat_12;
+  label_dsc.font = &lv_font_montserrat_10;
 
 
   // Draw Z-axis (vertical) - connect to X/Y axes origin with centered Z range
@@ -942,7 +942,7 @@ void BedMeshPanel::draw_axes_and_labels(const std::vector<std::vector<BedMeshPan
     lv_draw_label_dsc_t z_axis_label_dsc;
     lv_draw_label_dsc_init(&z_axis_label_dsc);
     z_axis_label_dsc.color = lv_color_white();
-    z_axis_label_dsc.font = &lv_font_montserrat_16;
+    z_axis_label_dsc.font = &lv_font_montserrat_10;
 
     double left_x = (0 - cols / 2.0) * MESH_SCALE;
     double front_y = ((rows-1) - rows / 2.0) * MESH_SCALE;
@@ -1714,7 +1714,7 @@ void BedMeshPanel::draw_horizontal_axes(double mesh_origin_x, double mesh_origin
   lv_draw_label_dsc_t axis_label_dsc;
   lv_draw_label_dsc_init(&axis_label_dsc);
   axis_label_dsc.color = lv_color_white();
-  axis_label_dsc.font = &lv_font_montserrat_16;
+  axis_label_dsc.font = &lv_font_montserrat_10;
 
   double middle_x_coord = ((cols/2) - cols / 2.0) * MESH_SCALE;
   draw_axis_label("X", middle_x_coord, front_y + TICK_MARK_LENGTH * 6, grid_reference_z, -10, 0, canvas_width, canvas_height, axis_label_dsc);

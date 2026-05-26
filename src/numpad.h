@@ -12,7 +12,9 @@ class Numpad {
   void set_callback(std::function<void(double)> cb);
   void handle_input(lv_event_t *event);
   /* void handle_defocused(lv_event_t *event); */
-  void foreground_reset();
+  /* initial >= 0 pre-fills the input field (useful for showing current set temp
+   * so the user can adjust rather than retype). Pass -1 (default) for blank. */
+  void foreground_reset(int initial = -1);
 
   static void _handle_input(lv_event_t *event) {
     Numpad *panel = (Numpad*)event->user_data;

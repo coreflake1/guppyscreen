@@ -24,15 +24,22 @@ Selector::Selector(lv_obj_t *parent,
   lv_obj_set_style_pad_all(cont, 0, 0);
   lv_obj_set_style_pad_row(cont, 0, 0);
 
-  auto height = (double)lv_disp_get_physical_ver_res(NULL) * (height_pct / 100.0);
-  height = height < 50 ? 50 : height;
+  auto ver_res = lv_disp_get_physical_ver_res(NULL);
+  bool small_screen = ver_res <= 320;
+  auto height = (double)ver_res * (height_pct / 100.0);
+  /* Lower the minimum on compact screens so the title label still fits
+   * alongside the button matrix in tight grid rows (e.g. 480x272). */
+  double min_height = small_screen ? 28.0 : 50.0;
+  if (height < min_height) height = min_height;
   lv_obj_set_size(btnm, LV_PCT(100), height);
-  lv_label_set_text(label, label_text);  
-  lv_obj_set_width(label, LV_PCT(100));  
+  lv_label_set_text(label, label_text);
+  lv_obj_set_width(label, LV_PCT(100));
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-  
+
+  /* Theme default is m10 on small screens now — no need to override per-widget here. */
+
   lv_btnmatrix_set_map(btnm, &map[0]);
-  lv_obj_set_style_pad_all(btnm, 4, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(btnm, small_screen ? 2 : 4, LV_PART_MAIN);
 
   lv_obj_set_style_outline_width(btnm, 0, LV_PART_ITEMS | LV_STATE_FOCUS_KEY);
     

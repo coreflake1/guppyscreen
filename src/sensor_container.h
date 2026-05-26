@@ -48,6 +48,9 @@ public:
   void update_target(int new_target);
   void update_value(int new_value);
   void update_series(int value);
+  /* Attach a second chart series that draws a horizontal line at the current
+   * target temperature. Set once, updated whenever update_target() fires. */
+  void set_target_series(lv_chart_series_t *ts);
   void handle_edit(lv_event_t *event);
 
   static void _handle_edit(lv_event_t *event) {
@@ -69,6 +72,7 @@ private:
   std::string id;
   lv_obj_t *chart;
   lv_chart_series_t *series;
+  lv_chart_series_t *target_series;
   std::time_t last_updated_ts;
   SensorType type;
 };

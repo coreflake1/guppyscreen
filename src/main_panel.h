@@ -41,6 +41,12 @@ class MainPanel : public NotifyConsumer {
   void create_sensors(json &temp_sensors);
   void create_fans(json &temp_fans);
   void create_leds(json &leds);
+#ifdef SIMULATOR
+  /* Populate sensors directly from config and start a periodic timer that
+   * pushes mock temperature values, so the home panel is visible without
+   * a live Moonraker connection. */
+  void sim_setup_mock_data();
+#endif
   void handle_homing_cb(lv_event_t *event);
   void handle_extrude_cb(lv_event_t *event);
   void handle_fanpanel_cb(lv_event_t *event);

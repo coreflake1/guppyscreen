@@ -113,6 +113,13 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   lv_style_init(&style_container);
   lv_style_set_border_width(&style_container, 0);
   lv_style_set_radius(&style_container, 0);
+  /* Force m10 on all lv_obj instances on small screens. Theme cascade alone
+   * doesn't reach plain lv_label children of lv_btn etc.; setting text_font
+   * on style_container (applied to every obj via theme_apply_cb) propagates
+   * via LV_STYLE_PROP_INHERIT to descendant labels too. */
+  if (lv_disp_get_physical_hor_res(NULL) <= 480) {
+    lv_style_set_text_font(&style_container, &lv_font_montserrat_10);
+  }
 
 //  lv_style_init(&style_imgbtn_default);
 //  lv_style_set_img_recolor_opa(&style_imgbtn_default, LV_OPA_100);
@@ -148,8 +155,14 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
                                      conf->get<std::string>(conf->df() + "moonraker_host"),
                                      conf->get<uint32_t>(conf->df() + "moonraker_port"));
 
+#ifdef SIMULATOR
+    /* Don't actually connect in simulator mode — the failing connect's
+     * disconnected callback re-shows the init overlay over the mock data. */
+    spdlog::info("simulator mode — skipping printer websocket connection to {}", ws_url);
+#else
     spdlog::info("connecting to printer at {}", ws_url);
     gs->connect_ws(ws_url);
+#endif
   }
 
 #ifndef OS_ANDROID
@@ -185,6 +198,13 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
     }
   }
 #endif // OS_ANDROID
+
+#ifdef SIMULATOR
+  /* No Moonraker in simulator mode — hide the init overlay and fabricate
+   * sensor data so the home panel renders something visible. */
+  gs->init_panel.sim_hide();
+  gs->main_panel.sim_setup_mock_data();
+#endif
 
   return gs;
 }

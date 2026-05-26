@@ -377,7 +377,9 @@ extern uint32_t custom_tick_get(void);
 
 /*Always set a default font*/
 #ifdef GUPPY_SMALL_SCREEN
-    #define LV_FONT_DEFAULT &lv_font_montserrat_12
+    /* m10 keeps file lists, btnmatrix labels (e.g. "Reload"/"Modified"/"A-Z"),
+     * and other un-styled labels readable without truncating at 480x272. */
+    #define LV_FONT_DEFAULT &lv_font_montserrat_10
 #else
     #define LV_FONT_DEFAULT &lv_font_montserrat_16
 #endif
