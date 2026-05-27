@@ -8,17 +8,19 @@ Release artifacts are produced by `.github/workflows/build.yml`, which runs insi
 pushes to `main`/`develop` (nightly prerelease) and on tags (stable release). The workflow checks out submodules, applies the three patches, builds the bundled
 libraries, builds GuppyScreen, then packages each asset with `scripts/release.sh`.
 
-### Build matrix
+### Build output
+
+This is a KE-focused fork, so CI builds **only the Ender-3 V3 KE asset**:
 
 | Asset | Toolchain | Theme | Small screen | Notes |
 |---|---|---|---|---|
 | `guppyscreen-smallscreen.tar.gz` | `mipsel-buildroot-linux-musl-` | material | **yes** | **The Ender-3 V3 KE asset** |
-| `guppyscreen.tar.gz` | `mipsel-buildroot-linux-musl-` | material | no | MIPS, standard screen |
-| `guppyscreen-zbolt.tar.gz` | `mipsel-buildroot-linux-musl-` | zbolt | no | MIPS, Z-Bolt icons |
-| `guppyscreen-arm.tar.gz` | `aarch64-none-linux-gnu-` | material | no | aarch64 — **will not run on the KE** |
 
 - Non-tag pushes set `GUPPYSCREEN_VERSION=nightly-<sha>` and publish a `nightly` prerelease.
 - Tag pushes set `GUPPYSCREEN_VERSION=<tag>` and publish a stable release with generated notes.
+
+> The toolchain image still ships an aarch64 cross-compiler, so other targets (standard-screen K1,
+> Z-Bolt icons, aarch64) can be built manually if ever needed — they're just not released.
 
 ## Packaging locally
 

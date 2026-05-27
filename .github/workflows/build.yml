@@ -15,33 +15,13 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: mipsel-buildroot-linux-musl-
-            theme: zbolt
-            small: false
-            rotate: true
-            calibrate: false
-            asset: guppyscreen-zbolt
-
-          - arch: mipsel-buildroot-linux-musl-
-            theme: material
-            small: false
-            rotate: true
-            calibrate: false
-            asset: guppyscreen
-
+          # Ender-3 V3 KE only: MIPS, 480x272 small screen.
           - arch: mipsel-buildroot-linux-musl-
             theme: material
             small: true
             rotate: false
             calibrate: true
             asset: guppyscreen-smallscreen
-
-          - arch: aarch64-none-linux-gnu-
-            theme: material
-            small: false
-            rotate: false
-            calibrate: true
-            asset: guppyscreen-arm
 
     runs-on: ubuntu-22.04
     container:
