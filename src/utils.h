@@ -12,6 +12,14 @@ using json = nlohmann::json;
 
 namespace KUtils {
   bool is_homed();
+  // True while a print job is active (printing or paused). Panels that move axes,
+  // home, or run calibration must not act in this state.
+  bool is_printing();
+  // Modal "Unavailable while printing" notice (single OK button).
+  void notify_locked();
+  // Runs cb immediately when idle; while printing, shows a Confirm/Cancel modal
+  // and only runs cb if the user confirms the override.
+  void confirm_if_printing(const std::string &msg, const std::function<void()> &cb);
   bool is_running_local();
   std::string get_root_path(const std::string root_name);
 

@@ -1,4 +1,5 @@
 #include "macro_item.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 
 MacroItem::MacroItem(KWebSocketClient &c,
@@ -149,8 +150,10 @@ void MacroItem::handle_send_macro(lv_event_t *e) {
       }
     }
 
-    spdlog::trace("sending macro: {}", fmt::format("{}", fmt::join(kv, " "))); 
-    ws.gcode_script(fmt::format("{}", fmt::join(kv, " ")));
+    std::string command = fmt::format("{}", fmt::join(kv, " "));
+    spdlog::trace("sending macro: {}", command);
+    KUtils::confirm_if_printing("Printer is printing.\nRun this macro anyway?",
+      [this, command]() { ws.gcode_script(command); });
   }
 }
 

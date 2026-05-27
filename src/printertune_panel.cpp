@@ -1,5 +1,6 @@
 #include "printertune_panel.h"
 #include "state.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 
 #include <experimental/filesystem>
@@ -7,7 +8,7 @@
 namespace fs = std::experimental::filesystem;
 
 LV_IMG_DECLARE(bedmesh_img);
-LV_IMG_DECLARE(fine_tune_img);
+LV_IMG_DECLARE(light_img);
 LV_IMG_DECLARE(inputshaper_img);
 LV_IMG_DECLARE(limit_img);
 LV_IMG_DECLARE(motor_img);
@@ -20,10 +21,10 @@ LV_IMG_DECLARE(power_devices_img);
 LV_IMG_DECLARE(print);
 #endif
 
-PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, FineTunePanel &finetune)
+PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, LedPanel &led)
   : cont(lv_obj_create(parent))
   , bedmesh_panel(c, l)
-  , finetune_panel(finetune)
+  , led_panel(led)
   , limits_panel(c, l)
   , inputshaper_panel(c, l)
   , belts_calibration_panel(c, l)
@@ -31,7 +32,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   , tmc_status_panel(c, l)
   , power_panel(c, l)
   , bedmesh_btn(cont, &bedmesh_img, "Bed Mesh", &PrinterTunePanel::_handle_callback, this)
-  , finetune_btn(cont, &fine_tune_img, "Fine Tune", &PrinterTunePanel::_handle_callback, this)
+  , led_btn(cont, &light_img, "LED", &PrinterTunePanel::_handle_callback, this)
   , inputshaper_btn(cont, &inputshaper_img, "Input Shaper", &PrinterTunePanel::_handle_callback, this)
 #ifndef ZBOLT
   , belts_calibration_btn(cont, &belts_calibration_img, "Belts/Shake", &PrinterTunePanel::_handle_callback, this)
@@ -63,7 +64,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
 
   // row 1
   lv_obj_set_grid_cell(bedmesh_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(finetune_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+  lv_obj_set_grid_cell(led_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_grid_cell(inputshaper_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_grid_cell(belts_calibration_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
@@ -117,30 +118,36 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
   if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
     lv_obj_t *btn = lv_event_get_current_target(event);
 
-    if (btn == finetune_btn.get_container()) {
-      spdlog::trace("tune finetune pressed");
-      finetune_panel.foreground();
+    if (btn == led_btn.get_container()) {
+      spdlog::trace("tune led pressed");
+      led_panel.foreground();
     } else if (btn == bedmesh_btn.get_container()) {
       spdlog::trace("tune bedmesh pressed");
+      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
       bedmesh_panel.foreground();
     } else if (btn == inputshaper_btn.get_container()) {
       spdlog::trace("tune inputshaper pressed");
+      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
       inputshaper_panel.foreground();
     } else if (btn == belts_calibration_btn.get_container()) {
       spdlog::trace("tune belts pressed");
+      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
       belts_calibration_panel.foreground();
     } else if (btn == limits_btn.get_container()) {
       spdlog::trace("limits pressed");
-      limits_panel.foreground();
+      KUtils::confirm_if_printing("Printer is printing.\nAdjust limits anyway?",
+        [this]() { limits_panel.foreground(); });
     } else if (btn == tmc_tune_btn.get_container()) {
       spdlog::trace("tmc auto tune pressed");
+      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
       tmc_tune_panel.foreground();
     } else if (btn == tmc_status_btn.get_container()) {
       spdlog::trace("tmc metrics pressed");
       tmc_status_panel.foreground();
     } else if (btn == power_devices_btn.get_container()) {
       spdlog::trace("power devices pressed");
-      power_panel.foreground();
+      KUtils::confirm_if_printing("Printer is printing.\nChange power devices anyway?",
+        [this]() { power_panel.foreground(); });
     }
   }
 }

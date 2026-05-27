@@ -1,5 +1,6 @@
 #include "console_panel.h"
 #include "state.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -133,10 +134,14 @@ void ConsolePanel::handle_kb_input(lv_event_t *e)
       return;
     }
 
-    lv_textarea_add_text(output,"> ");
-    lv_textarea_add_text(output, cmd);
-    lv_textarea_add_text(output,"\n");
-    ws.gcode_script(cmd);
+    std::string command(cmd);
+    KUtils::confirm_if_printing("Printer is printing.\nSend this command anyway?",
+      [this, command]() {
+        lv_textarea_add_text(output, "> ");
+        lv_textarea_add_text(output, command.c_str());
+        lv_textarea_add_text(output, "\n");
+        ws.gcode_script(command);
+      });
 
     if (!history.empty()) {
       const auto &front = history.front();
