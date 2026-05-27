@@ -41,10 +41,12 @@ FilePanel::FilePanel(lv_obj_t *parent)
   lv_label_set_long_mode(fname_label, LV_LABEL_LONG_SCROLL);
   lv_obj_set_width(fname_label, LV_PCT(100));
   lv_obj_set_style_pad_all(fname_label, 0, 0);
+  lv_obj_set_style_text_font(fname_label, &lv_font_montserrat_10, 0);
 
   // Setup detail label
   lv_obj_set_width(detail_label, LV_PCT(100));
   lv_obj_set_style_pad_all(detail_label, 0, 0);
+  lv_obj_set_style_text_font(detail_label, &lv_font_montserrat_10, 0);
 }
 
 FilePanel::~FilePanel() {

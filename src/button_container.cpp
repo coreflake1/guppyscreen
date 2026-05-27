@@ -65,6 +65,13 @@ ButtonContainer::ButtonContainer(lv_obj_t *parent,
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_color(label, lv_palette_darken(LV_PALETTE_GREY, 1), LV_STATE_DISABLED);
 
+  /* On small screens (e.g. 480x272 KE) the theme's default m12 truncates 7-8 char
+   * button labels like "Spoolman"/"Cooldown"/"Reload"/"Modified". Use m10 globally
+   * so all panels get readable, non-wrapping labels without each having to override. */
+  if (lv_disp_get_physical_hor_res(NULL) <= 480) {
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_10, 0);
+  }
+
   // lv_obj_align_to(label, btn, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
   // lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, 5);
   // lv_obj_set_style_border_width(btn_cont, 2, 0);
@@ -79,6 +86,14 @@ lv_obj_t *ButtonContainer::get_container() {
 
 lv_obj_t *ButtonContainer::get_button() {
   return btn;
+}
+
+lv_obj_t *ButtonContainer::get_label() {
+  return label;
+}
+
+void ButtonContainer::set_text(const char *text) {
+  lv_label_set_text(label, text);
 }
 
 void ButtonContainer::disable() {

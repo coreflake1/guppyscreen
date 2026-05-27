@@ -1,5 +1,6 @@
 #include "console_panel.h"
 #include "state.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -42,7 +43,7 @@ ConsolePanel::ConsolePanel(KWebSocketClient &websocket_client, std::mutex &lock,
   lv_obj_set_size(input_cont, LV_PCT(100), LV_SIZE_CONTENT);
 
   lv_obj_t *send_btn = lv_btn_create(input_cont);
-  lv_obj_set_style_text_font(send_btn, &lv_font_montserrat_16, LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(send_btn, &lv_font_montserrat_10, LV_STATE_DEFAULT);
   lv_obj_set_width(send_btn, 100);
   lv_obj_t *send_btn_label = lv_label_create(send_btn);
   lv_label_set_text(send_btn_label, LV_SYMBOL_NEW_LINE);
@@ -50,7 +51,7 @@ ConsolePanel::ConsolePanel(KWebSocketClient &websocket_client, std::mutex &lock,
   lv_obj_add_event_cb(send_btn , &ConsolePanel::_handle_send_macro, LV_EVENT_CLICKED, this);
 
   lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_style_text_font(kb, &lv_font_montserrat_16, LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(kb, &lv_font_montserrat_10, LV_STATE_DEFAULT);
   lv_obj_add_event_cb(input, &ConsolePanel::_handle_kb_input, LV_EVENT_ALL, this);
 
   lv_obj_set_size(macro_list, LV_PCT(40), LV_PCT(100));
@@ -61,7 +62,7 @@ ConsolePanel::ConsolePanel(KWebSocketClient &websocket_client, std::mutex &lock,
   lv_obj_set_scroll_dir(macro_list, LV_DIR_TOP | LV_DIR_BOTTOM);
 
   lv_obj_t *label = lv_label_create(input);
-  lv_obj_set_style_text_font(label, &lv_font_montserrat_16, LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(label, &lv_font_montserrat_10, LV_STATE_DEFAULT);
   lv_label_set_text(label, "      " LV_SYMBOL_CLOSE "      ");
   lv_obj_align(label, LV_ALIGN_RIGHT_MID, 0, 0);
   lv_obj_add_flag(label, LV_OBJ_FLAG_CLICKABLE);
@@ -133,10 +134,14 @@ void ConsolePanel::handle_kb_input(lv_event_t *e)
       return;
     }
 
-    lv_textarea_add_text(output,"> ");
-    lv_textarea_add_text(output, cmd);
-    lv_textarea_add_text(output,"\n");
-    ws.gcode_script(cmd);
+    std::string command(cmd);
+    KUtils::confirm_if_printing("Printer is printing.\nSend this command anyway?",
+      [this, command]() {
+        lv_textarea_add_text(output, "> ");
+        lv_textarea_add_text(output, command.c_str());
+        lv_textarea_add_text(output, "\n");
+        ws.gcode_script(command);
+      });
 
     if (!history.empty()) {
       const auto &front = history.front();

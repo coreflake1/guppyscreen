@@ -4,6 +4,7 @@
 #include "state.h"
 #include "spdlog/spdlog.h"
 #include "platform.h"
+#include "lvgl/lvgl.h"
 
 #include <cmath>
 #include <time.h>
@@ -32,6 +33,65 @@ namespace KUtils {
         && homed_axes.find("z") != std::string::npos;
     }
     return false;
+  }
+
+  bool is_printing() {
+    auto v = State::get_instance()
+      ->get_data("/printer_state/print_stats/state"_json_pointer);
+    if (!v.is_null()) {
+      std::string s = v.template get<std::string>();
+      return s == "printing" || s == "paused";
+    }
+    return false;
+  }
+
+  // Shared styling so print-lock dialogs match the app's other msgboxes:
+  // centered body text and a floating, centered button row at the bottom.
+  static void style_lock_mbox(lv_obj_t *mbox, lv_coord_t btns_pct) {
+    lv_obj_t *msg = ((lv_msgbox_t *)mbox)->text;
+    lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(msg, LV_PCT(100));
+    lv_obj_center(msg);
+
+    lv_obj_t *btnm = lv_msgbox_get_btns(mbox);
+    lv_obj_add_flag(btnm, LV_OBJ_FLAG_FLOATING);
+    lv_obj_align(btnm, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    auto hscale = (double)lv_disp_get_physical_ver_res(NULL) / 480.0;
+    lv_obj_set_size(btnm, LV_PCT(btns_pct), 50 * hscale);
+    lv_obj_set_size(mbox, LV_PCT(70), LV_PCT(45));
+    lv_obj_center(mbox);
+  }
+
+  void notify_locked() {
+    static const char *btns[] = {"OK", ""};
+    lv_obj_t *mbox = lv_msgbox_create(NULL, NULL,
+      "Unavailable while printing", btns, false);
+    lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
+      lv_msgbox_close(lv_obj_get_parent(lv_event_get_target(e)));
+    }, LV_EVENT_VALUE_CHANGED, NULL);
+    style_lock_mbox(mbox, 50);
+  }
+
+  void confirm_if_printing(const std::string &msg, const std::function<void()> &cb) {
+    if (!is_printing()) {
+      cb();
+      return;
+    }
+
+    auto *heap_cb = new std::function<void()>(cb);
+    static const char *btns[] = {"Confirm", "Cancel", ""};
+    lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, msg.c_str(), btns, false);
+    lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
+      lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
+      auto *fn = (std::function<void()> *)lv_event_get_user_data(e);
+      if (lv_msgbox_get_active_btn(obj) == 0 && fn != NULL) {
+        (*fn)();
+      }
+      delete fn;
+      lv_msgbox_close(obj);
+    }, LV_EVENT_VALUE_CHANGED, heap_cb);
+    style_lock_mbox(mbox, 90);
   }
 
   bool is_running_local() {

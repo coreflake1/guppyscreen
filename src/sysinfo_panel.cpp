@@ -249,11 +249,23 @@ SysInfoPanel::SysInfoPanel()
   }
   lv_obj_add_event_cb(def_temp_dd, &SysInfoPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
 
+  // Factory Reset lives alone in the top-right corner — kept away from Back and
+  // the settings rows to avoid accidental presses.
   lv_obj_add_flag(factory_reset_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(factory_reset_btn.get_container(), LV_ALIGN_BOTTOM_LEFT, 0, 0);
+  lv_obj_align(factory_reset_btn.get_container(), LV_ALIGN_TOP_RIGHT, 0, 0);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+
+  // The network/version text is left-aligned and the Factory Reset button is
+  // narrow and pinned to the right, so they don't overlap. Reserve only the
+  // button's width on the right so a very long interface line can't slide under
+  // it — full vertical height stays available so the version never clips.
+  lv_obj_update_layout(cont);
+  lv_obj_set_width(network_label,
+    lv_obj_get_width(right_cont)
+      - lv_obj_get_width(factory_reset_btn.get_container()) - 4);
+  lv_label_set_long_mode(network_label, LV_LABEL_LONG_WRAP);
 }
 
 SysInfoPanel::~SysInfoPanel() {

@@ -39,10 +39,10 @@ FineTunePanel::FineTunePanel(KWebSocketClient &websocket_client, std::mutex &l)
     {"0.01", "0.05", "0.10", ""}, 0, 30, 15, &FineTunePanel::_handle_callback, this)
   , multipler_selector(panel_cont, "Multipler Step (%)",
     {"1", "5", "10", "25", ""}, 0, 40, 15, &FineTunePanel::_handle_callback, this)
-  , z_offset(values_cont, &home_z, 150, 100, 15, "0.0 mm")
-  , pa(values_cont, &pa_plus_img, 150, 100, 15, "0.0 mm/s")
-  , speed_factor(values_cont, &speed_up_img, 150, 100, 15, "100%")
-  , flow_factor(values_cont, &flow_up_img, 150, 100, 15, "100%")
+  , z_offset(values_cont, &home_z, 100, 100, 15, "0.0 mm")
+  , pa(values_cont, &pa_plus_img, 100, 100, 15, "0.0 mm/s")
+  , speed_factor(values_cont, &speed_up_img, 100, 100, 15, "100%")
+  , flow_factor(values_cont, &flow_up_img, 100, 100, 15, "100%")
 {
   lv_obj_move_background(panel_cont);
 
@@ -103,13 +103,13 @@ void FineTunePanel::foreground() {
   auto v = State::get_instance()->get_data(
     "/printer_state/gcode_move/homing_origin/2"_json_pointer);
   if (!v.is_null()) {
-    z_offset.update_label(fmt::format("{:.5} mm", v.template get<double>()).c_str());
+    z_offset.update_label(fmt::format("{:.3f} mm", v.template get<double>()).c_str());
   }
 
   v = State::get_instance()->get_data(
     "/printer_state/extruder/pressure_advance"_json_pointer);
   if (!v.is_null()) {
-    pa.update_label(fmt::format("{:.5} mm/s", v.template get<double>()).c_str());
+    pa.update_label(fmt::format("{:.3f} mm/s", v.template get<double>()).c_str());
   }
 
   v = State::get_instance()->get_data(
@@ -133,12 +133,12 @@ void FineTunePanel::consume(json &j) {
   std::lock_guard<std::mutex> lock(lv_lock);
   auto v = j["/params/0/gcode_move/homing_origin/2"_json_pointer];
   if (!v.is_null()) {
-    z_offset.update_label(fmt::format("{:.5} mm", v.template get<double>()).c_str());
+    z_offset.update_label(fmt::format("{:.3f} mm", v.template get<double>()).c_str());
   }
 
   v = j["/params/0/extruder/pressure_advance"_json_pointer];
   if (!v.is_null()) {
-    pa.update_label(fmt::format("{:.5} mm/s", v.template get<double>()).c_str());
+    pa.update_label(fmt::format("{:.3f} mm/s", v.template get<double>()).c_str());
   }
 
   v = j["/params/0/gcode_move/speed_factor"_json_pointer];

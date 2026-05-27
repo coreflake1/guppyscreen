@@ -58,16 +58,22 @@ PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatu
   // file view buttons
   lv_obj_t *label = NULL;
 
+  /* Explicit m10 override — theme cascade alone isn't reaching these labels for
+   * some reason, possibly because they're children of plain lv_btn which carries
+   * its own default style. Forcing the font here matches the rest of the UI. */
   label = lv_label_create(refresh_btn);
   lv_label_set_text(label, LV_SYMBOL_REFRESH " Reload");
+  lv_obj_set_style_text_font(label, &lv_font_montserrat_10, 0);
   lv_obj_center(label);
 
   label = lv_label_create(modified_sort_btn);
   lv_label_set_text(label, LV_SYMBOL_LIST " Modified");
+  lv_obj_set_style_text_font(label, &lv_font_montserrat_10, 0);
   lv_obj_center(label);
 
   label = lv_label_create(az_sort_btn);
   lv_label_set_text(label, LV_SYMBOL_LIST " A-Z");
+  lv_obj_set_style_text_font(label, &lv_font_montserrat_10, 0);
   lv_obj_center(label);
 
   lv_obj_add_event_cb(refresh_btn, &PrintPanel::_handle_btns, LV_EVENT_CLICKED, this);

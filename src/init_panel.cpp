@@ -135,6 +135,13 @@ void InitPanel::disconnected(KWebSocketClient &ws) {
   lv_obj_move_foreground(cont);
 }
 
+#ifdef SIMULATOR
+void InitPanel::sim_hide() {
+  lv_obj_add_flag(cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_background(cont);
+}
+#endif
+
 void InitPanel::set_message(const char *message) {
 	lv_label_set_text(label, message);
 }

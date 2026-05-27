@@ -103,9 +103,16 @@ void Numpad::handle_input(lv_event_t *e) {
 //   }
 // }
 
-void Numpad::foreground_reset() {
-  spdlog::trace("resetting foreground");
-  lv_textarea_set_text(input, "");
+void Numpad::foreground_reset(int initial) {
+  spdlog::trace("resetting foreground with initial {}", initial);
+  if (initial >= 0) {
+    lv_textarea_set_text(input, fmt::format("{}", initial).c_str());
+    /* Place the cursor at the end so the next digit appends; selecting all
+     * would let a fresh number replace the value but feels surprising. */
+    lv_textarea_set_cursor_pos(input, LV_TEXTAREA_CURSOR_LAST);
+  } else {
+    lv_textarea_set_text(input, "");
+  }
   lv_obj_clear_flag(edit_cont, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_foreground(edit_cont);
 }

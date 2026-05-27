@@ -71,12 +71,15 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
   lv_obj_set_flex_flow(rightside_btns_cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(rightside_btns_cont, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_clear_flag(rightside_btns_cont, LV_OBJ_FLAG_SCROLLABLE);
+  /* Zero padding so the inner buttons (LV_PCT(100)) actually fill the column. */
+  lv_obj_set_style_pad_all(rightside_btns_cont, 0, 0);
 
   lv_obj_set_size(leftside_btns_cont, LV_PCT(20), LV_PCT(100));
   // lv_obj_set_style_pad_row(leftside_btns_cont, 15, 0);
   lv_obj_set_flex_flow(leftside_btns_cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(leftside_btns_cont, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_clear_flag(leftside_btns_cont, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(leftside_btns_cont, 0, 0);
 
   lv_obj_set_flex_grow(load_btn.get_container(), 1);
   lv_obj_set_flex_grow(unload_btn.get_container(), 1);
@@ -86,11 +89,27 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
   lv_obj_set_flex_grow(retract_btn.get_container(), 1);
   lv_obj_set_flex_grow(back_btn.get_container(), 1);
 
+  /* Stretch each button to fill its flex column. ButtonContainer's default
+   * 110*width_scale (~66 px on 480-wide) is too narrow for 7-8 char labels
+   * like "Spoolman" / "Cooldown" / "Extrude" — they truncate or wrap. */
+  lv_obj_t *btns[] = {
+    load_btn.get_container(), unload_btn.get_container(), cooldown_btn.get_container(),
+    spoolman_btn.get_container(), extrude_btn.get_container(),
+    retract_btn.get_container(), back_btn.get_container()
+  };
+  for (auto *b : btns) {
+    lv_obj_set_width(b, lv_pct(100));
+  }
+  /* Note: ButtonContainer applies the small-screen m10 font globally. */
+
   spoolman_btn.disable();
 
   static lv_coord_t grid_main_row_dsc[] = {LV_GRID_FR(3), LV_GRID_FR(6), LV_GRID_FR(6), LV_GRID_FR(6),
     LV_GRID_TEMPLATE_LAST};
-  static lv_coord_t grid_main_col_dsc[] = {LV_GRID_FR(2), LV_GRID_FR(7), LV_GRID_FR(2), LV_GRID_TEMPLATE_LAST};
+  /* FR(2)/FR(8)/FR(2): side cols ~80 px (still room for 8-char labels with
+   * pad_all=0 on the side containers) and middle ~320 px so each of the 7
+   * selector pills gets ~45 px — a usable touch target on the KE display. */
+  static lv_coord_t grid_main_col_dsc[] = {LV_GRID_FR(2), LV_GRID_FR(8), LV_GRID_FR(2), LV_GRID_TEMPLATE_LAST};
 
   lv_obj_clear_flag(panel_cont, LV_OBJ_FLAG_SCROLLABLE);
 

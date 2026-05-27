@@ -12,6 +12,9 @@ SHAPER_CONFIG=$KLIPPY_EXTRA_DIR/calibrate_shaper_config.py
 CONFIG_FILE="${HOME}/printer_data/config"
 PRINTER_DATA_DIR="${HOME}/printer_data"
 GUPPY_DIR="${HOME}/guppyscreen"
+BACKUP_DIR="${HOME}/guppyscreen-backup-$(date +%Y%m%d-%H%M%S)"
+PINNED_RELEASE="v0.1.0-ke-bedmesh"
+WPA_SVC=/lib/systemd/system/wpa_supplicant.service
 
 has_moonraker() {
     echo "Checking for a working Moonraker"
@@ -44,6 +47,18 @@ get_klipper_paths() {
     printf "${green} Found config dir: $CONFIG_DIR ${white}\n"
     printf "${green} Found printer_data dir: $PRINTER_DATA_DIR ${white}\n"
 
+}
+
+backup_existing() {
+    printf "${green}Creating pre-install backup at $BACKUP_DIR ${white}\n"
+    mkdir -p "$BACKUP_DIR"
+    [ -f "$CONFIG_DIR/printer.cfg" ] && cp "$CONFIG_DIR/printer.cfg" "$BACKUP_DIR/printer.cfg"
+    [ -f "$WPA_SVC" ] && cp "$WPA_SVC" "$BACKUP_DIR/wpa_supplicant.service"
+    [ -f /etc/systemd/system/guppyscreen.service ] && cp /etc/systemd/system/guppyscreen.service "$BACKUP_DIR/guppyscreen.service.bak"
+    [ -f /etc/systemd/system/disable_blinking_cursor.service ] && cp /etc/systemd/system/disable_blinking_cursor.service "$BACKUP_DIR/disable_blinking_cursor.service.bak"
+    [ -d "$CONFIG_DIR/GuppyScreen" ] && cp -r "$CONFIG_DIR/GuppyScreen" "$BACKUP_DIR/GuppyScreen"
+    printf "${green}Backup saved to $BACKUP_DIR ${white}\n"
+    printf "${yellow}NOTE: To manually restore printer.cfg: cp $BACKUP_DIR/printer.cfg $CONFIG_DIR/printer.cfg ${white}\n"
 }
 
 install_services() {
@@ -98,17 +113,72 @@ restart_services() {
     service guppyscreen restart
 }
 
+uninstall_guppy() {
+    printf "${green}Uninstalling Guppy Screen ${white}\n"
+
+    # Stop and remove services
+    sudo systemctl stop guppyscreen.service 2>/dev/null
+    sudo systemctl disable guppyscreen.service 2>/dev/null
+    sudo systemctl disable disable_blinking_cursor.service 2>/dev/null
+    sudo rm -f /etc/systemd/system/guppyscreen.service
+    sudo rm -f /etc/systemd/system/disable_blinking_cursor.service
+    sudo systemctl daemon-reload
+
+    # Re-enable KlipperScreen if it exists
+    sudo systemctl enable KlipperScreen.service 2>/dev/null && sudo systemctl start KlipperScreen.service 2>/dev/null
+
+    # Restore wpa_supplicant.service from most recent backup if available
+    LATEST_BACKUP=$(ls -dt "${HOME}"/guppyscreen-backup-* 2>/dev/null | head -1)
+    if [ -n "$LATEST_BACKUP" ] && [ -f "$LATEST_BACKUP/wpa_supplicant.service" ]; then
+        sudo cp "$LATEST_BACKUP/wpa_supplicant.service" "$WPA_SVC"
+        printf "${green}Restored wpa_supplicant.service from backup ${white}\n"
+    fi
+
+    # Remove GuppyScreen include from printer.cfg
+    K1_CONFIG_FILE=$(curl -s localhost:7125/printer/info 2>/dev/null | jq -r .result.config_file 2>/dev/null)
+    if [ -n "$K1_CONFIG_FILE" ] && [ -f "$K1_CONFIG_FILE" ]; then
+        sed -i '/\[include GuppyScreen/d' "$K1_CONFIG_FILE"
+        printf "${green}Removed GuppyScreen include from printer.cfg ${white}\n"
+    else
+        printf "${yellow}Could not auto-remove GuppyScreen from printer.cfg. Remove manually: [include GuppyScreen/*.cfg] ${white}\n"
+    fi
+
+    # Remove GuppyScreen config directory
+    if [ -n "$K1_CONFIG_FILE" ]; then
+        CONFIG_DIR=$(dirname "$K1_CONFIG_FILE")
+        if [ -d "$CONFIG_DIR/GuppyScreen" ]; then
+            rm -rf "$CONFIG_DIR/GuppyScreen"
+            printf "${green}Removed $CONFIG_DIR/GuppyScreen ${white}\n"
+        fi
+    fi
+
+    printf "${yellow}NOTE: Klipper extras (gcode_shell_command.py, calibrate_shaper_config.py) were NOT removed\n(they may be used by other tools). Remove manually if needed. ${white}\n"
+
+    printf "${yellow}Do you want to remove ~/guppyscreen? (y/n): ${white}"
+    read confirm
+    if [ "$confirm" = "y" -o "$confirm" = "Y" ]; then
+        rm -rf "${HOME}/guppyscreen"
+        printf "${green}Removed ~/guppyscreen ${white}\n"
+    fi
+    printf "${green}GuppyScreen uninstalled. Restart Klipper to apply printer.cfg changes. ${white}\n"
+}
+
 
 ARCH=`uname -m`
 echo "Found arch $ARCH"
 
 if [ "$ARCH" = "aarch64" ]; then
-    printf "${green}Installing Guppy Screen ${white}\n"
+    if [ "$1" = "uninstall" ]; then
+        uninstall_guppy
+        exit 0
+    fi
 
-    ASSET_URL="https://github.com/probielodan/guppyscreen/releases/latest/download/guppyscreen-arm.tar.gz"
+    printf "${green}Installing Guppy Screen (coreflake1 fork - ke-advanced-3d-bedmesh) ${white}\n"
+
+    ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_RELEASE}/guppyscreen-arm.tar.gz"
     if [ "$1" = "nightly" ]; then
         printf "${yellow}Installing nightly build ${white}\n"
-        ASSET_URL="https://github.com/probielodan/guppyscreen/releases/download/nightly/guppyscreen-arm.tar.gz"
+        ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/nightly/guppyscreen-arm.tar.gz"
     fi
 
     curl -s -L $ASSET_URL -o /tmp/guppyscreen.tar.gz
@@ -116,6 +186,7 @@ if [ "$ARCH" = "aarch64" ]; then
 
     has_moonraker
     get_klipper_paths
+    backup_existing
     install_services
     install_guppy_goodies
     restart_services

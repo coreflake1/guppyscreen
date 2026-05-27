@@ -34,7 +34,7 @@ MiniPrintStatus::MiniPrintStatus(lv_obj_t *parent,
   lv_obj_set_style_radius(cont, 4, 0);
   
   lv_obj_add_flag(cont, LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(cont, LV_ALIGN_TOP_LEFT, 0, -14 * scale);
+  lv_obj_align(cont, LV_ALIGN_TOP_RIGHT, 0, -14 * scale);
   lv_obj_add_flag(cont, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(cont, cb, LV_EVENT_CLICKED, user_data);
 

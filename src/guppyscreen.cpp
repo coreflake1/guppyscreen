@@ -113,6 +113,13 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   lv_style_init(&style_container);
   lv_style_set_border_width(&style_container, 0);
   lv_style_set_radius(&style_container, 0);
+  /* Force m10 on all lv_obj instances on small screens. Theme cascade alone
+   * doesn't reach plain lv_label children of lv_btn etc.; setting text_font
+   * on style_container (applied to every obj via theme_apply_cb) propagates
+   * via LV_STYLE_PROP_INHERIT to descendant labels too. */
+  if (lv_disp_get_physical_hor_res(NULL) <= 480) {
+    lv_style_set_text_font(&style_container, &lv_font_montserrat_10);
+  }
 
 //  lv_style_init(&style_imgbtn_default);
 //  lv_style_set_img_recolor_opa(&style_imgbtn_default, LV_OPA_100);
@@ -148,14 +155,21 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
                                      conf->get<std::string>(conf->df() + "moonraker_host"),
                                      conf->get<uint32_t>(conf->df() + "moonraker_port"));
 
+#ifdef SIMULATOR
+    /* Don't actually connect in simulator mode — the failing connect's
+     * disconnected callback re-shows the init overlay over the mock data. */
+    spdlog::info("simulator mode — skipping printer websocket connection to {}", ws_url);
+#else
     spdlog::info("connecting to printer at {}", ws_url);
     gs->connect_ws(ws_url);
+#endif
   }
 
 #ifndef OS_ANDROID
   screen_saver = lv_obj_create(lv_scr_act());
 
   lv_obj_set_size(screen_saver, LV_PCT(100), LV_PCT(100));
+  lv_obj_set_style_bg_color(screen_saver, lv_color_black(), 0);
   lv_obj_set_style_bg_opa(screen_saver, LV_OPA_100, 0);
   lv_obj_move_background(screen_saver);
 
@@ -185,6 +199,13 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   }
 #endif // OS_ANDROID
 
+#ifdef SIMULATOR
+  /* No Moonraker in simulator mode — hide the init overlay and fabricate
+   * sensor data so the home panel renders something visible. */
+  gs->init_panel.sim_hide();
+  gs->main_panel.sim_setup_mock_data();
+#endif
+
   return gs;
 }
 
@@ -206,7 +227,9 @@ void GuppyScreen::loop() {
       if (lv_disp_get_inactive_time(NULL) > display_sleep) {
         if (!is_sleeping.load()) {
           spdlog::debug("putting display to sleeping");
-          fbdev_blank();
+          // fbdev_blank() uses FB_BLANK_POWERDOWN which the Ingenic X2000
+          // kernel 4.4.94 DSI driver cannot recover from via FB_BLANK_UNBLANK.
+          // Use only the LVGL screen_saver (black) for the visual sleep effect.
           lv_obj_move_foreground(screen_saver);
           // spdlog::debug("screen saver foreground");
           is_sleeping = true;
@@ -216,6 +239,7 @@ void GuppyScreen::loop() {
           spdlog::debug("waking up display");
           fbdev_unblank();
           lv_obj_move_background(screen_saver);
+          lv_obj_invalidate(lv_scr_act());
           is_sleeping = false;
         }
       }

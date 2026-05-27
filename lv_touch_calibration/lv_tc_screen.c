@@ -297,7 +297,7 @@ static void lv_tc_screen_recalibrate_timer(lv_timer_t *timer) {
 
     if(timer->repeat_count == 0) {
         //Restart when timed out
-        lv_tc_screen_start(tCScreenObj);
+        lv_tc_screen_start((lv_obj_t *)tCScreenObj);
         return;
     }
     lv_label_set_text_fmt(lv_obj_get_child(tCScreenObj->recalibrateBtnObj, 0), LV_TC_RECALIBRATE_TXT LV_TC_RECALIBRATE_TIMEOUT_FORMAT, (int)timer->repeat_count);
@@ -307,5 +307,5 @@ static void lv_tc_screen_start_delay_timer(lv_timer_t *timer) {
     lv_tc_screen_t *tCScreenObj = (lv_tc_screen_t*)timer->user_data;
 
     lv_point_t point = {0, 0};
-    lv_tc_screen_step(tCScreenObj, STEP_FIRST, point);
+    lv_tc_screen_step((lv_obj_t *)tCScreenObj, STEP_FIRST, point);
 }

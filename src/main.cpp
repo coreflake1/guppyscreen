@@ -85,7 +85,7 @@ static void hal_init(lv_color_t primary, lv_color_t secondary) {
     spdlog::debug("resolution {} x {}", width, height);
     lv_disp_t * disp = lv_disp_drv_register(&disp_drv);
     lv_theme_t * th = height <= 480
-      ? lv_theme_default_init(NULL, primary, secondary, true, &lv_font_montserrat_12)
+      ? lv_theme_default_init(NULL, primary, secondary, true, &lv_font_montserrat_10)
       : lv_theme_default_init(NULL, primary, secondary, true, &lv_font_montserrat_20);
     lv_disp_set_theme(disp, th);
 
@@ -142,7 +142,7 @@ static void hal_init(lv_color_t primary, lv_color_t secondary)
 
   lv_disp_t * disp = lv_disp_drv_register(&disp_drv);
   lv_theme_t * th = MONITOR_HOR_RES <= 480
-    ? lv_theme_default_init(NULL, primary, secondary, true, &lv_font_montserrat_12)
+    ? lv_theme_default_init(NULL, primary, secondary, true, &lv_font_montserrat_10)
     : lv_theme_default_init(NULL, primary, secondary, true, &lv_font_montserrat_16);
   lv_disp_set_theme(disp, th);
  
