@@ -52,8 +52,8 @@ void Config::init(std::string config_path, const std::string thumbdir) {
       {"color", "purple"}
     },
     {
-      {"id", "temperature_sensor chamber_temp"},
-      {"display_name", "Chamber"},
+      {"id", "temperature_sensor mcu_temp"},
+      {"display_name", "MCU Temp"},
       {"controllable", false},
       {"color", "blue"}
     }

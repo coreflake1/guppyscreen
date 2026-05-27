@@ -77,7 +77,7 @@ BeltsCalibrationPanel::BeltsCalibrationPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_add_event_cb(excite_slider, &BeltsCalibrationPanel::_handle_update_slider,
     LV_EVENT_VALUE_CHANGED, this);
 
-  lv_obj_align_to(excite_label, excite_slider, LV_ALIGN_BOTTOM_MID, 0, 35 * hscale);
+  lv_obj_align(excite_label, LV_ALIGN_TOP_RIGHT, 0, 2 * hscale);
   lv_label_set_text(excite_label, "1 hz");
 
   lv_dropdown_set_options(excite_dd, fmt::format("{}", fmt::join(axes, "\n")).c_str());
