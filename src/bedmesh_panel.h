@@ -34,6 +34,9 @@ class BedMeshPanel : public NotifyConsumer {
   void handle_fov_zoom_out(lv_event_t *event);
   void handle_canvas_drag(lv_event_t *event);
   void handle_toggle_view(lv_event_t *event);
+  // Table view is the default; the 3D view is a fullscreen mode (canvas + Back only).
+  void show_table_view();
+  void show_3d_fullscreen();
   void handle_canvas_scroll(lv_event_t *event);
   void handle_canvas_gesture(lv_event_t *event);
   void scroll_check_timer_callback();

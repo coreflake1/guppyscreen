@@ -19,7 +19,6 @@
 #endif
 
 LV_IMG_DECLARE(chart_img);
-LV_IMG_DECLARE(sysinfo_img);
 
 // Z zoom limits
 const double MIN_Z_SCALE = 0.1;
@@ -63,14 +62,14 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
   , save_btn(controls_cont, &sd_img, "Save Profile", &BedMeshPanel::_handle_callback, this)
   , clear_btn(controls_cont, &delete_img, "Clear Profile", &BedMeshPanel::_handle_callback, this)
   , calibrate_btn(controls_cont, &bedmesh_img, "Calibrate", &BedMeshPanel::_handle_callback, this)
-  , toggle_view_btn(controls_cont, &sysinfo_img, "Table View", &BedMeshPanel::_handle_toggle_view, this)
+  , toggle_view_btn(controls_cont, &chart_img, "3D View", &BedMeshPanel::_handle_toggle_view, this)
   , back_btn(controls_cont, &back, "Back", &BedMeshPanel::_handle_callback, this)
   , msgbox(lv_obj_create(prompt))
   , input(lv_textarea_create(msgbox))
   , kb(lv_keyboard_create(prompt))
   , current_view_angle(VIEW_ANGLE_Z_DEGREES)
   , canvas_draw_buf(nullptr)
-  , show_3d_view(true)
+  , show_3d_view(false)
   , z_display_scale(2.4)
   , camera_distance(CAMERA_DISTANCE)
   , mesh_min_x(0.0)
@@ -223,10 +222,10 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
     spdlog::debug("Z zoom buttons hidden - using gesture zoom");
   }
 
-  // Start with 3D view by default
-  lv_obj_add_flag(mesh_table, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(mesh_canvas, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(rotation_cont, LV_OBJ_FLAG_HIDDEN);
+  // Start in table view by default; 3D is an opt-in fullscreen mode.
+  lv_obj_clear_flag(mesh_table, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(mesh_canvas, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(rotation_cont, LV_OBJ_FLAG_HIDDEN);
 
   // profile container
   lv_obj_set_height(profile_cont, LV_PCT(100));
@@ -569,6 +568,7 @@ void BedMeshPanel::foreground() {
   auto bm = State::get_instance()->get_data("/printer_state/bed_mesh"_json_pointer);
   spdlog::trace("bm {}", bm.dump());
   refresh_views(bm);
+  show_table_view();
 
   lv_obj_move_foreground(cont);
 }
@@ -604,7 +604,12 @@ void BedMeshPanel::handle_callback(lv_event_t *event) {
 
   } else if (btn == back_btn.get_container()) {
     spdlog::trace("back button pressed");
-    lv_obj_move_background(cont);
+    if (show_3d_view) {
+      // From fullscreen 3D, Back returns to the table view rather than exiting.
+      show_table_view();
+    } else {
+      lv_obj_move_background(cont);
+    }
   }
 }
 
@@ -709,13 +714,15 @@ void BedMeshPanel::resize_canvas()
     return;
   }
 
-  // Get available space for canvas (leave room for controls)
-  auto cont_width = lv_obj_get_width(display_cont); // No padding - use full width
-  auto cont_height = lv_obj_get_height(display_cont) - 80; // Leave space for controls
+  // Canvas fills the display container. In fullscreen 3D the zoom controls live
+  // in the right-side strip, so no bottom reservation is needed here.
+  auto cont_width = lv_obj_get_width(display_cont);
+  auto cont_height = lv_obj_get_height(display_cont);
 
-  // Use full width with proper padding
-  auto canvas_width = std::max(300, cont_width);
-  auto canvas_height = std::max(300, std::min(cont_height, canvas_width)); // Height limited by width or container
+  // Floor must stay below the small-screen height (272) or the canvas overflows.
+  int min_dim = (lv_disp_get_physical_hor_res(NULL) < 800) ? 100 : 300;
+  auto canvas_width = std::max(min_dim, cont_width);
+  auto canvas_height = std::max(min_dim, std::min(cont_height, canvas_width));
 
   // Only resize if significantly different to avoid constant redraws
   auto current_width = lv_obj_get_width(mesh_canvas);
@@ -2057,31 +2064,78 @@ void BedMeshPanel::draw_axis_label(const char* label_text, double x, double y, d
 }
 
 void BedMeshPanel::handle_toggle_view(lv_event_t *event) {
-  auto code = lv_event_get_code(event);
-  if (code == LV_EVENT_CLICKED) {
-    // Toggle between 3D view and table view
-    show_3d_view = !show_3d_view;
+  if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
+    show_3d_fullscreen();
+  }
+}
 
-    if (show_3d_view) {
-      // Show 3D view
-      lv_obj_add_flag(mesh_table, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(mesh_canvas, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(rotation_cont, LV_OBJ_FLAG_HIDDEN);
-      toggle_view_btn.set_text("Table View");  // Button shows what you'll switch TO
-      toggle_view_btn.set_image(&sysinfo_img); // Grid-like icon for table view
+// Table view: mesh values + profile list + all controls along the bottom.
+// This is the default state and uses the original vertical layout.
+void BedMeshPanel::show_table_view() {
+  show_3d_view = false;
 
-      // Redraw 3D mesh if we have data
-      if (!mesh.empty()) {
-        draw_3d_mesh();
-      }
-    } else {
-      // Show table view
-      lv_obj_clear_flag(mesh_table, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(mesh_canvas, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(rotation_cont, LV_OBJ_FLAG_HIDDEN);
-      toggle_view_btn.set_text("3D View");     // Button shows what you'll switch TO
-      toggle_view_btn.set_image(&chart_img);   // Chart icon for 3D view
-    }
+  // Vertical layout: top area over a bottom controls row.
+  lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
+
+  lv_obj_set_width(top_cont, LV_PCT(100));
+  lv_obj_set_height(top_cont, LV_SIZE_CONTENT);
+
+  // Zoom controls belong back inside the display area (hidden in table view).
+  lv_obj_set_parent(rotation_cont, display_cont);
+  lv_obj_set_flex_flow(rotation_cont, LV_FLEX_FLOW_ROW);
+
+  lv_obj_set_size(controls_cont, LV_PCT(100), LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(controls_cont, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(controls_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_flex_grow(back_btn.get_container(), 1);
+
+  lv_obj_clear_flag(mesh_table, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(mesh_canvas, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(rotation_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(profile_cont, LV_OBJ_FLAG_HIDDEN);
+
+  lv_obj_clear_flag(save_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(clear_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(calibrate_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(toggle_view_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+}
+
+// Fullscreen 3D: canvas fills the left, a narrow right-side strip holds the
+// zoom +/- and Back buttons. The profile list and other controls are hidden.
+void BedMeshPanel::show_3d_fullscreen() {
+  show_3d_view = true;
+
+  // Horizontal layout: [ canvas (grows) ][ control strip ].
+  lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_ROW);
+
+  lv_obj_set_width(top_cont, LV_SIZE_CONTENT);  // flex_grow fills the width
+  lv_obj_set_height(top_cont, LV_PCT(100));
+
+  // Right strip: zoom controls at the top, Back at the bottom.
+  lv_obj_set_size(controls_cont, LV_SIZE_CONTENT, LV_PCT(100));
+  lv_obj_set_flex_flow(controls_cont, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(controls_cont, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_flex_grow(back_btn.get_container(), 0);
+
+  lv_obj_set_parent(rotation_cont, controls_cont);
+  lv_obj_set_flex_flow(rotation_cont, LV_FLEX_FLOW_COLUMN);
+  lv_obj_move_to_index(rotation_cont, 0);
+
+  lv_obj_add_flag(mesh_table, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(mesh_canvas, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(rotation_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(profile_cont, LV_OBJ_FLAG_HIDDEN);
+
+  lv_obj_add_flag(save_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(clear_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(calibrate_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(toggle_view_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+
+  // Recompute layout so the canvas resize fires against the new (larger) area.
+  lv_obj_update_layout(cont);
+  resize_canvas();
+  if (!mesh.empty()) {
+    draw_3d_mesh();
   }
 }
 
