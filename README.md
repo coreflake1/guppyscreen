@@ -79,8 +79,9 @@ cd guppyscreen
 
 - **Desktop simulator** (try the UI without a printer) and **MIPS build for the KE** are both covered in
   [Building from Source](wiki/Building-from-Source.md).
-- There is no `Dockerfile` in this repo — the MIPS cross-build uses the external prebuilt
-  `ballaswag/guppydev:latest` toolchain image.
+- The MIPS cross-build runs in a toolchain container. This repo ships its own
+  [`docker/Dockerfile`](docker/Dockerfile), published as `ghcr.io/coreflake1/guppydev` — see
+  [Building from Source](wiki/Building-from-Source.md).
 
 ## License & credits
 

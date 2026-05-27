@@ -3,8 +3,9 @@
 ## CI pipeline
 
 Release artifacts are produced by `.github/workflows/build.yml`, which runs inside the
-`ballaswag/guppydev:latest` container on pushes to `main`/`develop` (nightly prerelease) and on tags
-(stable release). The workflow checks out submodules, applies the three patches, builds the bundled
+`ghcr.io/coreflake1/guppydev:latest` toolchain container (built from
+[`docker/Dockerfile`](https://github.com/coreflake1/guppyscreen/blob/main/docker/Dockerfile)) on
+pushes to `main`/`develop` (nightly prerelease) and on tags (stable release). The workflow checks out submodules, applies the three patches, builds the bundled
 libraries, builds GuppyScreen, then packages each asset with `scripts/release.sh`.
 
 ### Build matrix

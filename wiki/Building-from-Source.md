@@ -65,13 +65,20 @@ Output: `build/bin/guppyscreen`. See **[Development and Simulator](Development-a
 
 ## 4b. Cross-compile for the Ender-3 V3 KE (MIPS)
 
-The MIPS toolchain ships in the prebuilt `ballaswag/guppydev:latest` Docker image (the same image CI
-uses). Run the provided script **inside that container**; it rebuilds each dependency for MIPS and then
-builds GuppyScreen with `GUPPY_SMALL_SCREEN=1`:
+The MIPS toolchain ships in a container image. This repo provides its own toolchain image via
+[`docker/Dockerfile`](https://github.com/coreflake1/guppyscreen/blob/main/docker/Dockerfile),
+published as `ghcr.io/coreflake1/guppydev`. Run the provided script **inside that container**; it
+rebuilds each dependency for MIPS and then builds GuppyScreen with `GUPPY_SMALL_SCREEN=1`:
 
 ```bash
-docker run --rm -it -v "$PWD":/work -w /work ballaswag/guppydev:latest \
+docker run --rm -it -v "$PWD":/work -w /work ghcr.io/coreflake1/guppydev:latest \
   bash scripts/build-mips.sh
+```
+
+To build the toolchain image yourself instead of pulling it:
+
+```bash
+docker build -t ghcr.io/coreflake1/guppydev:latest docker/
 ```
 
 - `scripts/build-mips.sh` defaults `CROSS_COMPILE` to `mipsel-linux-` (matches the toolchain on the
@@ -82,11 +89,20 @@ docker run --rm -it -v "$PWD":/work -w /work ballaswag/guppydev:latest \
   `ELF 32-bit LSB executable, MIPS, MIPS32 version 1 (SYSV), statically linked` (~6.5 MB, no `NEEDED`
   entries).
 
-### Docker note
+### The toolchain image
 
-This repository does **not** contain a `Dockerfile` or `docker-compose.yml`. Docker is used only to
-provide the cross-compilation *toolchain* via the external, prebuilt `ballaswag/guppydev:latest` image
-— there is no project-defined container image to build.
+Docker is used only to provide the cross-compilation *toolchain* (the app itself is built by `make`,
+not in a container). The image is defined by [`docker/Dockerfile`](https://github.com/coreflake1/guppyscreen/blob/main/docker/Dockerfile):
+
+- **Base:** Ubuntu 22.04 + `build-essential`, `cmake`, `git`.
+- **MIPS:** Bootlin `mips32el--musl--stable-2024.02-1` (gcc 12.3.0) — provides both the
+  `mipsel-buildroot-linux-musl-` and `mipsel-linux-` prefixes.
+- **aarch64:** Arm GNU `gcc-arm-10.2-2020.11` (`aarch64-none-linux-gnu-`, gcc 10.2.1).
+- Both toolchains are downloaded from their official sources and verified by **SHA256** at build time.
+
+It is published to `ghcr.io/coreflake1/guppydev` (`:latest` and the pinned `:2024.02`). This is a
+from-source replacement for the upstream `ballaswag/guppydev` image, which it reproduces faithfully
+(same base, toolchains, paths, and PATH ordering).
 
 ## Build internals (reference)
 
