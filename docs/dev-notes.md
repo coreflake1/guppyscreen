@@ -301,7 +301,55 @@ Widgets with explicit hardcoded fonts (NOT affected by `LV_FONT_DEFAULT`):
 |---|---|---|---|
 | Temperature chart | Y-axis tick labels overlap at 6 ticks on 272px height | `src/main_panel.cpp` L227 | Reduce `major_cnt` 6→3 in `lv_chart_set_axis_tick`; set `LV_PART_TICKS` font to `montserrat_8` |
 | Limits sliders | 4 sliders in COLUMN layout overflow 272px; bottom slider(s) clipped | `src/limits_panel.cpp` | Switch `limit_cont` to 2×2 grid (2 FR cols × 2 FR rows) |
-| Bed mesh table | Cells ~35×25px, 5-char values unreadable | `src/bedmesh_panel.cpp` | Cell sizing independent of `LV_FONT_DEFAULT` |
+| ~~Bed mesh table~~ | ~~Cells unreadable~~ | `src/bedmesh_panel.cpp` | **Resolved** — table view is now the default; see GUI pass below |
+
+---
+
+## GUI & functional pass (2026-05-26)
+
+A round of usability fixes driven by on-device review. Verified in the SDL simulator
+(`build-sim/`, `GUPPY_SMALL_SCREEN=1`).
+
+### Print-state safety locks
+Panels are now gated by `KUtils::is_printing()` (true when `print_stats/state` is
+`printing` or `paused`) so a touch mid-print can't ruin the job. Helpers live in
+`src/utils.cpp`: `is_printing()`, `notify_locked()` (modal toast), and
+`confirm_if_printing(msg, cb)` (Confirm/Cancel override; runs `cb` immediately when idle).
+
+- **Block entry + toast** (nothing useful to see mid-print): Homing, Extrude
+  (`main_panel.cpp`); Bed Mesh, Input Shaper, Belts/Shake, TMC Autotune
+  (`printertune_panel.cpp`).
+- **Confirm-with-override**: Console (per command, `console_panel.cpp`), Macros
+  (per run, `macro_item.cpp`), Limits & Power (on entry, `printertune_panel.cpp`).
+- **Left open** (designed for mid-print use): Fine Tune, Fan, LED, Print Status, file browsing.
+- Note: a new-print start was *already* guarded in `print_panel.cpp` — it shows a
+  "Printing in progress…" dialog instead of starting a second job. (`View Job` / `Queue Job`
+  in that dialog are unimplemented stubs.)
+
+### Layout / UX
+- **LED ↔ Fine Tune swap**: Fine Tune moved to the home screen (used during prints);
+  LED moved to the Tune tab. `LedPanel` is owned by `MainPanel` and now passed by
+  reference into `PrinterTunePanel` (where `FineTunePanel&` used to go).
+- **Bed Mesh redesign** (`bedmesh_panel.cpp`): **table view is now the default**. The
+  3D view is an opt-in fullscreen mode — pressing "3D View" hides the profile list and
+  the other controls; the canvas fills the left and a narrow right-side strip holds the
+  zoom +/- and Back buttons. Back from 3D returns to table view; Back from table exits.
+  `resize_canvas()` floor lowered for <800px screens (the old 300px min overflowed 272px).
+- **Fine Tune readouts** (`finetune_panel.cpp`): Z/PA precision trimmed `{:.5}`→`{:.3f}`
+  and readout icon zoom 150→100 so long values (e.g. `0.123 mm/s`) no longer collide
+  with the icon.
+- **Belt shake** (`belts_calibration_panel.cpp`): excite-frequency readout moved from
+  35px below the slider (clipped by the cramped grid cell) to the top-right of the control.
+- **System panel** (`sysinfo_panel.cpp`): Factory Reset moved to the top-right corner
+  (away from Back / settings rows to avoid accidental presses); network/version text
+  width-constrained so it can't slide under the button. Factory Reset already had a
+  "Reset GuppyScreen to default settings?" confirm prompt.
+- **Mini print-status popup** (`mini_print_status.cpp`): aligned `TOP_RIGHT` (over the
+  now-locked Home/Fine-Tune buttons) instead of `TOP_LEFT` where it overlapped the temps.
+- **MCU temp default** (`src/config.cpp`): shipped default sensor changed from
+  `temperature_sensor chamber_temp`/"Chamber" to `temperature_sensor mcu_temp`/"MCU Temp".
+  Affects fresh installs only — existing on-device `guppyconfig.json` must be edited to
+  update a printer that already has a config.
 
 ---
 
