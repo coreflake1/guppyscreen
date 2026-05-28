@@ -73,6 +73,26 @@ namespace KUtils {
     style_lock_mbox(mbox, 50);
   }
 
+  void notify_toast(const std::string &msg, uint32_t timeout_ms) {
+    lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, msg.c_str(), NULL, false);
+    lv_obj_t *txt = ((lv_msgbox_t *)mbox)->text;
+    lv_obj_set_style_text_align(txt, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(txt, LV_PCT(100));
+    lv_obj_center(txt);
+    lv_obj_set_width(mbox, LV_PCT(70));
+    lv_obj_set_height(mbox, LV_SIZE_CONTENT);
+    lv_obj_center(mbox);
+
+    // Auto-close once after timeout_ms (repeat_count 1 → LVGL deletes the timer).
+    lv_timer_t *t = lv_timer_create([](lv_timer_t *tm) {
+      lv_obj_t *m = (lv_obj_t *)tm->user_data;
+      if (m != NULL) {
+        lv_msgbox_close(m);
+      }
+    }, timeout_ms, mbox);
+    lv_timer_set_repeat_count(t, 1);
+  }
+
   void confirm_if_printing(const std::string &msg, const std::function<void()> &cb) {
     if (!is_printing()) {
       cb();
