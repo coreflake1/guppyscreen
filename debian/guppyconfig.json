@@ -12,7 +12,11 @@
       "display_sleep_sec": 600,
       "fans": [],
       "log_level": "debug",
-      "monitored_sensors": [],
+      "monitored_sensors": [
+        { "id": "extruder", "display_name": "Extruder", "controllable": true, "color": "red" },
+        { "id": "heater_bed", "display_name": "Bed", "controllable": true, "color": "purple" },
+        { "id": "temperature_sensor mcu_temp", "display_name": "MCU Temp", "controllable": false, "color": "blue" }
+      ],
       "moonraker_api_key": false,
       "moonraker_host": "127.0.0.1",
       "moonraker_port": 7125
