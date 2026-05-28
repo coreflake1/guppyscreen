@@ -23,6 +23,7 @@ class SettingPanel {
 
   lv_obj_t *get_container();
   void enable_spoolman();
+  SysInfoPanel &get_sysinfo_panel() { return sysinfo_panel; }
 
   void handle_callback(lv_event_t *event);
 

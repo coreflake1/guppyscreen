@@ -47,6 +47,15 @@ namespace KUtils {
   std::string eta_string(int64_t s);
   size_t bytes_to_mb(size_t s);
 
+  // Backlight helpers. Scan /sys/class/backlight/ on first call; pick the first
+  // device. backlight_max() returns 0 if no device is found, in which case the
+  // callers should hide the brightness UI and skip writes. backlight_set() is
+  // a no-op when no device is available (or in SIMULATOR builds where it just
+  // caches the value for the sysinfo slider to read back).
+  int backlight_max();
+  int backlight_get();
+  void backlight_set(int value);
+
   template<typename T, typename U> void sort_map_values(std::map<T, U> v,
     std::vector<U> &out_vect,
     std::function<bool(U &, U &)> sorter) {

@@ -10,6 +10,7 @@
 #include <time.h>
 #include <sstream>
 #include <iomanip>
+#include <fstream>
 #include <sys/ioctl.h>
 #include <linux/if.h>
 #include <ifaddrs.h>
@@ -330,6 +331,79 @@ namespace KUtils {
 
   size_t bytes_to_mb(size_t s) {
     return s / 1024 / 1024;
+  }
+
+  // First /sys/class/backlight/<dev>/ found, or "" if no device. Cached
+  // after first scan so we don't hit the FS on every brightness write.
+  static const std::string& backlight_dir() {
+    static std::string cached;
+    static bool searched = false;
+    if (!searched) {
+      searched = true;
+      try {
+        if (fs::is_directory("/sys/class/backlight")) {
+          for (auto &p : fs::directory_iterator("/sys/class/backlight")) {
+            cached = p.path().string();
+            break;
+          }
+        }
+      } catch (const std::exception &e) {
+        spdlog::debug("backlight scan failed: {}", e.what());
+      }
+      if (cached.empty()) {
+        spdlog::info("no /sys/class/backlight device — brightness control disabled");
+      } else {
+        spdlog::info("backlight device: {}", cached);
+      }
+    }
+    return cached;
+  }
+
+  static int read_int_file(const std::string &path, int fallback) {
+    std::ifstream f(path);
+    int v = fallback;
+    if (f) { f >> v; }
+    return v;
+  }
+
+  int backlight_max() {
+    auto &d = backlight_dir();
+#ifdef SIMULATOR
+    // No /sys/class/backlight on x86 desktop; pretend we're a KE so the
+    // sysinfo slider renders with the same range it'd show on-device.
+    if (d.empty()) return 300;
+#endif
+    if (d.empty()) return 0;
+    return read_int_file(d + "/max_brightness", 0);
+  }
+
+  // Used by SIMULATOR and as a fallback when sysfs reads fail.
+  static int cached_brightness = -1;
+
+  int backlight_get() {
+    auto &d = backlight_dir();
+    if (d.empty()) {
+      return cached_brightness;
+    }
+    int v = read_int_file(d + "/brightness", -1);
+    if (v >= 0) cached_brightness = v;
+    return v;
+  }
+
+  void backlight_set(int v) {
+    if (v < 0) v = 0;
+    int mx = backlight_max();
+    if (mx > 0 && v > mx) v = mx;
+
+    cached_brightness = v;
+    auto &d = backlight_dir();
+    if (d.empty()) return;
+    std::ofstream f(d + "/brightness");
+    if (f) {
+      f << v;
+    } else {
+      spdlog::warn("backlight_set: failed to write {}/brightness", d);
+    }
   }
 
   std::map<std::string, std::map<std::string, std::string>> parse_macros(json &m) {

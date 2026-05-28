@@ -16,6 +16,7 @@
 #include "spdlog/spdlog.h"
 #include "state.h"
 #include "theme.h"
+#include "utils.h"
 
 GuppyScreen *GuppyScreen::instance = NULL;
 lv_style_t GuppyScreen::style_container;
@@ -213,7 +214,15 @@ void GuppyScreen::loop() {
   /*Handle LitlevGL tasks (tickless mode)*/
 #if !defined(SIMULATOR) && !defined(OS_ANDROID)
   std::atomic_bool is_sleeping(false);
+  int saved_brightness = -1;
   Config *conf = Config::get_instance();
+
+  // Apply the user's configured brightness on startup. Fall back to whatever
+  // the device already has if no value is stored.
+  auto stored_b = conf->get_json("/display_brightness");
+  if (!stored_b.is_null()) {
+    KUtils::backlight_set(stored_b.template get<int>());
+  }
 #endif
 
   while (1) {
@@ -228,10 +237,14 @@ void GuppyScreen::loop() {
         if (!is_sleeping.load()) {
           spdlog::debug("putting display to sleeping");
           // fbdev_blank() uses FB_BLANK_POWERDOWN which the Ingenic X2000
-          // kernel 4.4.94 DSI driver cannot recover from via FB_BLANK_UNBLANK.
-          // Use only the LVGL screen_saver (black) for the visual sleep effect.
+          // kernel 4.4.94 DSI driver cannot recover from via FB_BLANK_UNBLANK
+          // (backlight returns but video stays white). Instead: kill the
+          // backlight via /sys/class/backlight, which is a separate code
+          // path from DSI panel power-down, and overlay the LVGL screen_saver
+          // so the panel is black if the user wakes mid-DSI-refresh.
+          saved_brightness = KUtils::backlight_get();
+          KUtils::backlight_set(0);
           lv_obj_move_foreground(screen_saver);
-          // spdlog::debug("screen saver foreground");
           is_sleeping = true;
         }
       } else {
@@ -240,6 +253,9 @@ void GuppyScreen::loop() {
           fbdev_unblank();
           lv_obj_move_background(screen_saver);
           lv_obj_invalidate(lv_scr_act());
+          if (saved_brightness > 0) {
+            KUtils::backlight_set(saved_brightness);
+          }
           is_sleeping = false;
         }
       }

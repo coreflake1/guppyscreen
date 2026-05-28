@@ -2,6 +2,7 @@
 #define __SYSINFO_PANEL_H__
 
 #include "button_container.h"
+#include "selector.h"
 #include "lvgl/lvgl.h"
 
 #include <vector>
@@ -28,6 +29,10 @@ class SysInfoPanel {
 
   lv_obj_t *disp_sleep_cont;
   lv_obj_t *display_sleep_dd;
+
+  // Brightness preset dropdown (hidden if /sys/class/backlight has no device).
+  lv_obj_t *brightness_cont;
+  lv_obj_t *brightness_dd;
 
   lv_obj_t *ll_cont;
   lv_obj_t *loglevel_dd;

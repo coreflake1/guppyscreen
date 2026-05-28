@@ -431,6 +431,11 @@ void MainPanel::sim_setup_mock_data() {
   spoolman_panel.sim_setup_mock_data();
   spoolman_panel.foreground();
 
+  /* Top-most: the System settings panel, so the new brightness slider is the
+   * first thing visible in the sim. Press Back to step back through the stack:
+   * sysinfo → spoolman → extruder → home. */
+  setting_panel.get_sysinfo_panel().foreground();
+
   /* Faster timer (300ms) gives a denser live chart since SIMULATOR mode
    * bypasses the 1s throttle in SensorContainer::update_series. */
   lv_timer_t *t = lv_timer_create([](lv_timer_t *timer) {
