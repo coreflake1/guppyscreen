@@ -228,6 +228,63 @@ void SpoolmanPanel::handle_active_id_update(json &j) {
   }
 }
 
+#ifdef SIMULATOR
+void SpoolmanPanel::sim_setup_mock_data() {
+  // Build a small fixture matching Spoolman's REST shape: enough variety to
+  // exercise the color column, archived rendering, active highlight, and the
+  // two-line "Remain Weight / Length" cells.
+  std::vector<json> fake_spools = {
+    {
+      {"id", 1}, {"archived", false},
+      {"filament", {{"name", "PolyTerra Sunshine Yellow"},
+                    {"vendor", {{"name", "Polymaker"}}},
+                    {"material", "PLA"}, {"color_hex", "FFD700"}}},
+      {"remaining_weight", 832.4}, {"remaining_length", 277500.0}
+    },
+    {
+      {"id", 2}, {"archived", false},
+      {"filament", {{"name", "Galaxy Black"},
+                    {"vendor", {{"name", "Prusament"}}},
+                    {"material", "PETG"}, {"color_hex", "1A1A2E"}}},
+      {"remaining_weight", 612.8}, {"remaining_length", 196900.0}
+    },
+    {
+      {"id", 3}, {"archived", false},
+      {"filament", {{"name", "Carbon Fiber Nylon"},
+                    {"vendor", {{"name", "Fiberlogy"}}},
+                    {"material", "PA-CF"}, {"color_hex", "2B2B2B"}}},
+      {"remaining_weight", 425.0}, {"remaining_length", 132800.0}
+    },
+    {
+      {"id", 4}, {"archived", false},
+      {"filament", {{"name", "Silk Ruby Red"},
+                    {"vendor", {{"name", "eSUN"}}},
+                    {"material", "PLA"}, {"color_hex", "C0392B"}}},
+      {"remaining_weight", 998.2}, {"remaining_length", 332100.0}
+    },
+    {
+      {"id", 5}, {"archived", true},
+      {"filament", {{"name", "Mint Green (empty)"},
+                    {"vendor", {{"name", "Sunlu"}}},
+                    {"material", "PLA"}, {"color_hex", "98FB98"}}},
+      {"remaining_weight", 12.4}, {"remaining_length", 4100.0}
+    }
+  };
+
+  spools.clear();
+  for (auto &e : fake_spools) {
+    spools.insert({e["id"].template get<uint32_t>(), e});
+  }
+  active_id = 2;  // Galaxy Black is loaded
+
+  std::vector<json> sorted_spools;
+  KUtils::sort_map_values<uint32_t, json>(spools, sorted_spools, [](json &a, json &b) {
+    return a["id"].template get<uint32_t>() < b["id"].template get<uint32_t>();
+  });
+  populate_spools(sorted_spools);
+}
+#endif
+
 void SpoolmanPanel::handle_callback(lv_event_t *event) {
   lv_obj_t *btn = lv_event_get_current_target(event);
   if (btn == back_btn.get_container()) {

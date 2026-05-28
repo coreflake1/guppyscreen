@@ -32,6 +32,7 @@ class KWebSocketClient : public hv::WebSocketClient {
   int send_jsonrpc(const std::string &method, const json &params);
   int send_jsonrpc(const std::string &method);
   int gcode_script(const std::string &gcode);
+  int gcode_script(const std::string &gcode, std::function<void(json&)> cb);
 
   void register_method_callback(std::string resp_method,
 				std::string handler_name,

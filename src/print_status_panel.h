@@ -42,6 +42,12 @@ class PrintStatusPanel : public NotifyConsumer {
 
   FineTunePanel &get_finetune_panel();
 
+#ifdef SIMULATOR
+  // Populate fake print state (filename, progress, elapsed) so the panel can be
+  // visually verified without a Moonraker connection.
+  void sim_setup_mock_data();
+#endif
+
  private:
   KWebSocketClient &ws;
   FineTunePanel finetune_panel;
@@ -55,6 +61,7 @@ class PrintStatusPanel : public NotifyConsumer {
   ButtonContainer emergency_btn;
   ButtonContainer back_btn;
   lv_obj_t *thumbnail_cont;
+  lv_obj_t *filename_label;
   lv_obj_t *thumbnail;
   lv_obj_t *pbar_cont;
   lv_obj_t *progress_bar;
@@ -76,6 +83,14 @@ class PrintStatusPanel : public NotifyConsumer {
 
   /* json &metadata; */
   uint32_t estimated_time_s;
+
+  // Latest virtual_sdcard/progress value (0.0 .. 1.0). Used so update_time_progress
+  // can compute a dynamic ETA from elapsed/progress instead of only the slicer's
+  // static estimate (#126).
+  double current_progress = 0.0;
+  // Tracks the previous /printer_state/print_stats/state so we can dismiss the
+  // panel only when we transition out of an active print (#94).
+  std::string last_print_state;
 
   // flow rate
   std::time_t flow_ts;

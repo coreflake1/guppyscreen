@@ -1,7 +1,7 @@
 #ifndef __PRINTERTUNE_PANEL_H__
 #define __PRINTERTUNE_PANEL_H__
 
-#include "led_panel.h"
+#include "finetune_panel.h"
 #include "limits_panel.h"
 #include "bedmesh_panel.h"
 #include "inputshaper_panel.h"
@@ -15,7 +15,7 @@
 #include <mutex>
 class PrinterTunePanel {
  public:
-  PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, LedPanel &);
+  PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, FineTunePanel &);
   ~PrinterTunePanel();
 
   lv_obj_t *get_container();
@@ -32,7 +32,7 @@ class PrinterTunePanel {
  private:
   lv_obj_t *cont;
   BedMeshPanel bedmesh_panel;
-  LedPanel &led_panel;
+  FineTunePanel &finetune_panel;
   LimitsPanel limits_panel;
   InputShaperPanel inputshaper_panel;
   BeltsCalibrationPanel belts_calibration_panel;
@@ -40,7 +40,7 @@ class PrinterTunePanel {
   TmcStatusPanel tmc_status_panel;
   PowerPanel power_panel;
   ButtonContainer bedmesh_btn;
-  ButtonContainer led_btn;
+  ButtonContainer finetune_btn;
   ButtonContainer inputshaper_btn;
   ButtonContainer belts_calibration_btn;
   ButtonContainer limits_btn;

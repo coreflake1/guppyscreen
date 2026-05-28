@@ -1,9 +1,21 @@
 #include "extruder_panel.h"
 #include "state.h"
 #include "config.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 
+#include <algorithm>
 #include <limits>
+
+// How close (in C) the hotend must be to the target before we fire a pending
+// extrude/retract. Klipper still enforces its own min_extrude_temp.
+static const int HEAT_TOLERANCE = 5;
+// Max time to wait for the hotend to reach the requested temperature before
+// giving up and clearing the pending action.
+static const uint32_t HEAT_TIMEOUT_MS = 5 * 60 * 1000;
+// Safety cap on how long we keep buttons locked while waiting for a gcode
+// response. Long enough for a 50mm slow load; trips only if the ws dies.
+static const uint32_t ACTION_TIMEOUT_MS = 5 * 60 * 1000;
 
 LV_IMG_DECLARE(back);
 LV_IMG_DECLARE(spoolman_img);
@@ -144,6 +156,15 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
   // lv_obj_set_grid_cell(back_btn.get_container(), LV_GRID_ALIGN_END, 2, 1, LV_GRID_ALIGN_END, 2, 2);
 
 
+  // Busy spinner: floating overlay centered on the panel, big enough to be
+  // unmissable but not so big it covers the selectors behind it. Hidden until
+  // refresh_button_state() shows it.
+  busy_spinner = lv_spinner_create(panel_cont, 1000, 60);
+  lv_obj_add_flag(busy_spinner, LV_OBJ_FLAG_FLOATING);
+  lv_obj_set_size(busy_spinner, 80, 80);
+  lv_obj_align(busy_spinner, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_add_flag(busy_spinner, LV_OBJ_FLAG_HIDDEN);
+
   ws.register_notify_update(this);
 
   auto def_ext_temp_v = conf->get_json("/default_extruder_temp");
@@ -160,6 +181,7 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
 }
 
 ExtruderPanel::~ExtruderPanel() {
+  cancel_safety_timer();
   if (panel_cont != NULL) {
     lv_obj_del(panel_cont);
     panel_cont = NULL;
@@ -178,15 +200,169 @@ void ExtruderPanel::consume(json &j) {
   std::lock_guard<std::mutex> lock(lv_lock);
   auto target_value = j["/params/0/extruder/target"_json_pointer];
   if (!target_value.is_null()) {
-    int target = target_value.template get<int>();
-    extruder_temp.update_target(target);
+    current_target = target_value.template get<int>();
+    extruder_temp.update_target(current_target);
   }
 
   auto temp_value = j["/params/0/extruder/temperature"_json_pointer];
   if (!temp_value.is_null()) {
-    int value = temp_value.template get<int>();
-    extruder_temp.update_value(value);
+    current_temp = temp_value.template get<int>();
+    extruder_temp.update_value(current_temp);
   }
+
+  if (pending_kind != PA_NONE && current_temp + HEAT_TOLERANCE >= pending_want) {
+    fire_pending();
+  }
+}
+
+int ExtruderPanel::effective_temp() {
+  int sel = 0;
+  try {
+    sel = std::stoi(lv_btnmatrix_get_btn_text(temp_selector.get_selector(),
+      temp_selector.get_selected_idx()));
+  } catch (const std::exception &) {
+    sel = 0;
+  }
+  return std::max(sel, current_target);
+}
+
+void ExtruderPanel::refresh_button_state() {
+  bool busy = action_in_flight || pending_kind != PA_NONE;
+
+  if (action_in_flight) {
+    // A gcode is executing on klipper; lock everything until the response.
+    extrude_btn.disable();
+    retract_btn.disable();
+    load_btn.disable();
+    unload_btn.disable();
+    cooldown_btn.disable();
+  } else if (pending_kind != PA_NONE) {
+    // Waiting for the hotend to heat. Cooldown stays clickable so the user
+    // can cancel; the other actions are blocked until heat-up completes.
+    extrude_btn.disable();
+    retract_btn.disable();
+    load_btn.disable();
+    unload_btn.disable();
+    cooldown_btn.enable();
+  } else {
+    extrude_btn.enable();
+    retract_btn.enable();
+    load_btn.enable();
+    unload_btn.enable();
+    cooldown_btn.enable();
+  }
+
+  if (busy_spinner != NULL) {
+    if (busy) {
+      lv_obj_clear_flag(busy_spinner, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_add_flag(busy_spinner, LV_OBJ_FLAG_HIDDEN);
+    }
+  }
+}
+
+void ExtruderPanel::arm_safety_timer(uint32_t ms) {
+  cancel_safety_timer();
+  safety_timer = lv_timer_create([](lv_timer_t *t) {
+    auto *self = (ExtruderPanel *)t->user_data;
+    self->safety_timer = NULL;  // one-shot, LVGL deletes after this callback
+    if (self->action_in_flight) {
+      // Response never arrived — assume the ws/klipper lost it and recover.
+      spdlog::warn("extruder action response timeout, unlocking buttons");
+      self->action_in_flight = false;
+      self->refresh_button_state();
+    } else if (self->pending_kind != PA_NONE) {
+      spdlog::warn("extruder heat-up timed out, clearing pending action");
+      self->clear_pending();
+      KUtils::notify_toast("Heating timed out.");
+    }
+  }, ms, this);
+  lv_timer_set_repeat_count(safety_timer, 1);
+}
+
+void ExtruderPanel::cancel_safety_timer() {
+  if (safety_timer != NULL) {
+    lv_timer_del(safety_timer);
+    safety_timer = NULL;
+  }
+}
+
+void ExtruderPanel::send_action(const std::string &gcode) {
+  action_in_flight = true;
+  refresh_button_state();
+  arm_safety_timer(ACTION_TIMEOUT_MS);
+  // Moonraker only sends the JSON-RPC response for printer.gcode.script once
+  // the script has finished executing — that's our reliable "done" signal.
+  ws.gcode_script(gcode, [this](json &) {
+    std::lock_guard<std::mutex> lock(lv_lock);
+    on_action_response();
+  });
+}
+
+void ExtruderPanel::on_action_response() {
+  if (!action_in_flight) {
+    return;  // safety timer already recovered us
+  }
+  action_in_flight = false;
+  cancel_safety_timer();
+  refresh_button_state();
+}
+
+void ExtruderPanel::clear_pending() {
+  if (pending_kind == PA_NONE) {
+    return;
+  }
+  pending_kind = PA_NONE;
+  pending_len.clear();
+  pending_speed.clear();
+  pending_want = 0;
+  cancel_safety_timer();
+  refresh_button_state();
+}
+
+void ExtruderPanel::fire_pending() {
+  PendingKind k = pending_kind;
+  std::string len = pending_len;
+  std::string speed = pending_speed;
+  clear_pending();  // resets state + button enables; send_action re-locks them
+
+  int feed = 300;  // 5 mm/s fallback if the speed text fails to parse
+  try {
+    feed = std::stoi(speed) * 60;
+  } catch (const std::exception &) {}
+
+  send_action(fmt::format("M83\nG1 E{}{} F{}",
+    k == PA_RETRACT ? "-" : "", len, feed));
+}
+
+void ExtruderPanel::start_extrude_action(PendingKind kind, const char *len, const char *speed) {
+  int want = effective_temp();
+
+  // Non-blocking heat request. Avoids the M109 hang from #65 — we'll watch the
+  // temp stream ourselves and fire the move once we're hot enough.
+  if (want > current_target) {
+    ws.gcode_script(fmt::format("M104 S{}", want));
+  }
+
+  if (current_temp + HEAT_TOLERANCE >= want) {
+    int feed = 300;
+    try {
+      feed = std::stoi(speed) * 60;
+    } catch (const std::exception &) {}
+    send_action(fmt::format("M83\nG1 E{}{} F{}",
+      kind == PA_RETRACT ? "-" : "", len, feed));
+    return;
+  }
+
+  // Cold — queue it. consume() will fire it once we reach the threshold.
+  pending_kind = kind;
+  pending_len = len;
+  pending_speed = speed;
+  pending_want = want;
+  refresh_button_state();
+  arm_safety_timer(HEAT_TIMEOUT_MS);
+  KUtils::notify_toast(fmt::format("Heating to {}C, {} when ready.",
+    want, kind == PA_RETRACT ? "retracting" : "extruding"));
 }
 
 void ExtruderPanel::handle_callback(lv_event_t *e) {
@@ -217,57 +393,86 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
     lv_obj_t *btn = lv_event_get_current_target(e);
 
     if (btn == back_btn.get_container()) {
+      clear_pending();  // don't auto-extrude after the user navigates away
       lv_obj_move_background(panel_cont);
-    }
-
-    if (btn == extrude_btn.get_container()) {
-      const char *temp = lv_btnmatrix_get_btn_text(temp_selector.get_selector(),
-        temp_selector.get_selected_idx());
-      const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
-        length_selector.get_selected_idx());
-      const char *speed = lv_btnmatrix_get_btn_text(speed_selector.get_selector(),
-        speed_selector.get_selected_idx());
-      ws.gcode_script(fmt::format("M109 S{}\nM83\nG1 E{} F{}", temp, len, std::stoi(speed) * 60));
-    }
-
-    if (btn == retract_btn.get_container()) {
-      const char *temp = lv_btnmatrix_get_btn_text(temp_selector.get_selector(),
-        temp_selector.get_selected_idx());
-      const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
-        length_selector.get_selected_idx());
-      const char *speed = lv_btnmatrix_get_btn_text(speed_selector.get_selector(),
-        speed_selector.get_selected_idx());
-      ws.gcode_script(fmt::format("M109 S{}\nM83\nG1 E-{} F{}", temp, len, std::stoi(speed) * 60));
-    }
-
-    if (btn == unload_btn.get_container()) {
-      if (unload_filament_macro == "_GUPPY_QUIT_MATERIAL") {
-        const char *temp = lv_btnmatrix_get_btn_text(temp_selector.get_selector(),
-          temp_selector.get_selected_idx());
-        ws.gcode_script(fmt::format("{} EXTRUDER_TEMP={}", unload_filament_macro, temp));
-      } else {
-        ws.gcode_script(unload_filament_macro);
-      }
-    }
-
-    if (btn == load_btn.get_container()) {
-      if (load_filament_macro == "_GUPPY_LOAD_MATERIAL") {
-        const char *temp = lv_btnmatrix_get_btn_text(temp_selector.get_selector(),
-          temp_selector.get_selected_idx());
-        const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
-          length_selector.get_selected_idx());
-        ws.gcode_script(fmt::format("{} EXTRUDER_TEMP={} EXTRUDE_LEN={}", load_filament_macro, temp, len));
-      } else {
-        ws.gcode_script(load_filament_macro);
-      }
-    }
-
-    if (btn == cooldown_btn.get_container()) {
-      ws.gcode_script(cooldown_macro);
+      return;
     }
 
     if (btn == spoolman_btn.get_container()) {
       spoolman_panel.foreground();
+      return;
+    }
+
+    if (btn == cooldown_btn.get_container()) {
+      // Cooldown doubles as the cancel for a pending heat-up. Always allowed
+      // (unless a gcode is already in flight, in which case refresh disables it).
+      if (action_in_flight) {
+        return;
+      }
+      clear_pending();
+      send_action(cooldown_macro);
+      return;
+    }
+
+    // Remaining actions: blocked while another action is running OR while a
+    // heat-up is pending. refresh_button_state() also disables their widgets,
+    // but check the flags too in case of an event in flight before refresh.
+    if (action_in_flight || pending_kind != PA_NONE) {
+      return;
+    }
+
+    if (btn == extrude_btn.get_container()) {
+      const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
+        length_selector.get_selected_idx());
+      const char *speed = lv_btnmatrix_get_btn_text(speed_selector.get_selector(),
+        speed_selector.get_selected_idx());
+      start_extrude_action(PA_EXTRUDE, len, speed);
+      return;
+    }
+
+    if (btn == retract_btn.get_container()) {
+      const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
+        length_selector.get_selected_idx());
+      const char *speed = lv_btnmatrix_get_btn_text(speed_selector.get_selector(),
+        speed_selector.get_selected_idx());
+      start_extrude_action(PA_RETRACT, len, speed);
+      return;
+    }
+
+    if (btn == unload_btn.get_container()) {
+      // Klipper's _GUPPY_QUIT_MATERIAL macro handles its own heating + wait;
+      // a plain UNLOAD_FILAMENT macro is whatever the user defined. In both
+      // cases we just dispatch and unlock when klipper returns.
+      if (unload_filament_macro == "_GUPPY_QUIT_MATERIAL") {
+        send_action(fmt::format("{} EXTRUDER_TEMP={}",
+          unload_filament_macro, effective_temp()));
+      } else {
+        send_action(unload_filament_macro);
+      }
+      return;
+    }
+
+    if (btn == load_btn.get_container()) {
+      if (load_filament_macro == "_GUPPY_LOAD_MATERIAL") {
+        const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
+          length_selector.get_selected_idx());
+        send_action(fmt::format("{} EXTRUDER_TEMP={} EXTRUDE_LEN={}",
+          load_filament_macro, effective_temp(), len));
+      } else {
+        send_action(load_filament_macro);
+      }
+      return;
     }
   }
 }
+
+#ifdef SIMULATOR
+void ExtruderPanel::sim_show_busy() {
+  // Pretend a load just started: action buttons disabled, spinner visible.
+  // We don't actually send_action() because there's no websocket and the
+  // safety timer would fire ACTION_TIMEOUT_MS later.
+  action_in_flight = true;
+  refresh_button_state();
+  lv_obj_move_foreground(panel_cont);
+}
+#endif

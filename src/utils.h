@@ -17,6 +17,9 @@ namespace KUtils {
   bool is_printing();
   // Modal "Unavailable while printing" notice (single OK button).
   void notify_locked();
+  // Transient, auto-dismissing message (no buttons). Used for non-blocking
+  // feedback like "Heating, press again when ready".
+  void notify_toast(const std::string &msg, uint32_t timeout_ms = 1800);
   // Runs cb immediately when idle; while printing, shows a Confirm/Cancel modal
   // and only runs cb if the user confirms the override.
   void confirm_if_printing(const std::string &msg, const std::function<void()> &cb);

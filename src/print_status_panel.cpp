@@ -51,6 +51,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
 		  })
   , back_btn(buttons_cont, &back, "Back", &PrintStatusPanel::_handle_callback, this)
   , thumbnail_cont(lv_obj_create(status_cont))
+  , filename_label(lv_label_create(thumbnail_cont))
   , thumbnail(lv_img_create(thumbnail_cont))
   , pbar_cont(lv_obj_create(thumbnail_cont))
   , progress_bar(lv_bar_create(pbar_cont))
@@ -141,6 +142,17 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   lv_obj_set_size(thumbnail_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(thumbnail_cont, 0, 0);
 
+  // Filename label: between thumbnail and progress bar. lv_label_create defaults
+  // to no width, so set a percent width + DOT long-mode so a 60-char gcode name
+  // truncates instead of overflowing the column. Move to index 1 (after
+  // thumbnail, before pbar_cont) so the column reads top-to-bottom:
+  // thumbnail / filename / progress bar.
+  lv_obj_set_width(filename_label, LV_PCT(100));
+  lv_label_set_long_mode(filename_label, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_align(filename_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(filename_label, "");
+  lv_obj_move_to_index(filename_label, 1);
+
   // row 1
   lv_obj_set_grid_cell(thumbnail_cont, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
   lv_obj_set_grid_cell(detail_cont, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
@@ -177,6 +189,8 @@ void PrintStatusPanel::reset() {
   elapsed.update_label("0s");
   time_left.update_label("...");
   estimated_time_s = 0;
+  current_progress = 0.0;
+  lv_label_set_text(filename_label, "");
 
   auto v = State::get_instance()
     ->get_data("/printer_state/configfile/config/extruder/filament_diameter"_json_pointer);
@@ -239,6 +253,7 @@ void PrintStatusPanel::populate() {
   if (!printfile.is_null()) {
     const std::string fname = printfile.template get<std::string>();
     if (fname.length() > 0) {
+      lv_label_set_text(filename_label, fname.c_str());
       json fname_input = {{"filename", fname }};
       ws.send_jsonrpc("server.files.metadata", fname_input,
 		      [fname, this](json &d) { this->handle_metadata(fname, d); });
@@ -259,7 +274,8 @@ void PrintStatusPanel::populate() {
   // progress percentage
   auto v = s->get_data("/printer_state/virtual_sdcard/progress"_json_pointer);
   if (!v.is_null()) {
-    int new_value = static_cast<int>(v.template get<double>() * 100);
+    current_progress = v.template get<double>();
+    int new_value = static_cast<int>(current_progress * 100);
     lv_bar_set_value(progress_bar, new_value, LV_ANIM_ON);
     lv_label_set_text(progress_label, fmt::format("{}%", new_value).c_str());
     mini_print_status.update_progress(new_value);
@@ -350,11 +366,31 @@ void PrintStatusPanel::consume(json &j) {
     auto print_status = pstate.template get<std::string>();
     if (print_status != "printing" && print_status != "paused") {
       mini_print_status.hide();
+      // Print just ended (#94). Dismiss the full status panel if it was up
+      // for the print we just finished — otherwise the user is stuck looking
+      // at a "done" panel with no obvious next step.
+      if (last_print_state == "printing" || last_print_state == "paused") {
+        lv_obj_move_background(status_cont);
+      }
     } else {
       mini_print_status.show();
     }
 
     mini_print_status.update_status(print_status);
+    last_print_state = print_status;
+  }
+
+  // Keep the on-screen filename label in sync with mid-print rename / new file
+  // events. The state-update notify also surfaces these.
+  if (!printfile.is_null()) {
+    lv_label_set_text(filename_label, printfile.template get<std::string>().c_str());
+  }
+
+  // Track virtual_sdcard progress so update_time_progress can compute a
+  // dynamic ETA (#126).
+  auto progress = j["/params/0/virtual_sdcard/progress"_json_pointer];
+  if (!progress.is_null()) {
+    current_progress = progress.template get<double>();
   }
 
   auto v = j["/params/0/extruder/target"_json_pointer];
@@ -520,9 +556,18 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
 }
 
 void PrintStatusPanel::update_time_progress(uint32_t time_passed) {
-    int32_t remaining = estimated_time_s - time_passed;
+    int32_t remaining;
+    // Once we're past ~5% progress, the slicer estimate becomes the worse
+    // predictor and elapsed/progress wins (catches fast prints overshooting
+    // the slicer guess, see #126).
+    if (current_progress > 0.05) {
+      uint32_t dynamic_estimate = static_cast<uint32_t>(time_passed / current_progress);
+      remaining = static_cast<int32_t>(dynamic_estimate) - static_cast<int32_t>(time_passed);
+    } else {
+      remaining = static_cast<int32_t>(estimated_time_s) - static_cast<int32_t>(time_passed);
+    }
+
     if (remaining < 0) {
-      // XXX: better estimate
       time_left.update_label("...");
     } else {
       auto eta_str = KUtils::eta_string(remaining);
@@ -602,3 +647,29 @@ int PrintStatusPanel::current_layer(json &info) {
 FineTunePanel &PrintStatusPanel::get_finetune_panel() {
   return finetune_panel;
 }
+
+#ifdef SIMULATOR
+void PrintStatusPanel::sim_setup_mock_data() {
+  // Mid-print snapshot: 20% in, 10 minutes elapsed. Drives the dynamic-ETA
+  // branch (progress > 0.05) so we should see remaining ~40 minutes.
+  // To preview the auto-dismiss (#94) on this build, change "printing" to
+  // "complete" and rebuild — the panel should NOT foreground.
+  json mock = {{"params", {{
+    {"print_stats", {
+      {"filename", "BunnyHighResLongFilenameTest_v3.gcode"},
+      {"state", "printing"},
+      {"print_duration", 600.0},
+      {"filament_used", 1234.5},
+      {"info", {{"current_layer", 12}, {"total_layer", 60}}}
+    }},
+    {"virtual_sdcard", {{"progress", 0.20}}},
+    {"extruder", {{"temperature", 210}, {"target", 220}}},
+    {"heater_bed", {{"temperature", 62}, {"target", 65}}}
+  }}}};
+  State::get_instance()->consume(mock);
+  // consume() will reset() + populate() + foreground() because filename is
+  // present, then drive update_time_progress(600) which hits the dynamic-ETA
+  // branch via current_progress=0.20.
+  consume(mock);
+}
+#endif

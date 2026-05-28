@@ -7,7 +7,7 @@
 #include <string>
 
 LV_IMG_DECLARE(filament_img);
-LV_IMG_DECLARE(fine_tune_img);
+LV_IMG_DECLARE(light_img);
 LV_IMG_DECLARE(move);
 LV_IMG_DECLARE(print);
 LV_IMG_DECLARE(extruder);
@@ -42,7 +42,7 @@ MainPanel::MainPanel(KWebSocketClient &websocket,
   , main_cont(lv_obj_create(main_tab))
   , print_status_panel(websocket, lock, main_cont)
   , print_panel(ws, lock, print_status_panel)
-  , printertune_panel(ws, lock, printertune_tab, led_panel)
+  , printertune_panel(ws, lock, printertune_tab, print_status_panel.get_finetune_panel())
   , numpad(Numpad(main_cont))
   , extruder_panel(ws, lock, numpad, sm)
   , prompt_panel(websocket, lock, main_cont)
@@ -52,7 +52,7 @@ MainPanel::MainPanel(KWebSocketClient &websocket,
   , homing_btn(main_cont, &move, "Homing", &MainPanel::_handle_homing_cb, this)
   , extrude_btn(main_cont, &filament_img, "Extrude", &MainPanel::_handle_extrude_cb, this)
   , action_btn(main_cont, &fan, "Fans", &MainPanel::_handle_fanpanel_cb, this)
-  , finetune_btn(main_cont, &fine_tune_img, "Fine Tune", &MainPanel::_handle_finetune_cb, this)
+  , led_btn(main_cont, &light_img, "LED", &MainPanel::_handle_ledpanel_cb, this)
   , print_btn(main_cont, &print, "Print", &MainPanel::_handle_print_cb, this)
 {
   lv_style_init(&style);
@@ -186,10 +186,10 @@ void MainPanel::handle_fanpanel_cb(lv_event_t *event) {
   }
 }
 
-void MainPanel::handle_finetune_cb(lv_event_t *event) {
+void MainPanel::handle_ledpanel_cb(lv_event_t *event) {
   if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
-    spdlog::trace("clicked fine tune");
-    print_status_panel.get_finetune_panel().foreground();
+    spdlog::trace("clicked led panel");
+    led_panel.foreground();
   }
 }
 
@@ -232,13 +232,13 @@ void MainPanel::create_main(lv_obj_t *parent)
   lv_obj_set_parent(homing_btn.get_container(), btn_wrapper);
   lv_obj_set_parent(extrude_btn.get_container(), btn_wrapper);
   lv_obj_set_parent(action_btn.get_container(), btn_wrapper);
-  lv_obj_set_parent(finetune_btn.get_container(), btn_wrapper);
+  lv_obj_set_parent(led_btn.get_container(), btn_wrapper);
   lv_obj_set_parent(print_btn.get_container(), btn_wrapper);
 
   lv_obj_set_grid_cell(homing_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
   lv_obj_set_grid_cell(extrude_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
   lv_obj_set_grid_cell(action_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(finetune_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+  lv_obj_set_grid_cell(led_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_grid_cell(print_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 2, 1);
 
   /* Disable scrolling on the sensor container — the 5px left border on each
@@ -412,6 +412,24 @@ void MainPanel::sim_setup_mock_data() {
       s->update_series(v);
     }
   }
+
+  /* Drive the print status panel so its new widgets (filename label,
+   * dynamic ETA, spinner-on-extruder etc.) render with sensible values. */
+  print_status_panel.sim_setup_mock_data();
+
+  /* Then bring the extruder panel up in its busy state so #48's spinner is
+   * visible at startup. Foregrounded *after* the print status panel so the
+   * extruder is what we see; press Back from there to inspect each panel. */
+  extruder_panel.sim_show_busy();
+
+  /* Enable the Spoolman entry points and populate the panel with fake spools
+   * so the Spoolman UI is testable without a live Moonraker + Spoolman backend.
+   * Foregrounded last so it covers the others — press Back to step back through
+   * the stack (spoolman → extruder → home). */
+  setting_panel.enable_spoolman();
+  extruder_panel.enable_spoolman();
+  spoolman_panel.sim_setup_mock_data();
+  spoolman_panel.foreground();
 
   /* Faster timer (300ms) gives a denser live chart since SIMULATOR mode
    * bypasses the 1s throttle in SensorContainer::update_series. */

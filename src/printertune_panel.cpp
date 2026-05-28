@@ -8,7 +8,7 @@
 namespace fs = std::experimental::filesystem;
 
 LV_IMG_DECLARE(bedmesh_img);
-LV_IMG_DECLARE(light_img);
+LV_IMG_DECLARE(fine_tune_img);
 LV_IMG_DECLARE(inputshaper_img);
 LV_IMG_DECLARE(limit_img);
 LV_IMG_DECLARE(motor_img);
@@ -21,10 +21,10 @@ LV_IMG_DECLARE(power_devices_img);
 LV_IMG_DECLARE(print);
 #endif
 
-PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, LedPanel &led)
+PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, FineTunePanel &finetune)
   : cont(lv_obj_create(parent))
   , bedmesh_panel(c, l)
-  , led_panel(led)
+  , finetune_panel(finetune)
   , limits_panel(c, l)
   , inputshaper_panel(c, l)
   , belts_calibration_panel(c, l)
@@ -32,7 +32,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   , tmc_status_panel(c, l)
   , power_panel(c, l)
   , bedmesh_btn(cont, &bedmesh_img, "Bed Mesh", &PrinterTunePanel::_handle_callback, this)
-  , led_btn(cont, &light_img, "LED", &PrinterTunePanel::_handle_callback, this)
+  , finetune_btn(cont, &fine_tune_img, "Fine Tune", &PrinterTunePanel::_handle_callback, this)
   , inputshaper_btn(cont, &inputshaper_img, "Input Shaper", &PrinterTunePanel::_handle_callback, this)
 #ifndef ZBOLT
   , belts_calibration_btn(cont, &belts_calibration_img, "Belts/Shake", &PrinterTunePanel::_handle_callback, this)
@@ -64,7 +64,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
 
   // row 1
   lv_obj_set_grid_cell(bedmesh_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(led_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
+  lv_obj_set_grid_cell(finetune_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_grid_cell(inputshaper_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_grid_cell(belts_calibration_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
@@ -118,9 +118,9 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
   if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
     lv_obj_t *btn = lv_event_get_current_target(event);
 
-    if (btn == led_btn.get_container()) {
-      spdlog::trace("tune led pressed");
-      led_panel.foreground();
+    if (btn == finetune_btn.get_container()) {
+      spdlog::trace("tune finetune pressed");
+      finetune_panel.foreground();
     } else if (btn == bedmesh_btn.get_container()) {
       spdlog::trace("tune bedmesh pressed");
       if (KUtils::is_printing()) { KUtils::notify_locked(); return; }

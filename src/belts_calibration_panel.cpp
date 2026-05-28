@@ -58,7 +58,7 @@ BeltsCalibrationPanel::BeltsCalibrationPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_center(graph);
 
   lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_size(spinner, 100, 100);
+  lv_obj_set_size(spinner, 80, 80);
 
   auto scale = (double)lv_disp_get_physical_hor_res(NULL) / 800.0;
   auto hscale = (double)lv_disp_get_physical_ver_res(NULL) / 480.0;

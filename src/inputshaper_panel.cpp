@@ -128,10 +128,10 @@ InputShaperPanel::InputShaperPanel(KWebSocketClient &c, std::mutex &l)
 
   // spinners
   lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_size(xspinner, 100, 100);
+  lv_obj_set_size(xspinner, 80, 80);
 
   lv_obj_add_flag(yspinner, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_size(yspinner, 100, 100);
+  lv_obj_set_size(yspinner, 80, 80);
 
   // buttons
   lv_obj_set_size(button_cont, LV_PCT(20), LV_PCT(100));

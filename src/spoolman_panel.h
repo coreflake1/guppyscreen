@@ -18,6 +18,12 @@ class SpoolmanPanel {
   void foreground();
   void populate_spools(std::vector<json> &sorted_spools);
   void handle_active_id_update(json &j);
+
+#ifdef SIMULATOR
+  // Pre-populate the spool table with a realistic set of fake spools so the
+  // Spoolman UI can be visually verified without a Moonraker + Spoolman backend.
+  void sim_setup_mock_data();
+#endif
   
   void handle_callback(lv_event_t *event);
   void handle_spoolman_action(lv_event_t *event);
