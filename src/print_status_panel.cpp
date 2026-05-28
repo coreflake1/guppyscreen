@@ -647,3 +647,29 @@ int PrintStatusPanel::current_layer(json &info) {
 FineTunePanel &PrintStatusPanel::get_finetune_panel() {
   return finetune_panel;
 }
+
+#ifdef SIMULATOR
+void PrintStatusPanel::sim_setup_mock_data() {
+  // Mid-print snapshot: 20% in, 10 minutes elapsed. Drives the dynamic-ETA
+  // branch (progress > 0.05) so we should see remaining ~40 minutes.
+  // To preview the auto-dismiss (#94) on this build, change "printing" to
+  // "complete" and rebuild — the panel should NOT foreground.
+  json mock = {{"params", {{
+    {"print_stats", {
+      {"filename", "BunnyHighResLongFilenameTest_v3.gcode"},
+      {"state", "printing"},
+      {"print_duration", 600.0},
+      {"filament_used", 1234.5},
+      {"info", {{"current_layer", 12}, {"total_layer", 60}}}
+    }},
+    {"virtual_sdcard", {{"progress", 0.20}}},
+    {"extruder", {{"temperature", 210}, {"target", 220}}},
+    {"heater_bed", {{"temperature", 62}, {"target", 65}}}
+  }}}};
+  State::get_instance()->consume(mock);
+  // consume() will reset() + populate() + foreground() because filename is
+  // present, then drive update_time_progress(600) which hits the dynamic-ETA
+  // branch via current_progress=0.20.
+  consume(mock);
+}
+#endif

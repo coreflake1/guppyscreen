@@ -465,3 +465,14 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
     }
   }
 }
+
+#ifdef SIMULATOR
+void ExtruderPanel::sim_show_busy() {
+  // Pretend a load just started: action buttons disabled, spinner visible.
+  // We don't actually send_action() because there's no websocket and the
+  // safety timer would fire ACTION_TIMEOUT_MS later.
+  action_in_flight = true;
+  refresh_button_state();
+  lv_obj_move_foreground(panel_cont);
+}
+#endif

@@ -84,6 +84,13 @@ class ExtruderPanel : public NotifyConsumer {
   void refresh_button_state();
   void arm_safety_timer(uint32_t ms);
   void cancel_safety_timer();
+
+#ifdef SIMULATOR
+ public:
+  // Foreground the panel with the busy spinner showing so the #48 spinner
+  // change can be visually verified without driving the websocket.
+  void sim_show_busy();
+#endif
 };
 
 #endif // __EXTRUDER_PANEL_H__

@@ -42,6 +42,12 @@ class PrintStatusPanel : public NotifyConsumer {
 
   FineTunePanel &get_finetune_panel();
 
+#ifdef SIMULATOR
+  // Populate fake print state (filename, progress, elapsed) so the panel can be
+  // visually verified without a Moonraker connection.
+  void sim_setup_mock_data();
+#endif
+
  private:
   KWebSocketClient &ws;
   FineTunePanel finetune_panel;

@@ -413,6 +413,24 @@ void MainPanel::sim_setup_mock_data() {
     }
   }
 
+  /* Drive the print status panel so its new widgets (filename label,
+   * dynamic ETA, spinner-on-extruder etc.) render with sensible values. */
+  print_status_panel.sim_setup_mock_data();
+
+  /* Then bring the extruder panel up in its busy state so #48's spinner is
+   * visible at startup. Foregrounded *after* the print status panel so the
+   * extruder is what we see; press Back from there to inspect each panel. */
+  extruder_panel.sim_show_busy();
+
+  /* Enable the Spoolman entry points and populate the panel with fake spools
+   * so the Spoolman UI is testable without a live Moonraker + Spoolman backend.
+   * Foregrounded last so it covers the others — press Back to step back through
+   * the stack (spoolman → extruder → home). */
+  setting_panel.enable_spoolman();
+  extruder_panel.enable_spoolman();
+  spoolman_panel.sim_setup_mock_data();
+  spoolman_panel.foreground();
+
   /* Faster timer (300ms) gives a denser live chart since SIMULATOR mode
    * bypasses the 1s throttle in SensorContainer::update_series. */
   lv_timer_t *t = lv_timer_create([](lv_timer_t *timer) {
