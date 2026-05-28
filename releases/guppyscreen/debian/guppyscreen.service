@@ -1,0 +1,15 @@
+[Unit]
+Description=GuppyScreen
+After=moonraker.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=<USER>
+WorkingDirectory=/home/<USER>/guppyscreen
+ExecStart="/home/<USER>/guppyscreen/guppyscreen"
+
+[Install]
+WantedBy=multi-user.target
