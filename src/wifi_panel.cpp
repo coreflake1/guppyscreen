@@ -45,6 +45,7 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_add_flag(cont, LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_CLICKABLE);
 
   lv_obj_add_flag(spinner, LV_OBJ_FLAG_FLOATING);
+  lv_obj_set_size(spinner, 80, 80);
   lv_obj_align(spinner, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
