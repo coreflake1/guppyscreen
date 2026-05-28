@@ -21,7 +21,7 @@ class State : public NotifyConsumer {
   void reset();
   void set_data(const std::string &key, json &j, const std::string &json_path);
   json &get_data();
-  json &get_data(const json::json_pointer &ptr);
+  json get_data(const json::json_pointer &ptr);
 
   void consume(json &j);
 

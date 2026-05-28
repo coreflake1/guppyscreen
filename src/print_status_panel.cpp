@@ -311,7 +311,7 @@ void PrintStatusPanel::handle_metadata(const std::string &gcode_file, json &j) {
     estimated_time_s = static_cast<uint32_t>(eta.template get<float>());
     spdlog::trace("updated eta {}", estimated_time_s);
 
-    json &v = State::get_instance()->get_data("/printer_state/print_stats/print_duration"_json_pointer);
+    json v = State::get_instance()->get_data("/printer_state/print_stats/print_duration"_json_pointer);
     if (!v.is_null()) {
       uint32_t passed = static_cast<uint32_t>(v.template get<float>());
       spdlog::trace("updated time progress in handle metadata, passed {}", passed);

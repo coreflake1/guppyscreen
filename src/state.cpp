@@ -63,7 +63,7 @@ json &State::get_data() {
   return data;
 }
 
-json &State::get_data(const json::json_pointer &ptr) {
+json State::get_data(const json::json_pointer &ptr) {
   std::lock_guard<std::mutex> guard(lock);
   return data[ptr];
 }

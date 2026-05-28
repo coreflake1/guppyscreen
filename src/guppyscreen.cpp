@@ -223,6 +223,11 @@ void GuppyScreen::loop() {
   if (!stored_b.is_null()) {
     KUtils::backlight_set(stored_b.template get<int>());
   }
+
+  // Cache sleep config; re-read only periodically so the hot loop doesn't
+  // do a JSON lookup every tick.
+  int32_t display_sleep = conf->get<int32_t>("/display_sleep_sec") * 1000;
+  uint32_t sleep_cfg_refresh_ms = 0;
 #endif
 
   while (1) {
@@ -231,7 +236,10 @@ void GuppyScreen::loop() {
     lv_lock.unlock();
 
   #if !defined(SIMULATOR) && !defined(OS_ANDROID)
-    int32_t display_sleep = conf->get<int32_t>("/display_sleep_sec") * 1000;
+    if ((sleep_cfg_refresh_ms += 5) >= 1000) {
+      display_sleep = conf->get<int32_t>("/display_sleep_sec") * 1000;
+      sleep_cfg_refresh_ms = 0;
+    }
     if (display_sleep != -1) {
       if (lv_disp_get_inactive_time(NULL) > display_sleep) {
         if (!is_sleeping.load()) {
@@ -262,7 +270,7 @@ void GuppyScreen::loop() {
     }
 #endif  // SIMULATOR/OS_ANDROID
 
-    usleep(10000);
+    usleep(5000);
   }
 }
 
