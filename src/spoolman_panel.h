@@ -6,8 +6,10 @@
 #include "button_container.h"
 #include "lvgl/lvgl.h"
 
+#include <functional>
 #include <map>
 #include <mutex>
+#include <string>
 
 class SpoolmanPanel {
  public:
@@ -18,6 +20,15 @@ class SpoolmanPanel {
   void foreground();
   void populate_spools(std::vector<json> &sorted_spools);
   void handle_active_id_update(json &j);
+
+  // Display name ("Vendor - Name") of the currently active spool, or "" if none.
+  std::string get_active_spool_name();
+  // Full JSON of the currently active spool (filament material/color, remaining
+  // weight/length, ...), or a null json if none is selected.
+  json get_active_spool();
+  // Register a one-shot callback fired after the next spool selection. Used by
+  // PrintPanel to re-confirm the filament before starting a pending print.
+  void request_select_for_print(std::function<void()> cb);
 
 #ifdef SIMULATOR
   // Pre-populate the spool table with a realistic set of fake spools so the
@@ -51,6 +62,7 @@ class SpoolmanPanel {
   int32_t active_id;
   std::map<uint32_t, json> spools;
   uint32_t sorted_by;
+  std::function<void()> select_for_print_cb;
 };
 
 #endif // __SPOOLMAN_PANEL_H__

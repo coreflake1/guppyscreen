@@ -46,9 +46,56 @@ namespace KUtils {
     return false;
   }
 
+  void style_dialog_overlay(lv_obj_t *overlay) {
+    lv_obj_set_size(overlay, LV_PCT(100), LV_PCT(100));
+    lv_obj_clear_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_radius(overlay, 0, 0);
+    lv_obj_set_style_border_width(overlay, 0, 0);
+    lv_obj_set_style_pad_all(overlay, 0, 0);
+    lv_obj_set_style_bg_opa(overlay, LV_OPA_70, 0);
+  }
+
+  void style_dialog_box(lv_obj_t *box) {
+    lv_obj_set_style_border_width(box, 2, 0);
+    lv_obj_set_style_radius(box, 8, 0);
+    lv_obj_set_style_bg_color(box, lv_palette_darken(LV_PALETTE_GREY, 1), 0);
+    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_all(box, 12, 0);
+    lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+  }
+
+  void style_dialog_title(lv_obj_t *title) {
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 0);
+  }
+
+  void style_dialog_msgbox(lv_obj_t *mbox) {
+    lv_obj_set_style_border_width(mbox, 2, 0);
+    lv_obj_set_style_radius(mbox, 8, 0);
+    lv_obj_set_style_bg_color(mbox, lv_palette_darken(LV_PALETTE_GREY, 1), 0);
+    lv_obj_set_style_bg_opa(mbox, LV_OPA_COVER, 0);
+
+    // lv_msgbox renders its buttons as a button-matrix whose default item style
+    // is dark; restyle the items to the themed (blue) primary so they match the
+    // lv_btn buttons used by the custom-box dialogs.
+    lv_obj_t *btnm = lv_msgbox_get_btns(mbox);
+    if (btnm != NULL) {
+      lv_color_t primary = lv_theme_get_color_primary(mbox);
+      lv_obj_set_style_bg_opa(btnm, LV_OPA_TRANSP, LV_PART_MAIN);
+      lv_obj_set_style_border_width(btnm, 0, LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(btnm, LV_OPA_COVER, LV_PART_ITEMS);
+      lv_obj_set_style_bg_color(btnm, primary, LV_PART_ITEMS);
+      lv_obj_set_style_bg_color(btnm, primary, LV_PART_ITEMS | LV_STATE_CHECKED);
+      lv_obj_set_style_text_color(btnm, lv_color_white(), LV_PART_ITEMS);
+      lv_obj_set_style_radius(btnm, 4, LV_PART_ITEMS);
+    }
+  }
+
   // Shared styling so print-lock dialogs match the app's other msgboxes:
   // centered body text and a floating, centered button row at the bottom.
   static void style_lock_mbox(lv_obj_t *mbox, lv_coord_t btns_pct) {
+    style_dialog_msgbox(mbox);
+
     lv_obj_t *msg = ((lv_msgbox_t *)mbox)->text;
     lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(msg, LV_PCT(100));
@@ -76,6 +123,7 @@ namespace KUtils {
 
   void notify_toast(const std::string &msg, uint32_t timeout_ms) {
     lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, msg.c_str(), NULL, false);
+    style_dialog_msgbox(mbox);
     lv_obj_t *txt = ((lv_msgbox_t *)mbox)->text;
     lv_obj_set_style_text_align(txt, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(txt, LV_PCT(100));

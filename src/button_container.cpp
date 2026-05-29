@@ -1,5 +1,6 @@
 #include "button_container.h"
 #include "config.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 
 ButtonContainer::ButtonContainer(lv_obj_t *parent,
@@ -130,6 +131,7 @@ void ButtonContainer::handle_prompt() {
   static const char *btns[] = {"Confirm", "Cancel", ""};
 
   lv_obj_t *mbox1 = lv_msgbox_create(NULL, NULL, prompt_text.c_str(), btns, false);
+  KUtils::style_dialog_msgbox(mbox1);
   lv_obj_t *msg = ((lv_msgbox_t *)mbox1)->text;
   lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_width(msg, LV_PCT(100));

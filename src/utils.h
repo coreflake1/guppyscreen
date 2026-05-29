@@ -2,6 +2,7 @@
 #define __K_UTILS_H__
 
 #include "hv/json.hpp"
+#include "lvgl/lvgl.h"
 #include <vector>
 #include <map>
 #include <functional>
@@ -25,6 +26,17 @@ namespace KUtils {
   void confirm_if_printing(const std::string &msg, const std::function<void()> &cb);
   bool is_running_local();
   std::string get_root_path(const std::string root_name);
+
+  // ---- Shared dialog look ----------------------------------------------------
+  // One definition of the app's modal look so every popup matches and can't
+  // drift. Custom dialogs (their own overlay + box) use the first three; the
+  // last styles an LVGL lv_msgbox to the same card look. Sizes/alignment stay
+  // per-dialog; these set only the shared visuals (dim backdrop, rounded grey
+  // bordered card, montserrat_14 title).
+  void style_dialog_overlay(lv_obj_t *overlay);  // full-screen dim backdrop
+  void style_dialog_box(lv_obj_t *box);          // the centered card
+  void style_dialog_title(lv_obj_t *title);      // top-aligned header label
+  void style_dialog_msgbox(lv_obj_t *mbox);      // card look for an lv_msgbox
 
   // path, width
   std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j, double scale);

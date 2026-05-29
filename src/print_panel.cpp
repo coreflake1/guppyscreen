@@ -1,9 +1,11 @@
 #include "print_panel.h"
 #include "file_panel.h"
+#include "spoolman_panel.h"
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
 
+#include <cstdlib>
 #include <map>
 #include <sstream>
 
@@ -14,15 +16,26 @@ LV_IMG_DECLARE(back);
 #define SORTED_BY_NAME 1 << 0
 #define SORTED_BY_MODIFIED  1 << 1
 
-PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatusPanel &ps)
+PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatusPanel &ps, SpoolmanPanel &spool)
   : NotifyConsumer(lock)
   , ws(websocket)
+  , sm(spool)
   , files_cont(lv_obj_create(lv_scr_act()))
   , prompt_cont(lv_obj_create(lv_scr_act()))
   , msgbox(lv_obj_create(prompt_cont))
   , job_btn(lv_btn_create(msgbox))
   , cancel_btn(lv_btn_create(msgbox))
   , queue_btn(lv_btn_create(msgbox))
+  , filament_cont(lv_obj_create(lv_scr_act()))
+  , filament_box(lv_obj_create(filament_cont))
+  , filament_content_cont(lv_obj_create(filament_box))
+  , filament_row_cont(lv_obj_create(filament_content_cont))
+  , filament_swatch(lv_obj_create(filament_row_cont))
+  , filament_name_label(lv_label_create(filament_row_cont))
+  , filament_detail_label(lv_label_create(filament_content_cont))
+  , filament_enough_label(lv_label_create(filament_content_cont))
+  , filament_yes_btn(lv_btn_create(filament_box))
+  , filament_no_btn(lv_btn_create(filament_box))
   , left_cont(lv_obj_create(files_cont))
   , file_table_btns(lv_obj_create(left_cont))
   , refresh_btn(lv_btn_create(file_table_btns))
@@ -115,16 +128,12 @@ PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatu
   lv_obj_move_foreground(print_btn.get_container());
   lv_obj_move_foreground(status_btn.get_container());
 
-  // prompt
+  // "printing in progress" prompt (shared dialog look)
+  KUtils::style_dialog_overlay(prompt_cont);
   lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_size(prompt_cont, LV_PCT(100), LV_PCT(100));
-  lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_bg_opa(prompt_cont, LV_OPA_70, 0);
 
-  lv_obj_set_size(msgbox, LV_PCT(60), LV_PCT(30));
-  lv_obj_set_style_border_width(msgbox, 2, 0);
-  lv_obj_set_style_bg_color(msgbox, lv_palette_darken(LV_PALETTE_GREY, 1), 0);
-
+  KUtils::style_dialog_box(msgbox);
+  lv_obj_set_size(msgbox, LV_PCT(70), LV_PCT(42));
   lv_obj_align(msgbox, LV_ALIGN_CENTER, 0, 0);
 
   lv_obj_add_event_cb(job_btn, &PrintPanel::_handle_btns, LV_EVENT_CLICKED, this);
@@ -150,7 +159,69 @@ PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatu
 
   label = lv_label_create(msgbox);
   lv_label_set_text(label, "Printing in progress...");
-  lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
+  KUtils::style_dialog_title(label);
+
+  // spoolman "use the same filament?" confirm dialog (shared dialog look)
+  KUtils::style_dialog_overlay(filament_cont);
+  lv_obj_add_flag(filament_cont, LV_OBJ_FLAG_HIDDEN);
+
+  KUtils::style_dialog_box(filament_box);
+  lv_obj_set_size(filament_box, LV_PCT(80), LV_PCT(74));
+  lv_obj_align(filament_box, LV_ALIGN_CENTER, 0, 0);
+
+  // header
+  label = lv_label_create(filament_box);
+  lv_label_set_text(label, "Use the same filament?");
+  KUtils::style_dialog_title(label);
+
+  // content block: a centered group of rows, centered in the box
+  lv_obj_remove_style_all(filament_content_cont);
+  lv_obj_set_width(filament_content_cont, LV_PCT(100));
+  lv_obj_set_height(filament_content_cont, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(filament_content_cont, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(filament_content_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_row(filament_content_cont, 7, 0);
+  lv_obj_clear_flag(filament_content_cont, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_align(filament_content_cont, LV_ALIGN_CENTER, 0, 2);
+
+  // swatch + name, centered together as a group
+  lv_obj_remove_style_all(filament_row_cont);
+  lv_obj_set_width(filament_row_cont, LV_SIZE_CONTENT);
+  lv_obj_set_height(filament_row_cont, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(filament_row_cont, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(filament_row_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_column(filament_row_cont, 8, 0);
+  lv_obj_clear_flag(filament_row_cont, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_set_size(filament_swatch, 20, 20);
+  lv_obj_set_style_border_width(filament_swatch, 1, 0);
+  lv_obj_set_style_border_color(filament_swatch, lv_color_white(), 0);
+  lv_obj_set_style_radius(filament_swatch, 4, 0);
+  lv_obj_clear_flag(filament_swatch, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_label_set_long_mode(filament_name_label, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_max_width(filament_name_label, 280, 0);
+  lv_obj_set_style_text_font(filament_name_label, &lv_font_montserrat_14, 0);
+  lv_label_set_text(filament_name_label, "");
+
+  lv_obj_set_style_text_align(filament_detail_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(filament_detail_label, "");
+  lv_obj_set_style_text_align(filament_enough_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(filament_enough_label, "");
+
+  lv_obj_set_size(filament_yes_btn, 96, LV_SIZE_CONTENT);
+  lv_obj_add_event_cb(filament_yes_btn, &PrintPanel::_handle_filament_btns, LV_EVENT_CLICKED, this);
+  lv_obj_align(filament_yes_btn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+  label = lv_label_create(filament_yes_btn);
+  lv_label_set_text(label, "Yes");
+  lv_obj_center(label);
+
+  lv_obj_set_size(filament_no_btn, 96, LV_SIZE_CONTENT);
+  lv_obj_add_event_cb(filament_no_btn, &PrintPanel::_handle_filament_btns, LV_EVENT_CLICKED, this);
+  lv_obj_align(filament_no_btn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  label = lv_label_create(filament_no_btn);
+  lv_label_set_text(label, "No");
+  lv_obj_center(label);
 
   ws.register_notify_update(this);
 }
@@ -367,20 +438,142 @@ void PrintPanel::handle_print_callback(lv_event_t *event) {
     if (!pstat_state.is_null()
       && pstat_state.template get<std::string>() != "printing"
       && pstat_state.template get<std::string>() != "paused") {
-      spdlog::debug("printer ready to print. print file {}", cur_file->full_path);
 
       // ws.send_jsonrpc("printer.gcode.script",
       // 		    json::parse(R"({"script":"PRINT_PREPARE_CLEAR"})"));
 
-      json fname_input = {{"filename", cur_file->full_path }};
-      ws.send_jsonrpc("printer.print.start", fname_input);
-      print_status.foreground();
+      pending_print_path = cur_file->full_path;
+
+      // filament required by this print, from the cached gcode metadata
+      pending_needed_g = -1;
+      pending_needed_mm = -1;
+      if (cur_file->contains_metadata()) {
+        auto w = cur_file->metadata["/result/filament_weight_total"_json_pointer];
+        if (!w.is_null()) {
+          pending_needed_g = w.template get<double>();
+        }
+        auto l = cur_file->metadata["/result/filament_total"_json_pointer];
+        if (!l.is_null()) {
+          pending_needed_mm = l.template get<double>();
+        }
+      }
+
+      if (spoolman_enabled) {
+        // ask whether to keep the currently selected spool before printing
+        show_filament_dialog();
+      } else {
+        start_pending_print();
+      }
 
     } else {
       lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
       lv_obj_move_foreground(prompt_cont);
     }
   }
+}
+
+void PrintPanel::start_pending_print() {
+  if (pending_print_path.empty()) {
+    return;
+  }
+  spdlog::debug("printer ready to print. print file {}", pending_print_path);
+  json fname_input = {{"filename", pending_print_path}};
+  ws.send_jsonrpc("printer.print.start", fname_input);
+  pending_print_path.clear();
+  print_status.foreground();
+}
+
+void PrintPanel::show_filament_dialog() {
+  json spool = sm.get_active_spool();
+
+  if (spool.is_null()) {
+    lv_obj_add_flag(filament_swatch, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(filament_name_label, "None selected");
+    lv_label_set_text(filament_detail_label, "");
+    lv_label_set_text(filament_enough_label, "");
+  } else {
+    // name: "Vendor - Name"
+    auto vendor_json = spool["/filament/vendor/name"_json_pointer];
+    auto vendor = !vendor_json.is_null() ? vendor_json.template get<std::string>() : "";
+    auto name_json = spool["/filament/name"_json_pointer];
+    auto name = !name_json.is_null() ? name_json.template get<std::string>() : "";
+    lv_label_set_text(filament_name_label, fmt::format("{} - {}", vendor, name).c_str());
+
+    // color swatch from color_hex ("RRGGBB")
+    auto color_json = spool["/filament/color_hex"_json_pointer];
+    if (!color_json.is_null()) {
+      uint32_t rgb = static_cast<uint32_t>(strtol(color_json.template get<std::string>().c_str(), NULL, 16));
+      lv_obj_set_style_bg_color(filament_swatch, lv_color_hex(rgb), 0);
+      lv_obj_clear_flag(filament_swatch, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_add_flag(filament_swatch, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // material + remaining weight
+    auto material_json = spool["/filament/material"_json_pointer];
+    auto material = !material_json.is_null() ? material_json.template get<std::string>() : "?";
+    auto remaining_json = spool["/remaining_weight"_json_pointer];
+    if (!remaining_json.is_null()) {
+      lv_label_set_text(filament_detail_label,
+        fmt::format("{}, {:.0f} g left", material, remaining_json.template get<double>()).c_str());
+    } else {
+      lv_label_set_text(filament_detail_label, material.c_str());
+    }
+
+    // enough for this print? compare grams first, fall back to length
+    lv_color_t ok_col = lv_palette_main(LV_PALETTE_GREEN);
+    lv_color_t no_col = lv_palette_main(LV_PALETTE_RED);
+    std::string verdict;
+    bool known = false, enough = false;
+    if (pending_needed_g > 0 && !remaining_json.is_null()) {
+      known = true;
+      enough = remaining_json.template get<double>() >= pending_needed_g;
+      verdict = fmt::format("Print needs {:.0f} g  {}", pending_needed_g,
+        enough ? LV_SYMBOL_OK " enough" : LV_SYMBOL_CLOSE " not enough");
+    } else {
+      auto rem_len_json = spool["/remaining_length"_json_pointer];
+      if (pending_needed_mm > 0 && !rem_len_json.is_null()) {
+        known = true;
+        enough = rem_len_json.template get<double>() >= pending_needed_mm;
+        verdict = fmt::format("Print needs {:.1f} m  {}", pending_needed_mm / 1000.0,
+          enough ? LV_SYMBOL_OK " enough" : LV_SYMBOL_CLOSE " not enough");
+      }
+    }
+    if (known) {
+      lv_obj_set_style_text_color(filament_enough_label, enough ? ok_col : no_col, 0);
+      lv_label_set_text(filament_enough_label, verdict.c_str());
+    } else {
+      lv_obj_set_style_text_color(filament_enough_label, lv_color_white(), 0);
+      lv_label_set_text(filament_enough_label, "Filament usage unknown");
+    }
+  }
+
+  lv_obj_clear_flag(filament_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(filament_cont);
+}
+
+void PrintPanel::handle_filament_btns(lv_event_t *event) {
+  if (lv_event_get_code(event) != LV_EVENT_CLICKED) {
+    return;
+  }
+  lv_obj_t *btn = lv_event_get_current_target(event);
+
+  // dismiss the dialog regardless of choice
+  lv_obj_move_background(filament_cont);
+  lv_obj_add_flag(filament_cont, LV_OBJ_FLAG_HIDDEN);
+
+  if (btn == filament_yes_btn) {
+    start_pending_print();
+  } else if (btn == filament_no_btn) {
+    // open Spoolman; once a spool is chosen there, re-show this dialog with the
+    // newly selected filament so the user confirms before the print starts.
+    sm.request_select_for_print([this]() { this->show_filament_dialog(); });
+    sm.foreground();
+  }
+}
+
+void PrintPanel::enable_spoolman() {
+  spoolman_enabled = true;
 }
 
 void PrintPanel::handle_status_btn(lv_event_t *event) {

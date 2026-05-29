@@ -41,7 +41,7 @@ MainPanel::MainPanel(KWebSocketClient &websocket,
   , setting_panel(websocket, lock, setting_tab, sm)
   , main_cont(lv_obj_create(main_tab))
   , print_status_panel(websocket, lock, main_cont)
-  , print_panel(ws, lock, print_status_panel)
+  , print_panel(ws, lock, print_status_panel, sm)
   , printertune_panel(ws, lock, printertune_tab, print_status_panel.get_finetune_panel())
   , numpad(Numpad(main_cont))
   , extruder_panel(ws, lock, numpad, sm)
@@ -360,6 +360,7 @@ void MainPanel::enable_spoolman() {
   spoolman_panel.init();
   setting_panel.enable_spoolman();
   extruder_panel.enable_spoolman();
+  print_panel.enable_spoolman();
 }
 
 #ifdef SIMULATOR
@@ -428,6 +429,7 @@ void MainPanel::sim_setup_mock_data() {
    * the stack (spoolman → extruder → home). */
   setting_panel.enable_spoolman();
   extruder_panel.enable_spoolman();
+  print_panel.enable_spoolman();
   spoolman_panel.sim_setup_mock_data();
   spoolman_panel.foreground();
 

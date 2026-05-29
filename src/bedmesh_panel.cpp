@@ -1,5 +1,6 @@
 #include "bedmesh_panel.h"
 #include "state.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 
 #include <vector>
@@ -276,26 +277,19 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_add_event_cb(mesh_table, &BedMeshPanel::_mesh_draw_cb, LV_EVENT_DRAW_PART_BEGIN, this);
   lv_obj_add_event_cb(profile_table, &BedMeshPanel::_handle_profile_action, LV_EVENT_VALUE_CHANGED, this);
 
-  // prompt
-  lv_obj_set_style_pad_all(prompt, 0, 0);
-  lv_obj_set_size(prompt, LV_PCT(100), LV_PCT(100));
-  lv_obj_clear_flag(prompt, LV_OBJ_FLAG_SCROLLABLE);
+  // prompt (shared dialog look; keeps its flex layout + top anchor for the kb)
+  KUtils::style_dialog_overlay(prompt);
   lv_obj_add_flag(prompt, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_style_bg_opa(prompt, LV_OPA_70, 0);
 
   lv_textarea_set_one_line(input, true);
   lv_obj_set_width(input, LV_PCT(100));
 
+  KUtils::style_dialog_box(msgbox);
   // lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   lv_obj_set_flex_flow(msgbox, LV_FLEX_FLOW_ROW_WRAP);
   lv_obj_set_flex_align(msgbox, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_row(msgbox, 25, 0);
-
-  lv_obj_clear_flag(msgbox, LV_OBJ_FLAG_SCROLLABLE);
-
   lv_obj_set_size(msgbox, LV_PCT(60), LV_PCT(40));
-  lv_obj_set_style_border_width(msgbox, 2, 0);
-  lv_obj_set_style_bg_color(msgbox, lv_palette_darken(LV_PALETTE_GREY, 1), 0);
   lv_obj_align(msgbox, LV_ALIGN_TOP_MID, 0, 20);
 
   lv_obj_t *label = NULL;

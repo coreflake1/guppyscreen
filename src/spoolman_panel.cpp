@@ -136,6 +136,37 @@ void SpoolmanPanel::foreground() {
   lv_obj_move_foreground(cont);
 }
 
+std::string SpoolmanPanel::get_active_spool_name() {
+  if (active_id < 0) {
+    return "";
+  }
+  auto it = spools.find(static_cast<uint32_t>(active_id));
+  if (it == spools.end()) {
+    return "";
+  }
+  auto &el = it->second;
+  auto vendor_json = el["/filament/vendor/name"_json_pointer];
+  auto vendor = !vendor_json.is_null() ? vendor_json.template get<std::string>() : "";
+  auto name_json = el["/filament/name"_json_pointer];
+  auto name = !name_json.is_null() ? name_json.template get<std::string>() : "";
+  return fmt::format("{} - {}", vendor, name);
+}
+
+json SpoolmanPanel::get_active_spool() {
+  if (active_id < 0) {
+    return json();
+  }
+  auto it = spools.find(static_cast<uint32_t>(active_id));
+  if (it == spools.end()) {
+    return json();
+  }
+  return it->second;
+}
+
+void SpoolmanPanel::request_select_for_print(std::function<void()> cb) {
+  select_for_print_cb = std::move(cb);
+}
+
 void SpoolmanPanel::populate_spools(std::vector<json> &sorted_spools) {
   if (!spools.empty()) {
     lv_table_set_cell_value(spool_table, 0, 0, "ID");
@@ -289,6 +320,8 @@ void SpoolmanPanel::handle_callback(lv_event_t *event) {
   lv_obj_t *btn = lv_event_get_current_target(event);
   if (btn == back_btn.get_container()) {
     spdlog::trace("spoolman back button pressed");
+    // backed out without choosing a spool: drop any pending print confirmation
+    select_for_print_cb = nullptr;
     lv_obj_move_background(cont);
   } else if (btn == reload_btn.get_container()) {
     spdlog::trace("spoolman reload button pressed");
@@ -417,6 +450,17 @@ void SpoolmanPanel::handle_spoolman_action(lv_event_t *e) {
 	};
 
 	ws.send_jsonrpc("server.spoolman.post_spool_id", param);
+
+	// if a print is waiting on a filament choice, optimistically reflect the
+	// new active spool, hide this screen and hand control back to PrintPanel
+	// to re-confirm before starting the print.
+	if (select_for_print_cb) {
+	  active_id = id;
+	  auto cb = select_for_print_cb;
+	  select_for_print_cb = nullptr;
+	  lv_obj_move_background(cont);
+	  cb();
+	}
 
       }
 

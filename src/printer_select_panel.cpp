@@ -1,6 +1,7 @@
 #include "printer_select_panel.h"
 #include "guppyscreen.h"
 #include "config.h"
+#include "utils.h"
 #include "hv/json.hpp"
 #include "subprocess.hpp"
 
@@ -104,8 +105,9 @@ lv_obj_t *PrinterSelectContainer::prompt(const std::string &prompt_text) {
   static const char * btns[] = {"Confirm", "Cancel", ""};
 
   lv_obj_t *mbox1 = lv_msgbox_create(NULL, NULL, prompt_text.c_str(), btns, false);
+  KUtils::style_dialog_msgbox(mbox1);
   lv_obj_t *msg = ((lv_msgbox_t*)mbox1)->text;
-  lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);  
+  lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_width(msg, LV_PCT(100));
   lv_obj_center(msg);
   
