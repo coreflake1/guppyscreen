@@ -212,7 +212,7 @@ void PrintPanel::subscribe() {
 }
 
 void PrintPanel::foreground() {
-  json &pstat_state = State::get_instance()
+  json pstat_state = State::get_instance()
     ->get_data("/printer_state/print_stats/state"_json_pointer);
   spdlog::debug("print panel print stats {}",
     pstat_state.is_null() ? "nil" : pstat_state.template get<std::string>());
@@ -359,7 +359,7 @@ void PrintPanel::handle_print_callback(lv_event_t *event) {
   lv_event_code_t code = lv_event_get_code(event);
   if (code == LV_EVENT_CLICKED && cur_file != NULL) {
 
-    json &pstat_state = State::get_instance()
+    json pstat_state = State::get_instance()
       ->get_data("/printer_state/print_stats/state"_json_pointer);
     spdlog::debug("print panel print stats {}",
       pstat_state.is_null() ? "nil" : pstat_state.template get<std::string>());

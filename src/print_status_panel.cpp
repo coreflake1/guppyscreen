@@ -233,7 +233,7 @@ void PrintStatusPanel::init(json &fans) {
 
   reset();
   populate();
-  json &pstat_state = State::get_instance()
+  json pstat_state = State::get_instance()
     ->get_data("/printer_state/print_stats/state"_json_pointer);
   if (!pstat_state.is_null()) {
     auto pstatus = pstat_state.template get<std::string>();
@@ -249,7 +249,7 @@ void PrintStatusPanel::init(json &fans) {
 
 void PrintStatusPanel::populate() {
   State* s = State::get_instance();
-  json& printfile = s->get_data("/printer_state/print_stats/filename"_json_pointer);
+  json printfile = s->get_data("/printer_state/print_stats/filename"_json_pointer);
   if (!printfile.is_null()) {
     const std::string fname = printfile.template get<std::string>();
     if (fname.length() > 0) {
@@ -262,7 +262,7 @@ void PrintStatusPanel::populate() {
     }
   }
 
-  auto& pstate = s->get_data("/printer_state/print_stats/state"_json_pointer);
+  auto pstate = s->get_data("/printer_state/print_stats/state"_json_pointer);
   if (!pstate.is_null() && pstate.template get<std::string>() == "paused") {
     lv_obj_clear_flag(resume_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pause_btn.get_container(), LV_OBJ_FLAG_HIDDEN);

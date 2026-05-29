@@ -1,7 +1,13 @@
 /*.log
 build/
+build-sim/
+build-mips/
 *.d
 *.o
 *.a
+*.so
+*.so.*
+/guppyscreen-*.tar.gz
+/releases/guppyscreen/guppyscreen
 /.idea
 /.vscode
