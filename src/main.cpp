@@ -50,6 +50,37 @@ int main(void)
 
 #ifndef SIMULATOR
 
+// Touch input smoothing. The ns2009 resistive panel reports at ~50Hz while we
+// render at ~60Hz, so scrolling follows coarse position jumps (a fast flick
+// moves ~26px between samples) and looks steppy. Ease the reported point
+// toward each new sample with an exponential filter so those jumps are spread
+// across the in-between frames. Snap on a fresh press so taps land precisely
+// and a new touch doesn't slide in from the previous location.
+static void (*s_base_read_cb)(lv_indev_drv_t *, lv_indev_data_t *) = NULL;
+
+static void evdev_read_smoothed(lv_indev_drv_t *drv, lv_indev_data_t *data) {
+    s_base_read_cb(drv, data);
+
+    static int32_t sx = 0, sy = 0;
+    static bool was_pressed = false;
+
+    if (data->state == LV_INDEV_STATE_PR) {
+        if (!was_pressed) {
+            sx = data->point.x;
+            sy = data->point.y;
+        } else {
+            // alpha = 1/3 -> ~2 samples (~36ms) of trailing latency, smoother
+            sx += (data->point.x - sx) / 3;
+            sy += (data->point.y - sy) / 3;
+        }
+        was_pressed = true;
+        data->point.x = sx;
+        data->point.y = sy;
+    } else {
+        was_pressed = false;
+    }
+}
+
 static void hal_init(lv_color_t primary, lv_color_t secondary) {
     /*A small buffer for LittlevGL to draw the screen's content*/
     static lv_color_t buf[DISP_BUF_SIZE];
@@ -103,7 +134,11 @@ static void hal_init(lv_color_t primary, lv_color_t secondary) {
         lv_tc_indev_drv_init(&indev_drv_1, evdev_read);
       }
     }
-      
+
+    // Wrap whichever read_cb is active (raw or calibrated) with the smoother.
+    s_base_read_cb = indev_drv_1.read_cb;
+    indev_drv_1.read_cb = evdev_read_smoothed;
+
     lv_indev_drv_register(&indev_drv_1);
 }
 
