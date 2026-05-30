@@ -569,6 +569,14 @@ void BedMeshPanel::foreground() {
 
 void BedMeshPanel::handle_callback(lv_event_t *event) {
   lv_obj_t *btn = lv_event_get_current_target(event);
+  // Mesh-mutating actions move the toolhead or change the live compensation, so
+  // they stay locked during a print even though viewing the mesh is allowed.
+  if ((btn == save_btn.get_container() || btn == clear_btn.get_container() ||
+       btn == calibrate_btn.get_container()) && KUtils::is_printing()) {
+    KUtils::notify_locked();
+    return;
+  }
+
   if (btn == save_btn.get_container()) {
     spdlog::trace("mesh save pressed");
     lv_obj_clear_flag(prompt, LV_OBJ_FLAG_HIDDEN);

@@ -123,7 +123,8 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
       finetune_panel.foreground();
     } else if (btn == bedmesh_btn.get_container()) {
       spdlog::trace("tune bedmesh pressed");
-      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
+      // Viewing the mesh mid-print is fine; the mutating actions (Calibrate /
+      // Clear / Save) are blocked inside the panel instead.
       bedmesh_panel.foreground();
     } else if (btn == inputshaper_btn.get_container()) {
       spdlog::trace("tune inputshaper pressed");
