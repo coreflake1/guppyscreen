@@ -24,7 +24,7 @@ class ExtruderPanel : public NotifyConsumer {
   // hotter temperature is never lowered by an extrude/load/unload action.
   int effective_temp();
 
-  enum PendingKind { PA_NONE = 0, PA_EXTRUDE, PA_RETRACT };
+  enum PendingKind { PA_NONE = 0, PA_EXTRUDE, PA_RETRACT, PA_LOAD, PA_UNLOAD };
 
   static void _handle_callback(lv_event_t *event) {
     ExtruderPanel *panel = (ExtruderPanel*)event->user_data;
@@ -56,12 +56,16 @@ class ExtruderPanel : public NotifyConsumer {
   int current_temp = 0;
   int current_target = 0;
 
-  // Pending Extrude/Retract waiting for the hotend to heat. Cleared on fire,
-  // cooldown, back, dtor, or heat timeout.
+  // Pending action waiting for the hotend to heat. Any of extrude/retract/
+  // load/unload can be queued: pending_gcode is the exact command to run once
+  // we're hot enough. Cleared on fire, cooldown, back, dtor, or heat timeout.
   PendingKind pending_kind = PA_NONE;
-  std::string pending_len;
-  std::string pending_speed;
+  std::string pending_gcode;
   int pending_want = 0;
+
+  // Human-readable name of the action currently heating or running (matches the
+  // button the user pressed: "Extrude", "Load", ...). Drives the busy caption.
+  std::string action_name;
 
   // True between sending an action gcode and receiving its JSON-RPC response
   // (Moonraker only replies when the script has finished executing).
@@ -76,12 +80,20 @@ class ExtruderPanel : public NotifyConsumer {
   // gcode script, so the user sees something is still happening (#48).
   lv_obj_t *busy_spinner = NULL;
 
+  // Caption under the spinner describing the current phase ("Heating 25->220C,
+  // Extrude when ready" / "Extrude in progress..."), so a heat-then-fire action
+  // never looks like nothing happened.
+  lv_obj_t *busy_label = NULL;
+
   void send_action(const std::string &gcode);
   void on_action_response();
-  void start_extrude_action(PendingKind kind, const char *len, const char *speed);
+  // Heat to effective_temp() if needed, then run gcode; if the hotend is cold,
+  // queue it and fire from consume() once we reach temperature.
+  void run_when_hot(PendingKind kind, const std::string &name, const std::string &gcode);
   void fire_pending();
   void clear_pending();
   void refresh_button_state();
+  void update_busy_caption();
   void arm_safety_timer(uint32_t ms);
   void cancel_safety_timer();
 

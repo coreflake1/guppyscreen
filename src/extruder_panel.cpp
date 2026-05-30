@@ -36,11 +36,11 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
   , spoolman_panel(sm)
   , extruder_temp(ws, panel_cont, &extruder, 150,
     "Extruder", lv_palette_main(LV_PALETTE_RED), false, true, numpad, "extruder", NULL, NULL)
-  , temp_selector(panel_cont, "Extruder Temperature (C)",
+  , temp_selector(panel_cont, "Hotend target (°C)",
     {"180", "200", "220", "240", "260", "280", "300", ""}, 3, &ExtruderPanel::_handle_callback, this)
-  , length_selector(panel_cont, "Extrude Length (mm)",
+  , length_selector(panel_cont, "Extrude / Retract length (mm)",
     {"5", "10", "15", "20", "25", "30", "35", ""}, 1, &ExtruderPanel::_handle_callback, this)
-  , speed_selector(panel_cont, "Extrude Speed (mm/s)",
+  , speed_selector(panel_cont, "Extrude / Retract speed (mm/s)",
     {"1", "2", "5", "10", "25", "35", "50", ""}, 2, &ExtruderPanel::_handle_callback, this)
   , rightside_btns_cont(lv_obj_create(panel_cont))
   , leftside_btns_cont(lv_obj_create(panel_cont))
@@ -162,8 +162,20 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
   busy_spinner = lv_spinner_create(panel_cont, 1000, 60);
   lv_obj_add_flag(busy_spinner, LV_OBJ_FLAG_FLOATING);
   lv_obj_set_size(busy_spinner, 80, 80);
-  lv_obj_align(busy_spinner, LV_ALIGN_CENTER, 0, 0);
+  lv_obj_align(busy_spinner, LV_ALIGN_CENTER, 0, -10);
   lv_obj_add_flag(busy_spinner, LV_OBJ_FLAG_HIDDEN);
+
+  // Caption just below the spinner. Wrapped + centered so the two-line heating
+  // message fits. Uses the shared dialog-card styling so it matches the app's
+  // toasts/dialogs (grey card, radius 8, border) instead of an ad-hoc look.
+  busy_label = lv_label_create(panel_cont);
+  lv_obj_add_flag(busy_label, LV_OBJ_FLAG_FLOATING);
+  lv_label_set_long_mode(busy_label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(busy_label, 200);
+  lv_obj_set_style_text_align(busy_label, LV_TEXT_ALIGN_CENTER, 0);
+  KUtils::style_dialog_box(busy_label);
+  lv_obj_align(busy_label, LV_ALIGN_CENTER, 0, 55);
+  lv_obj_add_flag(busy_label, LV_OBJ_FLAG_HIDDEN);
 
   ws.register_notify_update(this);
 
@@ -212,6 +224,9 @@ void ExtruderPanel::consume(json &j) {
 
   if (pending_kind != PA_NONE && current_temp + HEAT_TOLERANCE >= pending_want) {
     fire_pending();
+  } else {
+    // Refresh the live "Heating X->YC" readout as the hotend climbs.
+    update_busy_caption();
   }
 }
 
@@ -258,6 +273,30 @@ void ExtruderPanel::refresh_button_state() {
     } else {
       lv_obj_add_flag(busy_spinner, LV_OBJ_FLAG_HIDDEN);
     }
+  }
+
+  update_busy_caption();
+}
+
+void ExtruderPanel::update_busy_caption() {
+  if (busy_label == NULL) {
+    return;
+  }
+
+  if (pending_kind != PA_NONE) {
+    // Heating toward the action. Show live current->target so the number
+    // visibly climbs and it's obvious the press registered. (ASCII arrow/dots:
+    // the small montserrat font lacks the U+2192 / U+2026 glyphs.)
+    lv_label_set_text(busy_label,
+      fmt::format("Heating {}°C -> {}°C\n{} when ready",
+        current_temp, pending_want, action_name).c_str());
+    lv_obj_clear_flag(busy_label, LV_OBJ_FLAG_HIDDEN);
+  } else if (action_in_flight) {
+    lv_label_set_text(busy_label,
+      fmt::format("{} in progress...", action_name).c_str());
+    lv_obj_clear_flag(busy_label, LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_add_flag(busy_label, LV_OBJ_FLAG_HIDDEN);
   }
 }
 
@@ -313,56 +352,42 @@ void ExtruderPanel::clear_pending() {
     return;
   }
   pending_kind = PA_NONE;
-  pending_len.clear();
-  pending_speed.clear();
+  pending_gcode.clear();
   pending_want = 0;
   cancel_safety_timer();
   refresh_button_state();
 }
 
 void ExtruderPanel::fire_pending() {
-  PendingKind k = pending_kind;
-  std::string len = pending_len;
-  std::string speed = pending_speed;
-  clear_pending();  // resets state + button enables; send_action re-locks them
-
-  int feed = 300;  // 5 mm/s fallback if the speed text fails to parse
-  try {
-    feed = std::stoi(speed) * 60;
-  } catch (const std::exception &) {}
-
-  send_action(fmt::format("M83\nG1 E{}{} F{}",
-    k == PA_RETRACT ? "-" : "", len, feed));
+  std::string gcode = pending_gcode;
+  clear_pending();   // resets pending state + button enables; send_action re-locks
+  send_action(gcode);  // action_name carries over so the caption stays correct
 }
 
-void ExtruderPanel::start_extrude_action(PendingKind kind, const char *len, const char *speed) {
+void ExtruderPanel::run_when_hot(PendingKind kind, const std::string &name,
+                                 const std::string &gcode) {
+  action_name = name;
   int want = effective_temp();
 
-  // Non-blocking heat request. Avoids the M109 hang from #65 — we'll watch the
-  // temp stream ourselves and fire the move once we're hot enough.
+  // Non-blocking heat request. Avoids the M109 hang from #65 — we watch the
+  // temp stream ourselves and run the action once we're hot enough. Applies to
+  // load/unload too, so the user's selected temp is honoured regardless of
+  // which filament macro is configured.
   if (want > current_target) {
     ws.gcode_script(fmt::format("M104 S{}", want));
   }
 
   if (current_temp + HEAT_TOLERANCE >= want) {
-    int feed = 300;
-    try {
-      feed = std::stoi(speed) * 60;
-    } catch (const std::exception &) {}
-    send_action(fmt::format("M83\nG1 E{}{} F{}",
-      kind == PA_RETRACT ? "-" : "", len, feed));
+    send_action(gcode);
     return;
   }
 
   // Cold — queue it. consume() will fire it once we reach the threshold.
   pending_kind = kind;
-  pending_len = len;
-  pending_speed = speed;
+  pending_gcode = gcode;
   pending_want = want;
   refresh_button_state();
   arm_safety_timer(HEAT_TIMEOUT_MS);
-  KUtils::notify_toast(fmt::format("Heating to {}C, {} when ready.",
-    want, kind == PA_RETRACT ? "retracting" : "extruding"));
 }
 
 void ExtruderPanel::handle_callback(lv_event_t *e) {
@@ -410,6 +435,7 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
         return;
       }
       clear_pending();
+      action_name = "Cooldown";
       send_action(cooldown_macro);
       return;
     }
@@ -421,46 +447,44 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
       return;
     }
 
-    if (btn == extrude_btn.get_container()) {
+    if (btn == extrude_btn.get_container() || btn == retract_btn.get_container()) {
+      bool retract = btn == retract_btn.get_container();
       const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
         length_selector.get_selected_idx());
       const char *speed = lv_btnmatrix_get_btn_text(speed_selector.get_selector(),
         speed_selector.get_selected_idx());
-      start_extrude_action(PA_EXTRUDE, len, speed);
-      return;
-    }
-
-    if (btn == retract_btn.get_container()) {
-      const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
-        length_selector.get_selected_idx());
-      const char *speed = lv_btnmatrix_get_btn_text(speed_selector.get_selector(),
-        speed_selector.get_selected_idx());
-      start_extrude_action(PA_RETRACT, len, speed);
+      int feed = 300;  // 5 mm/s fallback if the speed text fails to parse
+      try {
+        feed = std::stoi(speed) * 60;
+      } catch (const std::exception &) {}
+      run_when_hot(retract ? PA_RETRACT : PA_EXTRUDE,
+        retract ? "Retract" : "Extrude",
+        fmt::format("M83\nG1 E{}{} F{}", retract ? "-" : "", len, feed));
       return;
     }
 
     if (btn == unload_btn.get_container()) {
-      // Klipper's _GUPPY_QUIT_MATERIAL macro handles its own heating + wait;
-      // a plain UNLOAD_FILAMENT macro is whatever the user defined. In both
-      // cases we just dispatch and unlock when klipper returns.
-      if (unload_filament_macro == "_GUPPY_QUIT_MATERIAL") {
-        send_action(fmt::format("{} EXTRUDER_TEMP={}",
-          unload_filament_macro, effective_temp()));
-      } else {
-        send_action(unload_filament_macro);
-      }
+      // Heat to the selected temp first (run_when_hot), then run the macro.
+      // _GUPPY_QUIT_MATERIAL also takes EXTRUDER_TEMP; a plain UNLOAD_FILAMENT
+      // macro is whatever the user defined, but now always runs hot.
+      std::string gcode = unload_filament_macro == "_GUPPY_QUIT_MATERIAL"
+        ? fmt::format("{} EXTRUDER_TEMP={}", unload_filament_macro, effective_temp())
+        : unload_filament_macro;
+      run_when_hot(PA_UNLOAD, "Unload", gcode);
       return;
     }
 
     if (btn == load_btn.get_container()) {
+      std::string gcode;
       if (load_filament_macro == "_GUPPY_LOAD_MATERIAL") {
         const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
           length_selector.get_selected_idx());
-        send_action(fmt::format("{} EXTRUDER_TEMP={} EXTRUDE_LEN={}",
-          load_filament_macro, effective_temp(), len));
+        gcode = fmt::format("{} EXTRUDER_TEMP={} EXTRUDE_LEN={}",
+          load_filament_macro, effective_temp(), len);
       } else {
-        send_action(load_filament_macro);
+        gcode = load_filament_macro;
       }
+      run_when_hot(PA_LOAD, "Load", gcode);
       return;
     }
   }
@@ -468,10 +492,14 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
 
 #ifdef SIMULATOR
 void ExtruderPanel::sim_show_busy() {
-  // Pretend a load just started: action buttons disabled, spinner visible.
-  // We don't actually send_action() because there's no websocket and the
-  // safety timer would fire ACTION_TIMEOUT_MS later.
-  action_in_flight = true;
+  // Pretend Extrude was pressed cold: heating toward target, action buttons
+  // disabled, spinner + caption visible. We don't send_action() (no websocket;
+  // the safety timer would also fire ACTION_TIMEOUT_MS later) — just stage the
+  // pending state so the heat-up caption can be visually verified.
+  action_name = "Extrude";
+  pending_kind = PA_EXTRUDE;
+  pending_want = 220;
+  current_temp = 25;
   refresh_button_state();
   lv_obj_move_foreground(panel_cont);
 }
