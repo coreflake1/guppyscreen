@@ -37,6 +37,9 @@ namespace KUtils {
   void style_dialog_box(lv_obj_t *box);          // the centered card
   void style_dialog_title(lv_obj_t *title);      // top-aligned header label
   void style_dialog_msgbox(lv_obj_t *mbox);      // card look for an lv_msgbox
+  // Full modal look for an lv_msgbox: card + centered body + floating, centered
+  // button row (btns_pct = button-row width). Matches the print-lock dialogs.
+  void style_lock_mbox(lv_obj_t *mbox, lv_coord_t btns_pct);
 
   // path, width
   std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j, double scale);

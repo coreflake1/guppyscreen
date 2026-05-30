@@ -6,6 +6,7 @@
 #include "button_container.h"
 #include "image_label.h"
 #include "finetune_panel.h"
+#include "exclude_object_panel.h"
 #include "mini_print_status.h"
 #include "lvgl/lvgl.h"
 
@@ -51,10 +52,12 @@ class PrintStatusPanel : public NotifyConsumer {
  private:
   KWebSocketClient &ws;
   FineTunePanel finetune_panel;
+  ExcludeObjectPanel exclude_object_panel;
   MiniPrintStatus mini_print_status;
   lv_obj_t *status_cont;
   lv_obj_t *buttons_cont;
   ButtonContainer finetune_btn;
+  ButtonContainer objects_btn;
   ButtonContainer pause_btn;
   ButtonContainer resume_btn;
   ButtonContainer cancel_btn;

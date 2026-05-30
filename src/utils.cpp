@@ -93,7 +93,7 @@ namespace KUtils {
 
   // Shared styling so print-lock dialogs match the app's other msgboxes:
   // centered body text and a floating, centered button row at the bottom.
-  static void style_lock_mbox(lv_obj_t *mbox, lv_coord_t btns_pct) {
+  void style_lock_mbox(lv_obj_t *mbox, lv_coord_t btns_pct) {
     style_dialog_msgbox(mbox);
 
     lv_obj_t *msg = ((lv_msgbox_t *)mbox)->text;

@@ -17,6 +17,7 @@ LV_IMG_DECLARE(heater);
 LV_IMG_DECLARE(layers_img);
 
 LV_IMG_DECLARE(fine_tune_img);
+LV_IMG_DECLARE(delete_img);
 LV_IMG_DECLARE(pause_img);
 LV_IMG_DECLARE(resume);
 LV_IMG_DECLARE(cancel);
@@ -31,10 +32,12 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   : NotifyConsumer(lock)
   , ws(websocket_client)
   , finetune_panel(websocket_client, lock)
+  , exclude_object_panel(websocket_client, lock)
   , mini_print_status(mini_parent, &PrintStatusPanel::_handle_callback, this)
   , status_cont(lv_obj_create(lv_scr_act()))
   , buttons_cont(lv_obj_create(status_cont))
   , finetune_btn(buttons_cont, &fine_tune_img, "Fine Tune", &PrintStatusPanel::_handle_callback, this)
+  , objects_btn(buttons_cont, &delete_img, "Objects", &PrintStatusPanel::_handle_callback, this)
   , pause_btn(buttons_cont, &pause_img, "Pause", &PrintStatusPanel::_handle_callback, this)
   , resume_btn(buttons_cont, &resume, "Resume", &PrintStatusPanel::_handle_callback, this)
   , cancel_btn(buttons_cont, &cancel, "Cancel", &PrintStatusPanel::_handle_callback, this,
@@ -118,11 +121,15 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   lv_obj_set_flex_align(buttons_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
   lv_obj_set_flex_grow(finetune_btn.get_container(), 1);
+  lv_obj_set_flex_grow(objects_btn.get_container(), 1);
   lv_obj_set_flex_grow(pause_btn.get_container(), 1);
   lv_obj_set_flex_grow(resume_btn.get_container(), 1);
   lv_obj_set_flex_grow(cancel_btn.get_container(), 1);
   lv_obj_set_flex_grow(emergency_btn.get_container(), 1);
   lv_obj_set_flex_grow(back_btn.get_container(), 1);
+
+  // Hidden until a print with labelled objects is active (see consume()).
+  lv_obj_add_flag(objects_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_set_style_pad_all(pbar_cont, 0, 0);
   lv_obj_set_size(pbar_cont, LV_PCT(100), LV_SIZE_CONTENT);
@@ -354,6 +361,15 @@ void PrintStatusPanel::handle_metadata(const std::string &gcode_file, json &j) {
 void PrintStatusPanel::consume(json &j) {
   std::lock_guard<std::mutex> lock(lv_lock);
 
+  // Only surface the Exclude Objects button when the active print actually has
+  // labelled objects — otherwise it just crowds the button row.
+  auto objs = State::get_instance()->get_data("/printer_state/exclude_object/objects"_json_pointer);
+  if (objs.is_array() && !objs.empty()) {
+    lv_obj_clear_flag(objects_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+  } else {
+    lv_obj_add_flag(objects_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
+  }
+
   auto printfile = j["/params/0/print_stats/filename"_json_pointer];
   if (!printfile.is_null()) {
     // filename change indicates a start of a print
@@ -556,6 +572,8 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
     ws.send_jsonrpc("printer.print.cancel");
   } else if (btn == finetune_btn.get_container()) {
     finetune_panel.foreground();
+  } else if (btn == objects_btn.get_container()) {
+    exclude_object_panel.foreground();
   } else if (btn == mini_print_status.get_container()) {
     foreground();
   }
@@ -691,7 +709,20 @@ void PrintStatusPanel::sim_setup_mock_data() {
     }},
     {"virtual_sdcard", {{"progress", 0.20}}},
     {"extruder", {{"temperature", 210}, {"target", 220}}},
-    {"heater_bed", {{"temperature", 62}, {"target", 65}}}
+    {"heater_bed", {{"temperature", 62}, {"target", 65}}},
+    // Labelled objects so the conditional "Objects" button shows in the sim.
+    {"exclude_object", {
+      {"objects", {
+        {{"name", "benchy_1"}, {"center", {60, 60}},
+         {"polygon", {{40, 40}, {80, 40}, {80, 80}, {40, 80}}}},
+        {{"name", "benchy_2"}, {"center", {165, 85}},
+         {"polygon", {{145, 60}, {185, 60}, {185, 110}, {145, 110}}}},
+        {{"name", "LongBracketMountFilename_v3_id2"}, {"center", {110, 165}},
+         {"polygon", {{90, 145}, {130, 145}, {130, 185}, {90, 185}}}}
+      }},
+      {"excluded_objects", {"benchy_2"}},
+      {"current_object", "benchy_1"}
+    }}
   }}}};
   State::get_instance()->consume(mock);
   // consume() will reset() + populate() + foreground() because filename is
