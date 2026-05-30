@@ -38,19 +38,26 @@ MiniPrintStatus::MiniPrintStatus(lv_obj_t *parent,
   lv_obj_add_flag(cont, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(cont, cb, LV_EVENT_CLICKED, user_data);
 
-  lv_label_set_text(status_label, fmt::format("ETA: {}\nStatus: {}", eta, status).c_str());
+  lv_label_set_text(status_label, fmt::format("ETA: {}\n{}", eta, status).c_str());
+  // Homing/Extrude are blocked while printing, so this overlay can afford a
+  // modest bump up from the tiny default — but keep it balanced with the
+  // thumbnail preview alongside it.
+  lv_obj_set_style_text_font(status_label, &lv_font_montserrat_12, 0);
 
   lv_arc_set_rotation(progress_bar, 270);
-  lv_obj_set_size(progress_bar, 40 * scale, 40 * scale);
-  lv_obj_set_style_arc_width(progress_bar, 10 * scale, LV_PART_MAIN);
-  lv_obj_set_style_arc_width(progress_bar, 10 * scale, LV_PART_INDICATOR);
+  // Small progress ring so the thumbnail preview can be the overlay's hero.
+  lv_obj_set_size(progress_bar, 28, 28);
+  lv_obj_set_style_arc_width(progress_bar, 4, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(progress_bar, 4, LV_PART_INDICATOR);
   lv_arc_set_bg_angles(progress_bar, 0, 360);
   lv_obj_remove_style(progress_bar, NULL, LV_PART_KNOB);
   lv_obj_clear_flag(progress_bar, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_center(progress_bar);
 
   lv_img_set_size_mode(thumb, LV_IMG_SIZE_MODE_REAL);
-  
+  // Hidden until a real thumbnail arrives (update_img); avoids the red
+  // empty-image placeholder block.
+  lv_obj_add_flag(thumb, LV_OBJ_FLAG_HIDDEN);
 }
 
 MiniPrintStatus::~MiniPrintStatus() {
@@ -77,12 +84,12 @@ lv_obj_t *MiniPrintStatus::get_container() {
 
 void MiniPrintStatus::update_eta(std::string &eta_str) {
   eta = eta_str;
-  lv_label_set_text(status_label, fmt::format("ETA: {}\nStatus: {}", eta, status).c_str());
+  lv_label_set_text(status_label, fmt::format("ETA: {}\n{}", eta, status).c_str());
 }
 
 void MiniPrintStatus::update_status(std::string &status_str) {
   status = status_str;
-  lv_label_set_text(status_label, fmt::format("ETA: {}\nStatus: {}", eta, status).c_str());
+  lv_label_set_text(status_label, fmt::format("ETA: {}\n{}", eta, status).c_str());
 }
 
 void MiniPrintStatus::update_progress(int p) {
@@ -91,18 +98,21 @@ void MiniPrintStatus::update_progress(int p) {
 
 void MiniPrintStatus::update_img(const std::string &img_path, size_t twidth) {
   auto screen_width = lv_disp_get_physical_hor_res(NULL);
-  uint32_t normalized_thumb_scale = ((0.05 * (double)screen_width) / (double)twidth) * 256;
-  lv_img_set_zoom(thumb, normalized_thumb_scale);  
+  // ~12% of screen width — the preview is the overlay's hero now that the
+  // progress ring is small.
+  uint32_t normalized_thumb_scale = ((0.12 * (double)screen_width) / (double)twidth) * 256;
+  lv_img_set_zoom(thumb, normalized_thumb_scale);
+  lv_obj_clear_flag(thumb, LV_OBJ_FLAG_HIDDEN);  // a real preview arrived — show it
   lv_img_set_src(thumb, img_path.c_str());
 }
 
 void MiniPrintStatus::reset() {
   lv_arc_set_value(progress_bar, 0);
 
-  // free src
+  // Drop the preview and hide it until the next job's thumbnail loads (avoids
+  // the old red empty-image placeholder block).
   lv_img_set_src(thumb, NULL);
-  // hack to color in empty space.
-  ((lv_img_t*)thumb)->src_type = LV_IMG_SRC_SYMBOL;
+  lv_obj_add_flag(thumb, LV_OBJ_FLAG_HIDDEN);
 
   eta = "...";
   status = "n/a";  

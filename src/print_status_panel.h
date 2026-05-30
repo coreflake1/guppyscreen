@@ -42,6 +42,9 @@ class PrintStatusPanel : public NotifyConsumer {
   int current_layer(json &info);
 
   FineTunePanel &get_finetune_panel();
+  // The floating print overlay container, so the home panel can position it
+  // relative to its button cluster.
+  lv_obj_t *get_mini_container() { return mini_print_status.get_container(); }
 
 #ifdef SIMULATOR
   // Populate fake print state (filename, progress, elapsed) so the panel can be

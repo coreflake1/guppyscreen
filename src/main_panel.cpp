@@ -241,6 +241,12 @@ void MainPanel::create_main(lv_obj_t *parent)
   lv_obj_set_grid_cell(led_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_grid_cell(print_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 2, 1);
 
+  // The print overlay (shown only while printing, when Homing/Extrude are
+  // locked) lives in the button cluster, left-aligned with the Homing box.
+  lv_obj_t *mini = print_status_panel.get_mini_container();
+  lv_obj_set_parent(mini, btn_wrapper);
+  lv_obj_align(mini, LV_ALIGN_TOP_LEFT, 0, 0);
+
   /* Disable scrolling on the sensor container — the 5px left border on each
    * sensor row was tripping the horizontal scrollbar even though everything
    * fits visually. */
