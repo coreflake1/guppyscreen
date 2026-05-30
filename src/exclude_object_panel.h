@@ -48,7 +48,8 @@ class ExcludeObjectPanel : public NotifyConsumer {
   ButtonContainer back_btn;
 
   bool is_foreground = false;
-  std::string pending_name;  // object awaiting exclude confirmation
+  std::string pending_name;       // object awaiting exclude confirmation
+  lv_obj_t *confirm_mbox = nullptr;  // open confirm dialog, or null — guards double-taps
 
   // Bed bounds (mm) the current draw was mapped with; reused by the hit-test.
   double bed_min_x = 0.0, bed_max_x = 220.0;

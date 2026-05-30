@@ -252,6 +252,10 @@ void ExcludeObjectPanel::redraw() {
 
 void ExcludeObjectPanel::handle_canvas_click(lv_event_t *e) {
   (void)e;
+  // Ignore taps while a confirm dialog is already up (the resistive panel can
+  // bounce a single tap into several release events).
+  if (confirm_mbox != nullptr) return;
+
   lv_indev_t *indev = lv_indev_get_act();
   if (indev == NULL) return;
 
@@ -290,16 +294,24 @@ void ExcludeObjectPanel::confirm_exclude(const std::string &name) {
   if (shown.size() > MAXLEN) {
     shown = shown.substr(0, MAXLEN) + "...";
   }
+
+  // Stronger verb when excluding the object that's printing right now.
+  auto cur = State::get_instance()->get_data("/printer_state/exclude_object/current_object"_json_pointer);
+  bool printing_now = cur.is_string() && cur.template get<std::string>() == name;
+  std::string msg = printing_now
+    ? fmt::format("Stop printing \"{}\"?\nThis cannot be undone.", shown)
+    : fmt::format("Exclude \"{}\"?\nThis cannot be undone.", shown);
+
   static const char *btns[] = {"Exclude", "Cancel", ""};
-  lv_obj_t *mbox = lv_msgbox_create(NULL, NULL,
-    fmt::format("Exclude \"{}\"?\nThis cannot be undone.", shown).c_str(),
-    btns, false);
+  lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, msg.c_str(), btns, false);
+  confirm_mbox = mbox;
   lv_obj_add_event_cb(mbox, [](lv_event_t *ev) {
     lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(ev));
     auto *self = static_cast<ExcludeObjectPanel *>(lv_event_get_user_data(ev));
     if (lv_msgbox_get_active_btn(obj) == 0) {
       self->do_exclude();
     }
+    self->confirm_mbox = nullptr;
     lv_msgbox_close(obj);
   }, LV_EVENT_VALUE_CHANGED, this);
   KUtils::style_lock_mbox(mbox, 90);  // centered body + centered button row
