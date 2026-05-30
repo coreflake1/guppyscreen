@@ -84,10 +84,12 @@ class PrintStatusPanel : public NotifyConsumer {
   /* json &metadata; */
   uint32_t estimated_time_s;
 
-  // Latest virtual_sdcard/progress value (0.0 .. 1.0). Used so update_time_progress
-  // can compute a dynamic ETA from elapsed/progress instead of only the slicer's
-  // static estimate (#126).
+  // Latest virtual_sdcard/progress value (0.0 .. 1.0) and print_stats/filament_used
+  // (mm). update_time_progress averages the file-, filament- and slicer-based
+  // remaining-time estimates the same way Mainsail does, instead of relying on the
+  // slicer's static estimate alone (#126).
   double current_progress = 0.0;
+  double current_filament_used = 0.0;
   // Tracks the previous /printer_state/print_stats/state so we can dismiss the
   // panel only when we transition out of an active print (#94).
   std::string last_print_state;

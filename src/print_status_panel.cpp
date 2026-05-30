@@ -190,6 +190,7 @@ void PrintStatusPanel::reset() {
   time_left.update_label("...");
   estimated_time_s = 0;
   current_progress = 0.0;
+  current_filament_used = 0.0;
   lv_label_set_text(filename_label, "");
 
   auto v = State::get_instance()
@@ -386,11 +387,16 @@ void PrintStatusPanel::consume(json &j) {
     lv_label_set_text(filename_label, printfile.template get<std::string>().c_str());
   }
 
-  // Track virtual_sdcard progress so update_time_progress can compute a
-  // dynamic ETA (#126).
+  // Track virtual_sdcard progress and filament usage so update_time_progress
+  // can average the file-, filament- and slicer-based ETAs like Mainsail (#126).
   auto progress = j["/params/0/virtual_sdcard/progress"_json_pointer];
   if (!progress.is_null()) {
     current_progress = progress.template get<double>();
+  }
+
+  auto fil_used = j["/params/0/print_stats/filament_used"_json_pointer];
+  if (!fil_used.is_null()) {
+    current_filament_used = fil_used.template get<double>();
   }
 
   auto v = j["/params/0/extruder/target"_json_pointer];
@@ -556,23 +562,45 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
 }
 
 void PrintStatusPanel::update_time_progress(uint32_t time_passed) {
-    int32_t remaining;
-    // Once we're past ~5% progress, the slicer estimate becomes the worse
-    // predictor and elapsed/progress wins (catches fast prints overshooting
-    // the slicer guess, see #126).
-    if (current_progress > 0.05) {
-      uint32_t dynamic_estimate = static_cast<uint32_t>(time_passed / current_progress);
-      remaining = static_cast<int32_t>(dynamic_estimate) - static_cast<int32_t>(time_passed);
-    } else {
-      remaining = static_cast<int32_t>(estimated_time_s) - static_cast<int32_t>(time_passed);
+    // Average the available remaining-time estimates the way Mainsail does: each
+    // method (file, filament, slicer) contributes only when it yields a positive
+    // value, and the displayed ETA is their unweighted mean (#126). This tracks
+    // Mainsail's ETA, which stays accurate when a print over/under-runs the
+    // slicer's static guess.
+    double total = 0.0;
+    int count = 0;
+
+    // file: extrapolate elapsed time over the virtual_sdcard progress fraction.
+    if (current_progress > 0.0 && time_passed > 0) {
+      double file_remaining = time_passed / current_progress - time_passed;
+      if (file_remaining > 0.0) { total += file_remaining; ++count; }
     }
 
-    if (remaining < 0) {
-      time_left.update_label("...");
-    } else {
-      auto eta_str = KUtils::eta_string(remaining);
+    // filament: extrapolate elapsed time over the consumed/total filament ratio.
+    double filament_total = 0.0;
+    if (!current_file.is_null()) {
+      auto ft = current_file["/filament_total"_json_pointer];
+      if (!ft.is_null()) filament_total = ft.template get<double>();
+    }
+    if (current_filament_used > 0.0 && filament_total > current_filament_used
+        && time_passed > 0) {
+      double filament_remaining =
+        time_passed / (current_filament_used / filament_total) - time_passed;
+      if (filament_remaining > 0.0) { total += filament_remaining; ++count; }
+    }
+
+    // slicer: the static estimate from the gcode metadata.
+    if (estimated_time_s > 0) {
+      double slicer_remaining = static_cast<double>(estimated_time_s) - time_passed;
+      if (slicer_remaining > 0.0) { total += slicer_remaining; ++count; }
+    }
+
+    if (count > 0) {
+      auto eta_str = KUtils::eta_string(static_cast<int64_t>(total / count));
       time_left.update_label(eta_str.c_str());
       mini_print_status.update_eta(eta_str);
+    } else {
+      time_left.update_label("...");
     }
 
     elapsed.update_label(KUtils::eta_string(time_passed).c_str());
@@ -650,8 +678,7 @@ FineTunePanel &PrintStatusPanel::get_finetune_panel() {
 
 #ifdef SIMULATOR
 void PrintStatusPanel::sim_setup_mock_data() {
-  // Mid-print snapshot: 20% in, 10 minutes elapsed. Drives the dynamic-ETA
-  // branch (progress > 0.05) so we should see remaining ~40 minutes.
+  // Mid-print snapshot: 20% in, 10 minutes elapsed.
   // To preview the auto-dismiss (#94) on this build, change "printing" to
   // "complete" and rebuild — the panel should NOT foreground.
   json mock = {{"params", {{
@@ -668,8 +695,22 @@ void PrintStatusPanel::sim_setup_mock_data() {
   }}}};
   State::get_instance()->consume(mock);
   // consume() will reset() + populate() + foreground() because filename is
-  // present, then drive update_time_progress(600) which hits the dynamic-ETA
-  // branch via current_progress=0.20.
+  // present, then drive update_time_progress(600) with current_progress=0.20.
   consume(mock);
+
+  // reset() (inside consume) cleared the slicer estimate and metadata, so only
+  // the file method had data above. Inject a slicer estimate + filament total
+  // the way handle_metadata would, then recompute so the displayed ETA shows
+  // the full Mainsail-style average of all three methods (#126):
+  //   file     = 600/0.20            - 600 = 2400 s
+  //   filament = 600/(1234.5/5000.0) - 600 ≈ 1831 s
+  //   slicer   = 3000                - 600 = 2400 s
+  //   mean ≈ 2210 s ≈ 36m50s remaining.
+  estimated_time_s = 3000;
+  current_file = {{"filament_total", 5000.0}};
+  {
+    std::lock_guard<std::mutex> lock(lv_lock);
+    update_time_progress(600);
+  }
 }
 #endif
