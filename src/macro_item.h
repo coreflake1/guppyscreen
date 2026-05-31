@@ -42,6 +42,7 @@ class MacroItem {
   // collapse/expand of the parameter rows
   void set_expanded(bool e);
   void toggle_expand() { set_expanded(!expanded); }
+  bool is_expanded() const { return expanded; }
   bool has_params() const { return !params.empty(); }
 
   static void _handle_kb_input(lv_event_t *e) {

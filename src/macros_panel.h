@@ -37,6 +37,8 @@ class MacrosPanel {
   void move_highlight(int delta);
   void set_highlight(int idx);
   void highlight_item(MacroItem *m);
+  void toggle_expand(MacroItem *m);
+  void collapse_expanded();
 
   KWebSocketClient &ws;
   std::mutex &lv_lock;
@@ -53,6 +55,7 @@ class MacrosPanel {
   lv_obj_t *kb;
   View view;
   int highlight_index;
+  MacroItem *expanded_item;
   std::vector<std::shared_ptr<MacroItem>> macro_items;
   std::vector<MacroItem*> visible_items;
 

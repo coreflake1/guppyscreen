@@ -25,6 +25,7 @@ MacrosPanel::MacrosPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent)
   , kb(lv_keyboard_create(cont))
   , view(FAVORITES)
   , highlight_index(-1)
+  , expanded_item(nullptr)
 {
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_pad_all(cont, 0, 0);
@@ -132,6 +133,7 @@ void MacrosPanel::populate() {
   macro_items.clear();
   visible_items.clear();
   highlight_index = -1;
+  expanded_item = nullptr;
 
   auto config_json = State::get_instance()
     ->get_data("/printer_state/configfile/config"_json_pointer);
@@ -148,7 +150,7 @@ void MacrosPanel::populate() {
       macro_items.push_back(std::make_shared<MacroItem>(
 	ws, top_cont, k, v, kb, fav,
 	[this]() { apply_view(); },
-	[this](MacroItem *m) { highlight_item(m); }));
+	[this](MacroItem *m) { highlight_item(m); toggle_expand(m); }));
     }
   }
 
@@ -170,7 +172,32 @@ void MacrosPanel::highlight_item(MacroItem *m) {
   }
 }
 
+// single-expand: expanding one macro collapses any other that was open
+void MacrosPanel::toggle_expand(MacroItem *m) {
+  if (m->is_expanded()) {
+    m->set_expanded(false);
+    if (expanded_item == m) {
+      expanded_item = nullptr;
+    }
+  } else {
+    if (expanded_item != nullptr && expanded_item != m) {
+      expanded_item->set_expanded(false);
+    }
+    m->set_expanded(true);
+    expanded_item = m;
+  }
+}
+
+void MacrosPanel::collapse_expanded() {
+  if (expanded_item != nullptr) {
+    expanded_item->set_expanded(false);
+    expanded_item = nullptr;
+  }
+}
+
 void MacrosPanel::apply_view() {
+  // switching views (or re-entering the tab) collapses any open macro
+  collapse_expanded();
   for (const auto &m : macro_items) {
     m->set_visible(view == ALL || m->is_favorite());
   }
@@ -230,6 +257,10 @@ void MacrosPanel::move_highlight(int delta) {
   } else if (idx >= (int)visible_items.size()) {
     idx = (int)visible_items.size() - 1;
   }
+  // moving the highlight away collapses whatever was expanded
+  if (idx != highlight_index) {
+    collapse_expanded();
+  }
   set_highlight(idx);
 }
 
@@ -254,7 +285,7 @@ void MacrosPanel::handle_nav(lv_event_t *e) {
   } else if (target == ok_btn) {
     if (highlight_index >= 0 && highlight_index < (int)visible_items.size()) {
       MacroItem *m = visible_items[highlight_index];
-      m->toggle_expand();
+      toggle_expand(m);
       lv_obj_scroll_to_view(m->get_cont(), LV_ANIM_ON);
     }
   }

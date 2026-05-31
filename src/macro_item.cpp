@@ -153,11 +153,11 @@ void MacroItem::set_expanded(bool e) {
 
 void MacroItem::handle_expand(lv_event_t *e) {
   if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
-    // tapping a row also moves the keyboard-nav highlight onto it
+    // tapping a row moves the highlight onto it and toggles its expansion;
+    // the panel handles both (so it can enforce single-expand)
     if (on_activated) {
       on_activated(this);
     }
-    toggle_expand();
   }
 }
 
@@ -195,11 +195,19 @@ void MacroItem::handle_kb_input(lv_event_t *e)
     spdlog::trace("macro item focused");
     lv_keyboard_set_textarea(kb, obj);
     lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
-    // the keyboard now occupies the bottom of the panel; relayout so the list
-    // shrinks above it, then scroll the field being edited into that visible
-    // area so it isn't hidden behind the keyboard
     lv_obj_update_layout(lv_obj_get_parent(kb));
-    lv_obj_scroll_to_view(obj, LV_ANIM_OFF);
+
+    // position the field being edited just above the keyboard (small gap),
+    // by scrolling the macro list (this item's parent) by the exact overlap
+    lv_obj_t *list = lv_obj_get_parent(cont);
+    lv_area_t ta_coords, kb_coords;
+    lv_obj_get_coords(obj, &ta_coords);
+    lv_obj_get_coords(kb, &kb_coords);
+    lv_coord_t gap = 10;
+    lv_coord_t delta = (ta_coords.y2 + gap) - kb_coords.y1;
+    if (delta != 0) {
+      lv_obj_scroll_by(list, 0, -delta, LV_ANIM_OFF);
+    }
   }
 
   if(code == LV_EVENT_DEFOCUSED) {
