@@ -195,6 +195,11 @@ void MacroItem::handle_kb_input(lv_event_t *e)
     spdlog::trace("macro item focused");
     lv_keyboard_set_textarea(kb, obj);
     lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    // the keyboard now occupies the bottom of the panel; relayout so the list
+    // shrinks above it, then scroll the field being edited into that visible
+    // area so it isn't hidden behind the keyboard
+    lv_obj_update_layout(lv_obj_get_parent(kb));
+    lv_obj_scroll_to_view(obj, LV_ANIM_OFF);
   }
 
   if(code == LV_EVENT_DEFOCUSED) {
@@ -202,13 +207,12 @@ void MacroItem::handle_kb_input(lv_event_t *e)
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
   }
 
-  if (code == LV_EVENT_READY) {
-    spdlog::trace("macro item keyboard ready");
-  }
-
-  if (code == LV_EVENT_CANCEL) {
-    spdlog::trace("macro item keyboard close");
+  // both the keyboard's OK (checkmark) and close (X) buttons dismiss it
+  if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
+    spdlog::trace("macro item keyboard done");
+    lv_keyboard_set_textarea(kb, NULL);
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_state(obj, LV_STATE_FOCUSED);
   }
 }
 
