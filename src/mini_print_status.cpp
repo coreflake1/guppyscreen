@@ -8,6 +8,7 @@ MiniPrintStatus::MiniPrintStatus(lv_obj_t *parent,
   , progress_bar(lv_arc_create(cont))
   , thumb(lv_img_create(cont))
   , status_label(lv_label_create(cont))
+  , chip(lv_obj_create(parent))
   , status("n/a")
   , eta("...")
 {
@@ -58,12 +59,40 @@ MiniPrintStatus::MiniPrintStatus(lv_obj_t *parent,
   // Hidden until a real thumbnail arrives (update_img); avoids the red
   // empty-image placeholder block.
   lv_obj_add_flag(thumb, LV_OBJ_FLAG_HIDDEN);
+
+  // Tiny "Paused" pill shown in place of the full overlay while paused. It's a
+  // separate floating object the home panel positions in a corner; tapping it
+  // opens the full status panel (same callback as the overlay).
+  lv_obj_add_flag(chip, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(chip, LV_OBJ_FLAG_FLOATING);
+  lv_obj_clear_flag(chip, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_size(chip, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_hor(chip, 8, 0);
+  lv_obj_set_style_pad_ver(chip, 3, 0);
+  lv_obj_set_style_radius(chip, LV_RADIUS_CIRCLE, 0);
+  lv_obj_set_style_border_width(chip, 0, 0);
+  // Match the themed (blue) primary used by the other buttons rather than
+  // standing out — nothing else in the UI is amber.
+  lv_obj_set_style_bg_color(chip, lv_theme_get_color_primary(chip), 0);
+  lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
+  lv_obj_add_flag(chip, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(chip, cb, LV_EVENT_CLICKED, user_data);
+
+  lv_obj_t *chip_label = lv_label_create(chip);
+  lv_label_set_text(chip_label, LV_SYMBOL_PAUSE " Paused");
+  lv_obj_set_style_text_font(chip_label, &lv_font_montserrat_12, 0);
+  lv_obj_set_style_text_color(chip_label, lv_color_white(), 0);
+  lv_obj_center(chip_label);
 }
 
 MiniPrintStatus::~MiniPrintStatus() {
   if (cont != NULL) {
     lv_obj_del(cont);
     cont = NULL;
+  }
+  if (chip != NULL) {
+    lv_obj_del(chip);
+    chip = NULL;
   }
 }
 
@@ -80,6 +109,19 @@ void MiniPrintStatus::hide() {
 
 lv_obj_t *MiniPrintStatus::get_container() {
   return cont;
+}
+
+void MiniPrintStatus::show_chip() {
+  lv_obj_clear_flag(chip, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(chip);
+}
+
+void MiniPrintStatus::hide_chip() {
+  lv_obj_add_flag(chip, LV_OBJ_FLAG_HIDDEN);
+}
+
+lv_obj_t *MiniPrintStatus::get_chip() {
+  return chip;
 }
 
 void MiniPrintStatus::update_eta(std::string &eta_str) {

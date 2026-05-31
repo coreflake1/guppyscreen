@@ -45,6 +45,9 @@ class PrintStatusPanel : public NotifyConsumer {
   // The floating print overlay container, so the home panel can position it
   // relative to its button cluster.
   lv_obj_t *get_mini_container() { return mini_print_status.get_container(); }
+  // The tiny "Paused" chip, so the home panel can park it in a corner clear of
+  // the Homing/Extrude buttons.
+  lv_obj_t *get_mini_chip() { return mini_print_status.get_chip(); }
 
 #ifdef SIMULATOR
   // Populate fake print state (filename, progress, elapsed) so the panel can be

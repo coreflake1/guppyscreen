@@ -250,6 +250,13 @@ void MainPanel::create_main(lv_obj_t *parent)
   lv_obj_set_parent(mini, btn_wrapper);
   lv_obj_align(mini, LV_ALIGN_TOP_LEFT, 0, 0);
 
+  // The "Paused" chip (shown only while paused, when the buttons are live)
+  // parks in the top-right corner. It's small enough to leave the buttons
+  // underneath it tappable while staying clearly visible.
+  lv_obj_t *paused_chip = print_status_panel.get_mini_chip();
+  lv_obj_set_parent(paused_chip, main_cont);
+  lv_obj_align(paused_chip, LV_ALIGN_TOP_RIGHT, -4, 4);
+
   /* Disable scrolling on the sensor container — the 5px left border on each
    * sensor row was tripping the horizontal scrollbar even though everything
    * fits visually. */

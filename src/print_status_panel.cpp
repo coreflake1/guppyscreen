@@ -246,9 +246,15 @@ void PrintStatusPanel::init(json &fans) {
   if (!pstat_state.is_null()) {
     auto pstatus = pstat_state.template get<std::string>();
     // Overlay rides over Homing/Extrude, so show it only while actively
-    // printing; when paused (or idle) hide it to reveal those buttons.
-    if (pstatus != "printing") {
+    // printing; when paused swap it for the small chip; when idle hide both.
+    if (pstatus == "paused") {
       mini_print_status.hide();
+      mini_print_status.show_chip();
+    } else if (pstatus != "printing") {
+      mini_print_status.hide();
+      mini_print_status.hide_chip();
+    } else {
+      mini_print_status.hide_chip();
     }
     mini_print_status.update_status(pstatus);
   } else {
@@ -385,6 +391,7 @@ void PrintStatusPanel::consume(json &j) {
     auto print_status = pstate.template get<std::string>();
     if (print_status != "printing" && print_status != "paused") {
       mini_print_status.hide();
+      mini_print_status.hide_chip();
       // Print just ended (#94). Dismiss the full status panel if it was up
       // for the print we just finished — otherwise the user is stuck looking
       // at a "done" panel with no obvious next step.
@@ -392,12 +399,15 @@ void PrintStatusPanel::consume(json &j) {
         lv_obj_move_background(status_cont);
       }
     } else if (print_status == "paused") {
-      // Hide the overlay while paused so the Homing/Extrude buttons it sits over
-      // are revealed and tappable (purge/load filament, jog). Don't dismiss the
-      // full status panel — the job isn't over.
+      // Swap the big overlay for a small "Paused" chip so the Homing/Extrude
+      // buttons it sat over are revealed and tappable (purge/load filament,
+      // jog) while a tap still returns to the full status panel. Don't dismiss
+      // the full status panel — the job isn't over.
       mini_print_status.hide();
+      mini_print_status.show_chip();
     } else {
       mini_print_status.show();
+      mini_print_status.hide_chip();
     }
 
     mini_print_status.update_status(print_status);
@@ -581,7 +591,8 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
     finetune_panel.foreground();
   } else if (btn == objects_btn.get_container()) {
     exclude_object_panel.foreground();
-  } else if (btn == mini_print_status.get_container()) {
+  } else if (btn == mini_print_status.get_container()
+             || btn == mini_print_status.get_chip()) {
     foreground();
   }
 }
