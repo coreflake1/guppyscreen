@@ -70,6 +70,9 @@ MacrosPanel::MacrosPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent)
   lv_obj_set_flex_flow(top_cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_row(top_cont, 0, 0);
   lv_obj_set_scrollbar_mode(top_cont, LV_SCROLLBAR_MODE_OFF);
+  // clamp scrolling to the content (no elastic over-scroll past the first/last
+  // macro, which would leave whitespace at the top)
+  lv_obj_clear_flag(top_cont, LV_OBJ_FLAG_SCROLL_ELASTIC);
 
   // floated (ignored by the list's flex layout) so it can be centred
   lv_label_set_text(empty_label,
@@ -202,6 +205,10 @@ void MacrosPanel::apply_view() {
     m->set_visible(view == ALL || m->is_favorite());
   }
   rebuild_visible();
+
+  // reset scroll to the top so a switched/re-entered view starts at the first
+  // row (and the centered empty-state label isn't scrolled out of sight)
+  lv_obj_scroll_to_y(top_cont, 0, LV_ANIM_OFF);
 
   bool empty = (view == FAVORITES) && visible_items.empty();
   if (empty) {
