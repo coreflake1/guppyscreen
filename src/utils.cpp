@@ -46,6 +46,15 @@ namespace KUtils {
     return false;
   }
 
+  bool is_paused() {
+    auto v = State::get_instance()
+      ->get_data("/printer_state/print_stats/state"_json_pointer);
+    if (!v.is_null()) {
+      return v.template get<std::string>() == "paused";
+    }
+    return false;
+  }
+
   void style_dialog_overlay(lv_obj_t *overlay) {
     lv_obj_set_size(overlay, LV_PCT(100), LV_PCT(100));
     lv_obj_clear_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);

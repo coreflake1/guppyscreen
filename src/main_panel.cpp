@@ -160,7 +160,8 @@ void MainPanel::handle_homing_cb(lv_event_t *event) {
   spdlog::trace("clicked homing1");
   if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
     spdlog::trace("clicked homing");
-    if (KUtils::is_printing()) {
+    // Allowed while paused (toolhead is parked) — only block mid-print.
+    if (KUtils::is_printing() && !KUtils::is_paused()) {
       KUtils::notify_locked();
       return;
     }
@@ -171,7 +172,9 @@ void MainPanel::handle_homing_cb(lv_event_t *event) {
 void MainPanel::handle_extrude_cb(lv_event_t *event) {
   if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
     spdlog::trace("clicked extruder");
-    if (KUtils::is_printing()) {
+    // Allowed while paused so the user can purge/load filament (runout, manual
+    // colour change) — only block mid-print.
+    if (KUtils::is_printing() && !KUtils::is_paused()) {
       KUtils::notify_locked();
       return;
     }

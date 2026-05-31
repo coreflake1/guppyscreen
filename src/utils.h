@@ -16,6 +16,10 @@ namespace KUtils {
   // True while a print job is active (printing or paused). Panels that move axes,
   // home, or run calibration must not act in this state.
   bool is_printing();
+  // True only while the print is paused. When paused the toolhead is parked, so
+  // jogging/extruding (filament runout, manual M600 colour change) is safe and
+  // we let Homing/Extrude through.
+  bool is_paused();
   // Modal "Unavailable while printing" notice (single OK button).
   void notify_locked();
   // Transient, auto-dismissing message (no buttons). Used for non-blocking

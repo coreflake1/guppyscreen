@@ -245,7 +245,9 @@ void PrintStatusPanel::init(json &fans) {
     ->get_data("/printer_state/print_stats/state"_json_pointer);
   if (!pstat_state.is_null()) {
     auto pstatus = pstat_state.template get<std::string>();
-    if (pstatus != "printing" && pstatus != "paused") {
+    // Overlay rides over Homing/Extrude, so show it only while actively
+    // printing; when paused (or idle) hide it to reveal those buttons.
+    if (pstatus != "printing") {
       mini_print_status.hide();
     }
     mini_print_status.update_status(pstatus);
@@ -389,6 +391,11 @@ void PrintStatusPanel::consume(json &j) {
       if (last_print_state == "printing" || last_print_state == "paused") {
         lv_obj_move_background(status_cont);
       }
+    } else if (print_status == "paused") {
+      // Hide the overlay while paused so the Homing/Extrude buttons it sits over
+      // are revealed and tappable (purge/load filament, jog). Don't dismiss the
+      // full status panel — the job isn't over.
+      mini_print_status.hide();
     } else {
       mini_print_status.show();
     }
