@@ -88,6 +88,12 @@ class MainPanel : public NotifyConsumer {
     panel->handle_print_cb(event);
   };
 
+  void handle_tab_changed(lv_event_t *event);
+  static void _handle_tab_changed(lv_event_t *event) {
+    MainPanel *panel = (MainPanel*)event->user_data;
+    panel->handle_tab_changed(event);
+  };
+
  private:
   void create_main(lv_obj_t *parent);
   KWebSocketClient &ws;

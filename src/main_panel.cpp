@@ -138,6 +138,9 @@ void MainPanel::create_panel() {
   lv_obj_clear_flag(lv_tabview_get_content(tabview), LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_event_cb(lv_tabview_get_content(tabview), scroll_begin_event, LV_EVENT_SCROLL_BEGIN, NULL);
 
+  // always reset the Macros tab to its Favorites view whenever it's opened
+  lv_obj_add_event_cb(tabview, &MainPanel::_handle_tab_changed, LV_EVENT_VALUE_CHANGED, this);
+
   lv_obj_t *tab_btns = lv_tabview_get_tab_btns(tabview);
   lv_obj_set_style_bg_color(tab_btns, lv_palette_main(LV_PALETTE_GREY), LV_STATE_CHECKED | LV_PART_ITEMS);
   lv_obj_set_style_outline_width(tab_btns, 0, LV_PART_ITEMS | LV_STATE_FOCUS_KEY | LV_STATE_FOCUS_KEY);
@@ -200,6 +203,15 @@ void MainPanel::handle_print_cb(lv_event_t *event) {
   if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
     spdlog::trace("clicked print");
     print_panel.foreground();
+  }
+}
+
+void MainPanel::handle_tab_changed(lv_event_t *event) {
+  if (lv_event_get_code(event) == LV_EVENT_VALUE_CHANGED) {
+    // macros_tab is the 2nd tab (index 1); reset it to Favorites on entry
+    if (lv_tabview_get_tab_act(tabview) == 1) {
+      macros_panel.reset_to_favorites();
+    }
   }
 }
 
@@ -428,6 +440,52 @@ void MainPanel::sim_setup_mock_data() {
       }
       s->update_series(v);
     }
+  }
+
+  /* Seed a handful of gcode_macros into printer_state so the Macros panel
+   * has realistic data to render in the sim: a mix of param/no-param macros,
+   * a couple of `_`-private ones (which parse_macros filters out), and enough
+   * entries to require scrolling. One is pre-favorited via the guppyscreen DB
+   * namespace so the Favorites view isn't empty. */
+  {
+    auto mock_macro = [](const std::string &gcode) {
+      json m;
+      m["gcode"] = gcode;
+      return m;
+    };
+
+    json cfg;
+    cfg["gcode_macro LOAD_FILAMENT"] =
+      mock_macro("{% set t = params.TEMP|default(220) %}\nM109 S{t}\nG1 E50 F300");
+    cfg["gcode_macro UNLOAD_FILAMENT"] =
+      mock_macro("{% set t = params.TEMP|default(220) %}\nM109 S{t}\nG1 E-50 F300");
+    cfg["gcode_macro HEAT_SOAK"] =
+      mock_macro("{% set t = params.TEMP|default(60) %}{% set d = params.DURATION|default(10) %}\nM140 S{t}");
+    cfg["gcode_macro START_PRINT"] =
+      mock_macro("{% set bed = params.BED|default(60) %}{% set hot = params.EXTRUDER|default(200) %}\nM140 S{bed}");
+    cfg["gcode_macro END_PRINT"]    = mock_macro("M104 S0\nM140 S0\nG28 X Y");
+    cfg["gcode_macro PURGE"]        = mock_macro("G1 E20 F200");
+    cfg["gcode_macro CLEAN_NOZZLE"] = mock_macro("G28\nG1 X10 Y10 F3000");
+    cfg["gcode_macro PARK"]         = mock_macro("G1 X0 Y0 F6000");
+    cfg["gcode_macro BEEP"]         = mock_macro("M300 S1000 P200");
+    cfg["gcode_macro LED_ON"]       = mock_macro("SET_PIN PIN=caselight VALUE=1");
+    cfg["gcode_macro LED_OFF"]      = mock_macro("SET_PIN PIN=caselight VALUE=0");
+    cfg["gcode_macro PROBE_CALIBRATE"] =
+      mock_macro("{% set sp = params.SPEED|default(5) %}\nPROBE_CALIBRATE");
+    cfg["gcode_macro CALIBRATE_PRESSURE_ADVANCE_LONG_NAME_TEST"] =
+      mock_macro("TUNING_TOWER COMMAND=SET_PRESSURE_ADVANCE");
+    cfg["gcode_macro _PRIVATE_HELPER"] = mock_macro("G4 P100");
+    cfg["gcode_macro _CG28"]           = mock_macro("G28");
+
+    json ps;
+    ps["params"][0]["configfile"]["config"] = cfg;
+    State::get_instance()->set_data("printer_state", ps, "/params/0");
+
+    json fav;
+    fav["params"][0]["macros"]["settings"]["START_PRINT"]["favorite"] = true;
+    State::get_instance()->set_data("guppysettings", fav, "/params/0");
+
+    macros_panel.populate();
   }
 
   /* Drive the print status panel so its new widgets (filename label,
