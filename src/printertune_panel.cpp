@@ -13,6 +13,7 @@ LV_IMG_DECLARE(inputshaper_img);
 LV_IMG_DECLARE(limit_img);
 LV_IMG_DECLARE(motor_img);
 LV_IMG_DECLARE(chart_img);
+LV_IMG_DECLARE(retract_img);
 
 #ifndef ZBOLT
 LV_IMG_DECLARE(belts_calibration_img);
@@ -31,6 +32,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   , tmc_tune_panel(c)
   , tmc_status_panel(c, l)
   , power_panel(c, l)
+  , firmware_retraction_panel(c, l)
   , bedmesh_btn(cont, &bedmesh_img, "Bed Mesh", &PrinterTunePanel::_handle_callback, this)
   , finetune_btn(cont, &fine_tune_img, "Fine Tune", &PrinterTunePanel::_handle_callback, this)
   , inputshaper_btn(cont, &inputshaper_img, "Input Shaper", &PrinterTunePanel::_handle_callback, this)
@@ -47,6 +49,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
 #else
   , power_devices_btn(cont, &print, "Power Devices", &PrinterTunePanel::_handle_callback, this)
 #endif
+  , retraction_btn(cont, &retract_img, "Retraction", &PrinterTunePanel::_handle_callback, this)
 {
   lv_obj_move_background(cont);
 
@@ -55,8 +58,8 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
 
   tmc_tune_btn.disable();
 
-  static lv_coord_t grid_main_row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(5), LV_GRID_FR(5), LV_GRID_FR(1),
-    LV_GRID_TEMPLATE_LAST};
+  static lv_coord_t grid_main_row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(5), LV_GRID_FR(5), LV_GRID_FR(5),
+    LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
   static lv_coord_t grid_main_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
       LV_GRID_TEMPLATE_LAST};
 
@@ -74,6 +77,9 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   lv_obj_set_grid_cell(tmc_status_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
   lv_obj_set_grid_cell(power_devices_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
   // lv_obj_set_grid_cell(restart_firmware_btn.get_container(), LV_GRID_ALIGN_CENTER, 3, 1, LV_GRID_ALIGN_START, 2, 1);
+
+  // row 3
+  lv_obj_set_grid_cell(retraction_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
 }
 
 PrinterTunePanel::~PrinterTunePanel() {
@@ -149,6 +155,11 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
       spdlog::trace("power devices pressed");
       KUtils::confirm_if_printing("Printer is printing.\nChange power devices anyway?",
         [this]() { power_panel.foreground(); });
+    } else if (btn == retraction_btn.get_container()) {
+      spdlog::trace("retraction pressed");
+      // safe to tune live during a print; the panel shows an empty-state if
+      // [firmware_retraction] isn't configured
+      firmware_retraction_panel.foreground();
     }
   }
 }

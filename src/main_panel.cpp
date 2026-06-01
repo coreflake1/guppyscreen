@@ -508,6 +508,24 @@ void MainPanel::sim_setup_mock_data() {
     macros_panel.populate();
   }
 
+  /* Seed a firmware_retraction object so the Retraction panel renders its live
+   * controls in the sim. (On a real printer without [firmware_retraction] the
+   * object is absent and the panel shows its empty-state instead.) */
+  {
+    json fr;
+    auto &o = fr["params"][0]["firmware_retraction"];
+    o["retract_length"] = 0.5;
+    o["retract_speed"] = 40;
+    o["unretract_extra_length"] = 0.0;
+    o["unretract_speed"] = 30;
+    auto &d = fr["params"][0]["configfile"]["settings"]["firmware_retraction"];
+    d["retract_length"] = 0.5;
+    d["retract_speed"] = 40;
+    d["unretract_extra_length"] = 0.0;
+    d["unretract_speed"] = 30;
+    State::get_instance()->set_data("printer_state", fr, "/params/0");
+  }
+
   /* Seed the console: recent history, favorites, a gcode.help list spanning the
    * quick-filter chip groups, and some output lines. */
   {
