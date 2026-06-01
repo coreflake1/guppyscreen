@@ -105,6 +105,13 @@ namespace KUtils {
   void style_lock_mbox(lv_obj_t *mbox, lv_coord_t btns_pct) {
     style_dialog_msgbox(mbox);
 
+    // centre the title too (dialogs with a title were left-aligned otherwise)
+    lv_obj_t *title = ((lv_msgbox_t *)mbox)->title;
+    if (title != NULL) {
+      lv_obj_set_width(title, LV_PCT(100));
+      lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+    }
+
     lv_obj_t *msg = ((lv_msgbox_t *)mbox)->text;
     lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(msg, LV_PCT(100));

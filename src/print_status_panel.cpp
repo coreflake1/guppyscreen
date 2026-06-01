@@ -475,6 +475,9 @@ void PrintStatusPanel::consume(json &j) {
       mini_print_status.hide();
       mini_print_status.show_chip();
     } else {
+      // actively printing: make sure any leftover completion summary is gone
+      // (covers a new print started externally, including a same-file reprint)
+      lv_obj_move_background(complete_cont);
       mini_print_status.show();
       mini_print_status.hide_chip();
     }
