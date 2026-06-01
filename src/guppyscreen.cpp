@@ -37,6 +37,7 @@ GuppyScreen::GuppyScreen()
   : spoolman_panel(ws, lv_lock)
   , main_panel(ws, lv_lock, spoolman_panel)
   , init_panel(main_panel, main_panel.get_tune_panel().get_bedmesh_panel(), lv_lock)
+  , notification_manager(ws, lv_lock)
 {
   main_panel.create_panel();
 }

@@ -12,6 +12,7 @@
 #include "init_panel.h"
 #include "main_panel.h"
 #include "spoolman_panel.h"
+#include "notification_manager.h"
 #include "websocket_client.h"
 
 class GuppyScreen {
@@ -31,6 +32,7 @@ class GuppyScreen {
   SpoolmanPanel spoolman_panel;
   MainPanel main_panel;
   InitPanel init_panel;
+  NotificationManager notification_manager;
 
  public:
   GuppyScreen();
