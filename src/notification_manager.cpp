@@ -1,5 +1,6 @@
 #include "notification_manager.h"
 #include "state.h"
+#include "utils.h"
 #include "spdlog/spdlog.h"
 
 static const int    TAB_W      = 60;     // left tab bar width
@@ -10,8 +11,8 @@ NotificationManager::NotificationManager(KWebSocketClient &websocket_client, std
   : NotifyConsumer(lock)
   , ws(websocket_client)
   , cont(lv_obj_create(lv_layer_top()))
+  , homing_mbox(NULL)
   , baselined(false)
-  , last_fil_detected(true)
 {
   // toast stack: top of screen, right of the tab bar, stacking downward.
   lv_coord_t w = lv_disp_get_hor_res(NULL) - TAB_W - 8;
@@ -44,9 +45,13 @@ NotificationManager::NotificationManager(KWebSocketClient &websocket_client, std
 #ifdef SIMULATOR
 void NotificationManager::sim_demo() {
   // called from an lv_timer cb -> lv_lock is already held by lv_timer_handler
-  push("Print complete\nbenchy.gcode", INFO);
-  push("Filament runout", WARNING);
-  push("Must home axis first", ERROR);
+  push("Heater extruder: temperature outside range", ERROR);
+  push("Bed leveling complete", INFO);  // M117-style status message
+  static bool homing_shown = false;
+  if (!homing_shown) {  // show the homing modal once so it can be inspected
+    homing_shown = true;
+    show_homing_prompt();
+  }
 }
 #endif
 
@@ -84,7 +89,13 @@ void NotificationManager::handle_gcode_response(json &j) {
     std::string line = el.template get<std::string>();
     // "!! " = Klipper error; "// action:" belongs to PromptPanel; skip the rest
     if (line.rfind("!! ", 0) == 0) {
-      push(line.substr(3), ERROR);
+      std::string err = line.substr(3);
+      // a homing-required error becomes an actionable modal instead of a toast
+      if (err.find("Must home axis first") != std::string::npos) {
+        show_homing_prompt();
+      } else {
+        push(err, ERROR);
+      }
     }
   }
 }
@@ -99,28 +110,10 @@ void NotificationManager::baseline() {
     ? ps["webhooks"]["state"].template get<std::string>() : "ready";
   last_print_state = ps.contains("print_stats") && ps["print_stats"]["state"].is_string()
     ? ps["print_stats"]["state"].template get<std::string>() : "standby";
-  if (ps.contains("print_stats") && ps["print_stats"]["filename"].is_string()) {
-    last_filename = ps["print_stats"]["filename"].template get<std::string>();
-  }
   last_display_msg = ps.contains("display_status") && ps["display_status"]["message"].is_string()
     ? ps["display_status"]["message"].template get<std::string>() : "";
 
-  // discover the filament sensor object (switch or motion) and its current state
-  fil_key.clear();
-  if (ps.is_object()) {
-    for (auto &el : ps.items()) {
-      if (el.key().rfind("filament_switch_sensor ", 0) == 0 ||
-          el.key().rfind("filament_motion_sensor ", 0) == 0) {
-        fil_key = el.key();
-        if (el.value()["filament_detected"].is_boolean()) {
-          last_fil_detected = el.value()["filament_detected"].template get<bool>();
-        }
-        break;
-      }
-    }
-  }
-  spdlog::debug("notif baseline: webhooks={} print={} fil_key='{}' detected={}",
-                last_webhooks_state, last_print_state, fil_key, last_fil_detected);
+  spdlog::debug("notif baseline: webhooks={} print={}", last_webhooks_state, last_print_state);
 }
 
 void NotificationManager::process(json &st) {
@@ -141,41 +134,10 @@ void NotificationManager::process(json &st) {
     }
   }
 
-  // print state transitions (also keeps last_print_state fresh for M117 gating)
-  if (st.contains("print_stats")) {
-    auto &p = st["print_stats"];
-    if (p["filename"].is_string()) {
-      std::string fn = p["filename"].template get<std::string>();
-      if (!fn.empty()) {
-        last_filename = fn;
-      }
-    }
-    if (p["state"].is_string()) {
-      std::string ns = p["state"].template get<std::string>();
-      if (ns != last_print_state) {
-        if (ns == "complete") {
-          push(last_filename.empty() ? "Print complete" : ("Print complete\n" + last_filename), INFO);
-        } else if (ns == "cancelled") {
-          push("Print cancelled", INFO);
-        }
-        last_print_state = ns;
-      }
-    }
-  }
-
-  // filament runout (only while the sensor is enabled)
-  if (!fil_key.empty() && st.contains(fil_key)) {
-    auto &fo = st[fil_key];
-    bool enabled = fo["enabled"].is_boolean() ? fo["enabled"].template get<bool>() : true;
-    if (fo["filament_detected"].is_boolean()) {
-      bool det = fo["filament_detected"].template get<bool>();
-      if (det != last_fil_detected) {
-        if (!det && enabled) {
-          push("Filament runout", WARNING);
-        }
-        last_fil_detected = det;
-      }
-    }
+  // keep print state fresh for M117 gating (completion is shown on the
+  // print-status panel; runout is handled by the runout modal)
+  if (st.contains("print_stats") && st["print_stats"]["state"].is_string()) {
+    last_print_state = st["print_stats"]["state"].template get<std::string>();
   }
 
   // M117 / status messages — only when not printing (slicers spam M117 progress)
@@ -279,4 +241,27 @@ void NotificationManager::_timer_cb(lv_timer_t *t) {
   lv_obj_t *card = (lv_obj_t *)t->user_data;
   auto *self = (NotificationManager *)lv_obj_get_user_data(card);
   self->remove_card(card, true);
+}
+
+// ---- homing-required modal ----
+
+void NotificationManager::show_homing_prompt() {
+  if (homing_mbox != NULL) {
+    return;  // already open — don't stack
+  }
+  static const char *btns[] = {"Home", "Cancel", ""};
+  homing_mbox = lv_msgbox_create(NULL, "Homing required",
+    "The printer must be homed first.", btns, false);
+  KUtils::style_lock_mbox(homing_mbox, 90);  // same centered card + blue buttons as other dialogs
+  lv_obj_add_event_cb(homing_mbox, &NotificationManager::_homing_mbox_cb, LV_EVENT_VALUE_CHANGED, this);
+}
+
+void NotificationManager::_homing_mbox_cb(lv_event_t *e) {
+  auto *self = (NotificationManager *)lv_event_get_user_data(e);
+  lv_obj_t *mbox = lv_obj_get_parent(lv_event_get_target(e));
+  if (lv_msgbox_get_active_btn(mbox) == 0) {  // "Home now"
+    self->ws.gcode_script("G28");
+  }
+  self->homing_mbox = NULL;
+  lv_msgbox_close(mbox);
 }

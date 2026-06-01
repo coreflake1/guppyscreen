@@ -30,6 +30,7 @@ class NotificationManager : public NotifyConsumer {
 
   static void _tap_cb(lv_event_t *e);
   static void _timer_cb(lv_timer_t *t);
+  static void _homing_mbox_cb(lv_event_t *e);
 
  private:
   enum Severity { INFO, WARNING, ERROR };
@@ -38,18 +39,17 @@ class NotificationManager : public NotifyConsumer {
   void baseline();                   // snapshot watched fields from State (no toasts)
   void process(json &status);        // diff a status object, fire toasts
   void push(const std::string &text, Severity sev);
+  void show_homing_prompt();         // modal on "Must home axis first"
   bool is_printing() const { return last_print_state == "printing"; }
 
   KWebSocketClient &ws;
   lv_obj_t *cont;                    // toast stack on lv_layer_top()
   std::list<Toast> toasts;           // front = oldest
+  lv_obj_t *homing_mbox;             // open homing prompt, or NULL
 
   bool baselined;
-  std::string fil_key;               // "filament_switch_sensor <name>" or ""
-  bool last_fil_detected;
   std::string last_webhooks_state;
   std::string last_print_state;
-  std::string last_filename;
   std::string last_display_msg;
 };
 

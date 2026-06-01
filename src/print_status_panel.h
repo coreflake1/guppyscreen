@@ -35,6 +35,7 @@ class PrintStatusPanel : public NotifyConsumer {
   };
 
   void consume(json &j);
+  void show_completion(const std::string &state);  // print finished -> result + stats + Done
   void update_time_progress(uint32_t time_passed);
   void update_flow_rate(double filament_used);
   void update_layers(json &info);
@@ -76,6 +77,13 @@ class PrintStatusPanel : public NotifyConsumer {
   lv_obj_t *progress_bar;
   lv_obj_t *progress_label;
   lv_obj_t *detail_cont;
+
+  // completion overlay (shown when a print finishes, instead of auto-dismissing)
+  lv_obj_t *complete_cont;
+  lv_obj_t *complete_title;
+  lv_obj_t *complete_file;
+  lv_obj_t *complete_stats;
+  lv_obj_t *complete_done_btn;
 
   ImageLabel extruder_temp;
   ImageLabel bed_temp;

@@ -13,6 +13,7 @@
 #include "main_panel.h"
 #include "spoolman_panel.h"
 #include "notification_manager.h"
+#include "filament_runout_panel.h"
 #include "websocket_client.h"
 
 class GuppyScreen {
@@ -33,6 +34,7 @@ class GuppyScreen {
   MainPanel main_panel;
   InitPanel init_panel;
   NotificationManager notification_manager;
+  FilamentRunoutPanel filament_runout_panel;
 
  public:
   GuppyScreen();

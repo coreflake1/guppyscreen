@@ -167,6 +167,39 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   //row 2
   lv_obj_set_grid_cell(buttons_cont, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 1, 1);
 
+  // ---- completion overlay (own full-screen layer, shown by show_completion) ----
+  complete_cont = lv_obj_create(lv_scr_act());
+  lv_obj_move_background(complete_cont);
+  lv_obj_set_size(complete_cont, LV_PCT(100), LV_PCT(100));
+  lv_obj_clear_flag(complete_cont, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_flex_flow(complete_cont, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(complete_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_row(complete_cont, 12, 0);
+
+  complete_title = lv_label_create(complete_cont);
+  lv_obj_set_style_text_font(complete_title, &lv_font_montserrat_20, 0);
+  lv_obj_set_style_text_align(complete_title, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(complete_title, "");
+
+  complete_file = lv_label_create(complete_cont);
+  lv_obj_set_width(complete_file, LV_PCT(80));
+  lv_label_set_long_mode(complete_file, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_align(complete_file, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_font(complete_file, &lv_font_montserrat_16, 0);
+  lv_label_set_text(complete_file, "");
+
+  complete_stats = lv_label_create(complete_cont);
+  lv_obj_set_style_text_align(complete_stats, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_color(complete_stats, lv_palette_lighten(LV_PALETTE_GREY, 2), 0);
+  lv_label_set_text(complete_stats, "");
+
+  complete_done_btn = lv_btn_create(complete_cont);
+  lv_obj_set_size(complete_done_btn, 160, 48);
+  lv_obj_t *done_lbl = lv_label_create(complete_done_btn);
+  lv_label_set_text(done_lbl, "Done");
+  lv_obj_center(done_lbl);
+  lv_obj_add_event_cb(complete_done_btn, &PrintStatusPanel::_handle_callback, LV_EVENT_CLICKED, this);
+
   ws.register_notify_update(this);
 }
 
@@ -188,7 +221,39 @@ void PrintStatusPanel::background() {
   lv_obj_move_background(status_cont);
 }
 
+void PrintStatusPanel::show_completion(const std::string &state) {
+  State *s = State::get_instance();
+  bool ok = (state == "complete");
+
+  lv_label_set_text(complete_title, ok ? LV_SYMBOL_OK "  Print complete"
+                                       : LV_SYMBOL_CLOSE "  Print cancelled");
+  lv_obj_set_style_text_color(complete_title,
+    ok ? lv_palette_main(LV_PALETTE_GREEN) : lv_palette_main(LV_PALETTE_RED), 0);
+
+  auto fn = s->get_data("/printer_state/print_stats/filename"_json_pointer);
+  lv_label_set_text(complete_file, fn.is_string() ? fn.template get<std::string>().c_str() : "");
+
+  std::string stats;
+  auto dur = s->get_data("/printer_state/print_stats/print_duration"_json_pointer);
+  if (dur.is_number()) {
+    int t = (int)dur.template get<double>();
+    int h = t / 3600, m = (t % 3600) / 60, sec = t % 60;
+    stats = h > 0 ? fmt::format("Time  {}h {:02d}m", h, m)
+                  : fmt::format("Time  {}m {:02d}s", m, sec);
+  }
+  auto fil = s->get_data("/printer_state/print_stats/filament_used"_json_pointer);
+  if (fil.is_number()) {
+    stats += fmt::format("     Filament  {:.2f} m", fil.template get<double>() / 1000.0);
+  }
+  lv_label_set_text(complete_stats, stats.c_str());
+
+  lv_obj_move_background(status_cont);
+  lv_obj_clear_flag(complete_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(complete_cont);
+}
+
 void PrintStatusPanel::reset() {
+  lv_obj_move_background(complete_cont);  // a new print clears any completion summary
   lv_bar_set_value(progress_bar, 0, LV_ANIM_OFF);
   lv_label_set_text(progress_label, "0%");
   print_speed.update_label("0 mm/s");
@@ -392,11 +457,15 @@ void PrintStatusPanel::consume(json &j) {
     if (print_status != "printing" && print_status != "paused") {
       mini_print_status.hide();
       mini_print_status.hide_chip();
-      // Print just ended (#94). Dismiss the full status panel if it was up
-      // for the print we just finished — otherwise the user is stuck looking
-      // at a "done" panel with no obvious next step.
+      // Print just ended (#94). Show a completion summary (result + stats +
+      // Done) instead of dismissing — otherwise the user is left with no
+      // confirmation. Other terminal states (e.g. standby) just dismiss.
       if (last_print_state == "printing" || last_print_state == "paused") {
-        lv_obj_move_background(status_cont);
+        if (print_status == "complete" || print_status == "cancelled") {
+          show_completion(print_status);
+        } else {
+          lv_obj_move_background(status_cont);
+        }
       }
     } else if (print_status == "paused") {
       // Swap the big overlay for a small "Paused" chip so the Homing/Extrude
@@ -575,6 +644,9 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
   lv_obj_t *btn = lv_event_get_current_target(event);
   if (btn == back_btn.get_container()) {
     lv_obj_move_background(status_cont);
+
+  } else if (btn == complete_done_btn) {
+    lv_obj_move_background(complete_cont);
 
   } else if (btn == emergency_btn.get_container()) {
     ws.send_jsonrpc("printer.emergency_stop");
@@ -761,5 +833,11 @@ void PrintStatusPanel::sim_setup_mock_data() {
     std::lock_guard<std::mutex> lock(lv_lock);
     update_time_progress(600);
   }
+
+  // preview the completion summary (no real print finishes in the sim)
+  lv_timer_t *t = lv_timer_create([](lv_timer_t *tm) {
+    ((PrintStatusPanel *)tm->user_data)->show_completion("complete");
+  }, 11000, this);
+  lv_timer_set_repeat_count(t, 1);
 }
 #endif
