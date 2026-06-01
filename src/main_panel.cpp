@@ -142,6 +142,8 @@ void MainPanel::create_panel() {
   lv_obj_add_event_cb(tabview, &MainPanel::_handle_tab_changed, LV_EVENT_VALUE_CHANGED, this);
 
   lv_obj_t *tab_btns = lv_tabview_get_tab_btns(tabview);
+  // catch re-taps of the already-active tab (no VALUE_CHANGED is raised then)
+  lv_obj_add_event_cb(tab_btns, &MainPanel::_handle_tab_btn_clicked, LV_EVENT_CLICKED, this);
   lv_obj_set_style_bg_color(tab_btns, lv_palette_main(LV_PALETTE_GREY), LV_STATE_CHECKED | LV_PART_ITEMS);
   lv_obj_set_style_outline_width(tab_btns, 0, LV_PART_ITEMS | LV_STATE_FOCUS_KEY | LV_STATE_FOCUS_KEY);
   lv_obj_set_style_border_side(tab_btns, 0, LV_PART_ITEMS | LV_STATE_CHECKED);
@@ -208,10 +210,28 @@ void MainPanel::handle_print_cb(lv_event_t *event) {
 
 void MainPanel::handle_tab_changed(lv_event_t *event) {
   if (lv_event_get_code(event) == LV_EVENT_VALUE_CHANGED) {
-    // macros_tab is the 2nd tab (index 1); reset it to Favorites on entry
-    if (lv_tabview_get_tab_act(tabview) == 1) {
+    uint32_t act = lv_tabview_get_tab_act(tabview);
+    // macros_tab (index 1) resets to Favorites; console_tab (index 2) to Terminal
+    if (act == 1) {
       macros_panel.reset_to_favorites();
+    } else if (act == 2) {
+      console_panel.reset_to_terminal();
     }
+  }
+}
+
+void MainPanel::handle_tab_btn_clicked(lv_event_t *event) {
+  // Fires on every tab-button click, including re-tapping the already-active
+  // tab (which does NOT raise VALUE_CHANGED). Mirror handle_tab_changed so the
+  // Console tab always drops back to its terminal, and Macros back to Favorites.
+  if (lv_event_get_code(event) != LV_EVENT_CLICKED) {
+    return;
+  }
+  uint32_t act = lv_tabview_get_tab_act(tabview);
+  if (act == 1) {
+    macros_panel.reset_to_favorites();
+  } else if (act == 2) {
+    console_panel.reset_to_terminal();
   }
 }
 
@@ -486,6 +506,43 @@ void MainPanel::sim_setup_mock_data() {
     State::get_instance()->set_data("guppysettings", fav, "/params/0");
 
     macros_panel.populate();
+  }
+
+  /* Seed the console: recent history, favorites, a gcode.help list spanning the
+   * quick-filter chip groups, and some output lines. */
+  {
+    json hist;
+    hist["params"][0]["commandHistory"] = json::array({
+      "SAVE_CONFIG", "SET_PRESSURE_ADVANCE ADVANCE=0.04", "QUERY_PROBE",
+      "M117 hello", "BED_MESH_CALIBRATE", "G28"});
+    State::get_instance()->set_data("console", hist, "/params/0");
+
+    json cfav;
+    cfav["params"][0]["console"]["favorites"] = json::array({"G28", "BED_MESH_CALIBRATE"});
+    State::get_instance()->set_data("guppysettings", cfav, "/params/0");
+
+    static const char *CMDS[] = {
+      "G28","G29","M204","M205","M106","M107","M117","M600",
+      "SET_VELOCITY_LIMIT","FORCE_MOVE","SET_KINEMATIC_POSITION","SET_GCODE_OFFSET",
+      "SET_HEATER_TEMPERATURE","TEMPERATURE_WAIT","PID_CALIBRATE",
+      "BED_MESH_CALIBRATE","BED_MESH_CLEAR","BED_MESH_MAP","BED_MESH_PROFILE","BED_MESH_OFFSET",
+      "PROBE","PROBE_ACCURACY","PROBE_CALIBRATE","QUERY_PROBE","Z_OFFSET_APPLY_PROBE",
+      "INPUTSHAPER","TEST_RESONANCES","ACCELEROMETER_QUERY","SET_PRESSURE_ADVANCE","SHAPER_CALIBRATE",
+      "SET_TMC_CURRENT","DUMP_TMC","INIT_TMC","SET_TMC_FIELD",
+      "SET_PIN","SET_FILAMENT_SENSOR","SET_DISPLAY_TEXT","SET_IDLE_TIMEOUT",
+      "QUERY_ENDSTOPS","QUERY_ADC","QUERY_FILAMENT_SENSOR",
+      "CAM_BRIGHTNESS","CAM_CONTRAST","CAM_HUE","CAM_SATURATION",
+      "SAVE_CONFIG","SAVE_GCODE_STATE","SAVE_VARIABLE",
+      "RESPOND","STATUS","EXCLUDE_OBJECT","RESTART","FIRMWARE_RESTART",
+      "_HOME_Z","_CG28", NULL};
+    json help;
+    for (int i = 0; CMDS[i] != NULL; i++) {
+      help["result"][CMDS[i]] = "mock help";
+    }
+    console_panel.handle_macros(help);
+    json resp;
+    resp["params"] = json::array({"Klipper state: Ready", "// probe: open"});
+    console_panel.handle_macro_response(resp);
   }
 
   /* Drive the print status panel so its new widgets (filename label,

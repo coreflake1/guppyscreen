@@ -94,6 +94,14 @@ class MainPanel : public NotifyConsumer {
     panel->handle_tab_changed(event);
   };
 
+  // re-tapping the already-active tab button (no value change) — used so the
+  // Console tab always drops back to its terminal even when already selected
+  void handle_tab_btn_clicked(lv_event_t *event);
+  static void _handle_tab_btn_clicked(lv_event_t *event) {
+    MainPanel *panel = (MainPanel*)event->user_data;
+    panel->handle_tab_btn_clicked(event);
+  };
+
  private:
   void create_main(lv_obj_t *parent);
   KWebSocketClient &ws;

@@ -31,14 +31,19 @@ MacroItem::MacroItem(KWebSocketClient &c,
   lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_all(cont, 4, 0);
   lv_obj_set_style_pad_row(cont, 0, 0);
-  lv_obj_set_style_border_side(cont, LV_BORDER_SIDE_TOP, LV_PART_MAIN);
-  lv_obj_set_style_border_width(cont, 2, 0);
+  // match the console-commands row separator: a thin 1px bottom border
+  lv_obj_set_style_border_side(cont, LV_BORDER_SIDE_BOTTOM, LV_PART_MAIN);
+  lv_obj_set_style_border_width(cont, 1, 0);
+  // transparent by default; set_highlight fills it (the inner rows below are
+  // kept transparent too, so the highlight reads as a solid band like console)
+  lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, LV_PART_MAIN);
   lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
 
   // top row: [ * ] [ macro name (grows) ] [ play ]
   lv_obj_set_size(top_cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(top_cont, 0, 0);
   lv_obj_set_style_pad_column(top_cont, 4, 0);
+  lv_obj_set_style_bg_opa(top_cont, LV_OPA_TRANSP, LV_PART_MAIN);  // let cont highlight show through
   lv_obj_set_flex_flow(top_cont, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(top_cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_clear_flag(top_cont, LV_OBJ_FLAG_SCROLLABLE);
@@ -75,6 +80,7 @@ MacroItem::MacroItem(KWebSocketClient &c,
     lv_obj_set_flex_align(params_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
     lv_obj_set_style_pad_all(params_cont, 0, 0);
     lv_obj_set_style_border_width(params_cont, 0, 0);
+    lv_obj_set_style_bg_opa(params_cont, LV_OPA_TRANSP, LV_PART_MAIN);  // let cont highlight show through
     lv_obj_clear_flag(params_cont, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *param_name;
