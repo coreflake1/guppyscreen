@@ -120,43 +120,36 @@ FirmwareRetractionPanel::~FirmwareRetractionPanel() {
 }
 
 void FirmwareRetractionPanel::build_row(Field &f) {
+  // one line: [ name .......... ] [ value ] [ - ] [ + ], all vertically centred
   lv_obj_t *row = lv_obj_create(list_area);
   lv_obj_set_width(row, LV_PCT(100));
   lv_obj_set_flex_grow(row, 1);  // the 4 rows share list_area's height evenly
   lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_pad_hor(row, 6, 0);
-  lv_obj_set_style_pad_ver(row, 2, 0);
-  lv_obj_set_style_pad_column(row, 6, 0);
+  lv_obj_set_style_pad_hor(row, 8, 0);
+  lv_obj_set_style_pad_ver(row, 0, 0);
+  lv_obj_set_style_pad_column(row, 8, 0);
   lv_obj_set_style_border_side(row, LV_BORDER_SIDE_BOTTOM, LV_PART_MAIN);
   lv_obj_set_style_border_width(row, 1, 0);
   lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, LV_PART_MAIN);
   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-  // info: name (label) above the current value
-  lv_obj_t *info = lv_obj_create(row);
-  lv_obj_set_flex_grow(info, 1);
-  lv_obj_set_height(info, LV_PCT(100));
-  lv_obj_clear_flag(info, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_pad_all(info, 0, 0);
-  lv_obj_set_style_border_width(info, 0, 0);
-  lv_obj_set_style_bg_opa(info, LV_OPA_TRANSP, LV_PART_MAIN);
-  lv_obj_set_flex_flow(info, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(info, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-
-  lv_obj_t *name = lv_label_create(info);
+  lv_obj_t *name = lv_label_create(row);
   lv_label_set_text(name, f.name);
-  lv_obj_set_style_text_font(name, &lv_font_montserrat_14, 0);
-  lv_obj_set_style_text_color(name, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+  lv_obj_set_flex_grow(name, 1);
+  lv_obj_set_style_text_font(name, &lv_font_montserrat_16, 0);
+  lv_obj_set_style_text_color(name, lv_palette_lighten(LV_PALETTE_GREY, 2), 0);
 
-  f.value = lv_label_create(info);
+  f.value = lv_label_create(row);
   lv_label_set_text(f.value, "—");
+  lv_obj_set_width(f.value, 110);
   lv_obj_set_style_text_font(f.value, &lv_font_montserrat_20, 0);
+  lv_obj_set_style_text_align(f.value, LV_TEXT_ALIGN_RIGHT, 0);
 
   // - / + buttons
   auto make_btn = [&](const char *sym) {
     lv_obj_t *b = lv_btn_create(row);
-    lv_obj_set_size(b, 58, LV_PCT(82));
+    lv_obj_set_size(b, 58, LV_PCT(78));
     lv_obj_set_style_bg_color(b, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
     lv_obj_t *lbl = lv_label_create(b);
     lv_label_set_text(lbl, sym);
