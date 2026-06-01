@@ -2,17 +2,16 @@
 #define __FIRMWARE_RETRACTION_PANEL_H__
 
 #include "lvgl/lvgl.h"
-#include "button_container.h"
 #include "selector.h"
-#include "image_label.h"
 #include "websocket_client.h"
 #include "notify_consumer.h"
 
 #include <mutex>
 
-// Live-tuning panel for Klipper's [firmware_retraction], modelled on FineTune.
-// Adjusts the four SET_RETRACTION values. Gated on the firmware_retraction
-// printer object existing; shows an empty-state when it's absent.
+// Live-tuning panel for Klipper's [firmware_retraction], reached from the Tune
+// tab. One labelled row per SET_RETRACTION value (name + current value + -/+),
+// a length-step and speed-step selector, and a Reset-all. Gated on the
+// firmware_retraction object existing; shows an empty-state when it's absent.
 class FirmwareRetractionPanel : public NotifyConsumer {
  public:
   FirmwareRetractionPanel(KWebSocketClient &, std::mutex &);
@@ -20,42 +19,44 @@ class FirmwareRetractionPanel : public NotifyConsumer {
   void foreground();
   void consume(json &j);
 
-  void handle_callback(lv_event_t *event);  // selectors + back
-  void handle_retract_length(lv_event_t *event);
-  void handle_retract_speed(lv_event_t *event);
-  void handle_unretract_extra(lv_event_t *event);
-  void handle_unretract_speed(lv_event_t *event);
-
-  static void _handle_callback(lv_event_t *e)        { ((FirmwareRetractionPanel*)e->user_data)->handle_callback(e); }
-  static void _handle_retract_length(lv_event_t *e)  { ((FirmwareRetractionPanel*)e->user_data)->handle_retract_length(e); }
-  static void _handle_retract_speed(lv_event_t *e)   { ((FirmwareRetractionPanel*)e->user_data)->handle_retract_speed(e); }
-  static void _handle_unretract_extra(lv_event_t *e) { ((FirmwareRetractionPanel*)e->user_data)->handle_unretract_extra(e); }
-  static void _handle_unretract_speed(lv_event_t *e) { ((FirmwareRetractionPanel*)e->user_data)->handle_unretract_speed(e); }
+  void handle_callback(lv_event_t *event);
+  static void _handle_callback(lv_event_t *e) { ((FirmwareRetractionPanel*)e->user_data)->handle_callback(e); }
 
  private:
-  // current value (from state) for a retraction field, or NaN if unavailable
-  double cur_value(const char *field);
-  double config_default(const char *field);
-  void update_values_from(json &src, const char *base_ptr);
+  // one tunable retraction field
+  struct Field {
+    const char *name;     // display name
+    const char *param;    // SET_RETRACTION parameter
+    const char *key;      // firmware_retraction status / config key
+    const char *unit;     // "mm" / "mm/s"
+    bool is_speed;        // integer + speed step (vs. 2-decimal + length step)
+    lv_obj_t *minus;
+    lv_obj_t *plus;
+    lv_obj_t *value;
+  };
+
+  void build_row(Field &f);
+  void apply_step(Field &f, bool up);
+  void send_field(const Field &f, double value);
+  double cur_value(const Field &f);
+  double config_default(const Field &f);
+  void refresh_values();              // from State
+  void update_from(json &fr);         // from a status object
 
   KWebSocketClient &ws;
   lv_obj_t *panel_cont;
-  lv_obj_t *body;          // all controls (shown when the object exists)
-  lv_obj_t *empty_cont;    // empty-state (shown when the object is absent)
-  lv_obj_t *values_cont;
+  lv_obj_t *body;
+  lv_obj_t *list_area;
+  lv_obj_t *step_row;
+  lv_obj_t *bottom_row;
+  lv_obj_t *empty_cont;
+  lv_obj_t *reset_all_btn;
+  lv_obj_t *back_btn;
+  lv_obj_t *empty_back_btn;
+  Selector length_step_selector;
+  Selector speed_step_selector;
 
-  ButtonContainer rl_reset_btn, rl_up_btn, rl_down_btn;
-  ButtonContainer rs_reset_btn, rs_up_btn, rs_down_btn;
-  ButtonContainer ue_reset_btn, ue_up_btn, ue_down_btn;
-  ButtonContainer us_reset_btn, us_up_btn, us_down_btn;
-  ButtonContainer back_btn;
-  ButtonContainer empty_back_btn;
-  Selector length_step_selector;  // mm steps (lengths)
-  Selector speed_step_selector;   // mm/s steps (speeds)
-  ImageLabel retract_length_lbl;
-  ImageLabel retract_speed_lbl;
-  ImageLabel unretract_extra_lbl;
-  ImageLabel unretract_speed_lbl;
+  Field fields[4];
 };
 
 #endif  // __FIRMWARE_RETRACTION_PANEL_H__

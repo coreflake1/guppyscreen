@@ -4,93 +4,88 @@
 
 #include <cmath>
 
-LV_IMG_DECLARE(retract_img);
-LV_IMG_DECLARE(refresh_img);
-LV_IMG_DECLARE(flow_up_img);
-LV_IMG_DECLARE(flow_down_img);
-LV_IMG_DECLARE(speed_up_img);
-LV_IMG_DECLARE(speed_down_img);
-LV_IMG_DECLARE(back);
-
 FirmwareRetractionPanel::FirmwareRetractionPanel(KWebSocketClient &websocket_client, std::mutex &l)
   : NotifyConsumer(l)
   , ws(websocket_client)
   , panel_cont(lv_obj_create(lv_scr_act()))
   , body(lv_obj_create(panel_cont))
+  , list_area(lv_obj_create(body))
+  , step_row(lv_obj_create(body))
+  , bottom_row(lv_obj_create(body))
   , empty_cont(lv_obj_create(panel_cont))
-  , values_cont(lv_obj_create(body))
-  , rl_reset_btn(body, &refresh_img, "Reset", &FirmwareRetractionPanel::_handle_retract_length, this)
-  , rl_up_btn(body, &flow_up_img, "Length +", &FirmwareRetractionPanel::_handle_retract_length, this)
-  , rl_down_btn(body, &flow_down_img, "Length -", &FirmwareRetractionPanel::_handle_retract_length, this)
-  , rs_reset_btn(body, &refresh_img, "Reset", &FirmwareRetractionPanel::_handle_retract_speed, this)
-  , rs_up_btn(body, &speed_up_img, "Speed +", &FirmwareRetractionPanel::_handle_retract_speed, this)
-  , rs_down_btn(body, &speed_down_img, "Speed -", &FirmwareRetractionPanel::_handle_retract_speed, this)
-  , ue_reset_btn(body, &refresh_img, "Reset", &FirmwareRetractionPanel::_handle_unretract_extra, this)
-  , ue_up_btn(body, &flow_up_img, "Extra +", &FirmwareRetractionPanel::_handle_unretract_extra, this)
-  , ue_down_btn(body, &flow_down_img, "Extra -", &FirmwareRetractionPanel::_handle_unretract_extra, this)
-  , us_reset_btn(body, &refresh_img, "Reset", &FirmwareRetractionPanel::_handle_unretract_speed, this)
-  , us_up_btn(body, &speed_up_img, "Un-Spd +", &FirmwareRetractionPanel::_handle_unretract_speed, this)
-  , us_down_btn(body, &speed_down_img, "Un-Spd -", &FirmwareRetractionPanel::_handle_unretract_speed, this)
-  , back_btn(body, &back, "Back", &FirmwareRetractionPanel::_handle_callback, this)
-  , empty_back_btn(empty_cont, &back, "Back", &FirmwareRetractionPanel::_handle_callback, this)
-  , length_step_selector(body, "Length step (mm)", {"0.05", "0.10", "0.25", ""}, 1, 40, 15,
+  , reset_all_btn(lv_btn_create(bottom_row))
+  , back_btn(lv_btn_create(bottom_row))
+  , empty_back_btn(lv_btn_create(empty_cont))
+  , length_step_selector(step_row, "Length step (mm)", {"0.05", "0.10", "0.25", ""}, 1,
       &FirmwareRetractionPanel::_handle_callback, this)
-  , speed_step_selector(body, "Speed step (mm/s)", {"1", "5", "10", ""}, 1, 40, 15,
+  , speed_step_selector(step_row, "Speed step (mm/s)", {"1", "5", "10", ""}, 1,
       &FirmwareRetractionPanel::_handle_callback, this)
-  , retract_length_lbl(values_cont, &retract_img, 100, 100, 15, "Len —")
-  , retract_speed_lbl(values_cont, &speed_up_img, 100, 100, 15, "RSpd —")
-  , unretract_extra_lbl(values_cont, &retract_img, 100, 100, 15, "Extra —")
-  , unretract_speed_lbl(values_cont, &speed_up_img, 100, 100, 15, "USpd —")
 {
-  lv_obj_move_background(panel_cont);
+  fields[0] = {"Retract length",   "RETRACT_LENGTH",         "retract_length",         "mm",   false, nullptr, nullptr, nullptr};
+  fields[1] = {"Retract speed",    "RETRACT_SPEED",          "retract_speed",          "mm/s", true,  nullptr, nullptr, nullptr};
+  fields[2] = {"Unretract extra",  "UNRETRACT_EXTRA_LENGTH", "unretract_extra_length", "mm",   false, nullptr, nullptr, nullptr};
+  fields[3] = {"Unretract speed",  "UNRETRACT_SPEED",        "unretract_speed",        "mm/s", true,  nullptr, nullptr, nullptr};
 
+  lv_obj_move_background(panel_cont);
   lv_obj_set_size(panel_cont, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(panel_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(panel_cont, 0, 0);
 
-  // ---- body (the live controls) ----
+  // ---- body (live controls) ----
   lv_obj_set_size(body, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(body, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_pad_all(body, 0, 0);
+  lv_obj_set_style_pad_all(body, 3, 0);
+  lv_obj_set_style_pad_row(body, 3, 0);
   lv_obj_set_style_border_width(body, 0, 0);
+  lv_obj_set_flex_flow(body, LV_FLEX_FLOW_COLUMN);
 
-  lv_obj_set_size(values_cont, LV_PCT(20), LV_PCT(80));
-  lv_obj_clear_flag(values_cont, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_pad_all(values_cont, 0, 0);
-  lv_obj_set_flex_flow(values_cont, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(values_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  // list of parameter rows (fills the space above the step/bottom bars)
+  lv_obj_set_width(list_area, LV_PCT(100));
+  lv_obj_set_flex_grow(list_area, 1);
+  lv_obj_clear_flag(list_area, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(list_area, 0, 0);
+  lv_obj_set_style_pad_row(list_area, 0, 0);
+  lv_obj_set_style_border_width(list_area, 0, 0);
+  lv_obj_set_flex_flow(list_area, LV_FLEX_FLOW_COLUMN);
 
-  static lv_coord_t row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
-    LV_GRID_TEMPLATE_LAST};
-  static lv_coord_t col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
-    LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
-  lv_obj_set_grid_dsc_array(body, col_dsc, row_dsc);
+  for (auto &f : fields) {
+    build_row(f);
+  }
 
-  // col 0: retract_length
-  lv_obj_set_grid_cell(rl_reset_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-  lv_obj_set_grid_cell(rl_up_btn.get_container(),    LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(rl_down_btn.get_container(),  LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(length_step_selector.get_container(), LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 3, 1);
+  // ---- step selectors row ----
+  lv_obj_set_width(step_row, LV_PCT(100));
+  lv_obj_set_height(step_row, LV_SIZE_CONTENT);
+  lv_obj_clear_flag(step_row, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(step_row, 0, 0);
+  lv_obj_set_style_pad_column(step_row, 6, 0);
+  lv_obj_set_style_border_width(step_row, 0, 0);
+  lv_obj_set_flex_flow(step_row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_grow(length_step_selector.get_container(), 1);
+  lv_obj_set_flex_grow(speed_step_selector.get_container(), 1);
 
-  // col 1: unretract_extra_length (the other length -> shares the length step)
-  lv_obj_set_grid_cell(ue_reset_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-  lv_obj_set_grid_cell(ue_up_btn.get_container(),    LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(ue_down_btn.get_container(),  LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+  // ---- bottom row: Reset all | Back ----
+  lv_obj_set_width(bottom_row, LV_PCT(100));
+  lv_obj_set_height(bottom_row, LV_SIZE_CONTENT);
+  lv_obj_clear_flag(bottom_row, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(bottom_row, 0, 0);
+  lv_obj_set_style_pad_column(bottom_row, 6, 0);
+  lv_obj_set_style_border_width(bottom_row, 0, 0);
+  lv_obj_set_flex_flow(bottom_row, LV_FLEX_FLOW_ROW);
 
-  // col 2: retract_speed
-  lv_obj_set_grid_cell(rs_reset_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-  lv_obj_set_grid_cell(rs_up_btn.get_container(),    LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(rs_down_btn.get_container(),  LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(speed_step_selector.get_container(), LV_GRID_ALIGN_STRETCH, 2, 2, LV_GRID_ALIGN_STRETCH, 3, 1);
+  lv_obj_set_flex_grow(reset_all_btn, 1);
+  lv_obj_set_height(reset_all_btn, 36);
+  lv_obj_set_style_bg_color(reset_all_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+  lv_obj_t *ra_lbl = lv_label_create(reset_all_btn);
+  lv_label_set_text(ra_lbl, LV_SYMBOL_REFRESH "  Reset all");
+  lv_obj_center(ra_lbl);
+  lv_obj_add_event_cb(reset_all_btn, &FirmwareRetractionPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
-  // col 3: unretract_speed (shares the speed step)
-  lv_obj_set_grid_cell(us_reset_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-  lv_obj_set_grid_cell(us_up_btn.get_container(),    LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
-  lv_obj_set_grid_cell(us_down_btn.get_container(),  LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-
-  // col 4: live values + back
-  lv_obj_set_grid_cell(values_cont, LV_GRID_ALIGN_STRETCH, 4, 1, LV_GRID_ALIGN_STRETCH, 0, 3);
-  lv_obj_set_grid_cell(back_btn.get_container(), LV_GRID_ALIGN_STRETCH, 4, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
+  lv_obj_set_flex_grow(back_btn, 1);
+  lv_obj_set_height(back_btn, 36);
+  lv_obj_t *bk_lbl = lv_label_create(back_btn);
+  lv_label_set_text(bk_lbl, LV_SYMBOL_LEFT "  Back");
+  lv_obj_center(bk_lbl);
+  lv_obj_add_event_cb(back_btn, &FirmwareRetractionPanel::_handle_callback, LV_EVENT_CLICKED, this);
 
   // ---- empty state ----
   lv_obj_set_size(empty_cont, LV_PCT(100), LV_PCT(100));
@@ -98,7 +93,6 @@ FirmwareRetractionPanel::FirmwareRetractionPanel(KWebSocketClient &websocket_cli
   lv_obj_set_flex_flow(empty_cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(empty_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_row(empty_cont, 16, 0);
-
   lv_obj_t *empty_lbl = lv_label_create(empty_cont);
   lv_label_set_text(empty_lbl,
     "Firmware retraction is not enabled.\n\n"
@@ -106,7 +100,12 @@ FirmwareRetractionPanel::FirmwareRetractionPanel(KWebSocketClient &websocket_cli
     "printer.cfg and restart Klipper.");
   lv_obj_set_style_text_align(empty_lbl, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(empty_lbl, &lv_font_montserrat_16, 0);
-
+  lv_obj_set_height(empty_back_btn, 40);
+  lv_obj_set_width(empty_back_btn, 140);
+  lv_obj_t *eb_lbl = lv_label_create(empty_back_btn);
+  lv_label_set_text(eb_lbl, LV_SYMBOL_LEFT "  Back");
+  lv_obj_center(eb_lbl);
+  lv_obj_add_event_cb(empty_back_btn, &FirmwareRetractionPanel::_handle_callback, LV_EVENT_CLICKED, this);
   lv_obj_add_flag(empty_cont, LV_OBJ_FLAG_HIDDEN);
 
   ws.register_notify_update(this);
@@ -120,149 +119,156 @@ FirmwareRetractionPanel::~FirmwareRetractionPanel() {
   ws.unregister_notify_update(this);
 }
 
-double FirmwareRetractionPanel::cur_value(const char *field) {
+void FirmwareRetractionPanel::build_row(Field &f) {
+  lv_obj_t *row = lv_obj_create(list_area);
+  lv_obj_set_width(row, LV_PCT(100));
+  lv_obj_set_flex_grow(row, 1);  // the 4 rows share list_area's height evenly
+  lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_hor(row, 6, 0);
+  lv_obj_set_style_pad_ver(row, 2, 0);
+  lv_obj_set_style_pad_column(row, 6, 0);
+  lv_obj_set_style_border_side(row, LV_BORDER_SIDE_BOTTOM, LV_PART_MAIN);
+  lv_obj_set_style_border_width(row, 1, 0);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+  // info: name (label) above the current value
+  lv_obj_t *info = lv_obj_create(row);
+  lv_obj_set_flex_grow(info, 1);
+  lv_obj_set_height(info, LV_PCT(100));
+  lv_obj_clear_flag(info, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(info, 0, 0);
+  lv_obj_set_style_border_width(info, 0, 0);
+  lv_obj_set_style_bg_opa(info, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_flex_flow(info, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(info, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+
+  lv_obj_t *name = lv_label_create(info);
+  lv_label_set_text(name, f.name);
+  lv_obj_set_style_text_font(name, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(name, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+
+  f.value = lv_label_create(info);
+  lv_label_set_text(f.value, "—");
+  lv_obj_set_style_text_font(f.value, &lv_font_montserrat_20, 0);
+
+  // - / + buttons
+  auto make_btn = [&](const char *sym) {
+    lv_obj_t *b = lv_btn_create(row);
+    lv_obj_set_size(b, 58, LV_PCT(82));
+    lv_obj_set_style_bg_color(b, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+    lv_obj_t *lbl = lv_label_create(b);
+    lv_label_set_text(lbl, sym);
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_24, 0);
+    lv_obj_center(lbl);
+    lv_obj_add_event_cb(b, &FirmwareRetractionPanel::_handle_callback, LV_EVENT_CLICKED, this);
+    return b;
+  };
+  f.minus = make_btn(LV_SYMBOL_MINUS);
+  f.plus = make_btn(LV_SYMBOL_PLUS);
+}
+
+double FirmwareRetractionPanel::cur_value(const Field &f) {
   auto v = State::get_instance()->get_data(
-    json::json_pointer(std::string("/printer_state/firmware_retraction/") + field));
+    json::json_pointer(std::string("/printer_state/firmware_retraction/") + f.key));
   return v.is_number() ? v.template get<double>() : NAN;
 }
 
-double FirmwareRetractionPanel::config_default(const char *field) {
+double FirmwareRetractionPanel::config_default(const Field &f) {
   auto v = State::get_instance()->get_data(
-    json::json_pointer(std::string("/printer_state/configfile/settings/firmware_retraction/") + field));
+    json::json_pointer(std::string("/printer_state/configfile/settings/firmware_retraction/") + f.key));
   return v.is_number() ? v.template get<double>() : NAN;
 }
 
-void FirmwareRetractionPanel::update_values_from(json &src, const char *base_ptr) {
-  auto fr = src[json::json_pointer(base_ptr)];
-  if (fr.is_null()) {
-    return;
+void FirmwareRetractionPanel::send_field(const Field &f, double value) {
+  value = value < 0 ? 0 : value;
+  if (f.is_speed) {
+    ws.gcode_script(fmt::format("SET_RETRACTION {}={}", f.param, static_cast<int>(std::lround(value))));
+  } else {
+    ws.gcode_script(fmt::format("SET_RETRACTION {}={:.2f}", f.param, value));
   }
-  if (fr["retract_length"].is_number()) {
-    retract_length_lbl.update_label(
-      fmt::format("Len {:.2f}", fr["retract_length"].template get<double>()).c_str());
+}
+
+void FirmwareRetractionPanel::apply_step(Field &f, bool up) {
+  double cur = cur_value(f);
+  if (std::isnan(cur)) return;
+  Selector &sel = f.is_speed ? speed_step_selector : length_step_selector;
+  double step = std::stod(lv_btnmatrix_get_btn_text(sel.get_selector(), sel.get_selected_idx()));
+  send_field(f, cur + (up ? step : -step));
+}
+
+void FirmwareRetractionPanel::update_from(json &fr) {
+  if (fr.is_null()) return;
+  for (auto &f : fields) {
+    auto v = fr[f.key];
+    if (!v.is_number()) continue;
+    if (f.is_speed) {
+      lv_label_set_text(f.value,
+        fmt::format("{} {}", static_cast<int>(std::lround(v.template get<double>())), f.unit).c_str());
+    } else {
+      lv_label_set_text(f.value,
+        fmt::format("{:.2f} {}", v.template get<double>(), f.unit).c_str());
+    }
   }
-  if (fr["unretract_extra_length"].is_number()) {
-    unretract_extra_lbl.update_label(
-      fmt::format("Extra {:.2f}", fr["unretract_extra_length"].template get<double>()).c_str());
-  }
-  if (fr["retract_speed"].is_number()) {
-    retract_speed_lbl.update_label(
-      fmt::format("RSpd {}", static_cast<int>(std::lround(fr["retract_speed"].template get<double>()))).c_str());
-  }
-  if (fr["unretract_speed"].is_number()) {
-    unretract_speed_lbl.update_label(
-      fmt::format("USpd {}", static_cast<int>(std::lround(fr["unretract_speed"].template get<double>()))).c_str());
-  }
+}
+
+void FirmwareRetractionPanel::refresh_values() {
+  auto fr = State::get_instance()->get_data("/printer_state/firmware_retraction"_json_pointer);
+  update_from(fr);
 }
 
 void FirmwareRetractionPanel::foreground() {
   auto fr = State::get_instance()->get_data("/printer_state/firmware_retraction"_json_pointer);
-  bool present = !fr.is_null();
-
-  if (present) {
+  if (!fr.is_null()) {
     lv_obj_clear_flag(body, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(empty_cont, LV_OBJ_FLAG_HIDDEN);
-    auto root = State::get_instance()->get_data("/printer_state"_json_pointer);
-    update_values_from(root, "/firmware_retraction");
+    refresh_values();
   } else {
     lv_obj_add_flag(body, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(empty_cont, LV_OBJ_FLAG_HIDDEN);
   }
-
   lv_obj_move_foreground(panel_cont);
 }
 
 void FirmwareRetractionPanel::consume(json &j) {
   std::lock_guard<std::mutex> lock(lv_lock);
-  update_values_from(j, "/params/0/firmware_retraction");
+  auto fr = j["/params/0/firmware_retraction"_json_pointer];
+  update_from(fr);
 }
 
 void FirmwareRetractionPanel::handle_callback(lv_event_t *e) {
-  if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
-    lv_obj_t *selector = lv_event_get_target(e);
-    uint32_t idx = lv_btnmatrix_get_selected_btn(selector);
-    if (selector == length_step_selector.get_selector()) {
+  lv_event_code_t code = lv_event_get_code(e);
+
+  if (code == LV_EVENT_VALUE_CHANGED) {
+    lv_obj_t *sel = lv_event_get_target(e);
+    uint32_t idx = lv_btnmatrix_get_selected_btn(sel);
+    if (sel == length_step_selector.get_selector()) {
       length_step_selector.set_selected_idx(idx);
-    } else if (selector == speed_step_selector.get_selector()) {
+    } else if (sel == speed_step_selector.get_selector()) {
       speed_step_selector.set_selected_idx(idx);
     }
+    return;
   }
 
-  if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
-    lv_obj_t *btn = lv_event_get_current_target(e);
-    if (btn == back_btn.get_container() || btn == empty_back_btn.get_container()) {
-      lv_obj_move_background(panel_cont);
+  if (code != LV_EVENT_CLICKED) return;
+  lv_obj_t *btn = lv_event_get_current_target(e);
+
+  if (btn == back_btn || btn == empty_back_btn) {
+    lv_obj_move_background(panel_cont);
+    return;
+  }
+
+  if (btn == reset_all_btn) {
+    for (auto &f : fields) {
+      double d = config_default(f);
+      if (!std::isnan(d)) send_field(f, d);
     }
-  }
-}
-
-// Apply a delta to one SET_RETRACTION field (clamped >= 0). step_sel picks the
-// increment; sends only that field so the others are untouched.
-static void set_field(KWebSocketClient &ws, const char *param, double value, bool is_speed) {
-  value = value < 0 ? 0 : value;
-  if (is_speed) {
-    ws.gcode_script(fmt::format("SET_RETRACTION {}={}", param, static_cast<int>(std::lround(value))));
-  } else {
-    ws.gcode_script(fmt::format("SET_RETRACTION {}={:.2f}", param, value));
-  }
-}
-
-void FirmwareRetractionPanel::handle_retract_length(lv_event_t *e) {
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-  lv_obj_t *btn = lv_event_get_current_target(e);
-  if (btn == rl_reset_btn.get_container()) {
-    double d = config_default("retract_length");
-    if (!std::isnan(d)) set_field(ws, "RETRACT_LENGTH", d, false);
     return;
   }
-  double cur = cur_value("retract_length");
-  if (std::isnan(cur)) return;
-  double step = std::stod(lv_btnmatrix_get_btn_text(length_step_selector.get_selector(),
-    length_step_selector.get_selected_idx()));
-  set_field(ws, "RETRACT_LENGTH", cur + (btn == rl_up_btn.get_container() ? step : -step), false);
-}
 
-void FirmwareRetractionPanel::handle_unretract_extra(lv_event_t *e) {
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-  lv_obj_t *btn = lv_event_get_current_target(e);
-  if (btn == ue_reset_btn.get_container()) {
-    double d = config_default("unretract_extra_length");
-    if (!std::isnan(d)) set_field(ws, "UNRETRACT_EXTRA_LENGTH", d, false);
-    return;
+  for (auto &f : fields) {
+    if (btn == f.minus) { apply_step(f, false); return; }
+    if (btn == f.plus)  { apply_step(f, true);  return; }
   }
-  double cur = cur_value("unretract_extra_length");
-  if (std::isnan(cur)) return;
-  double step = std::stod(lv_btnmatrix_get_btn_text(length_step_selector.get_selector(),
-    length_step_selector.get_selected_idx()));
-  set_field(ws, "UNRETRACT_EXTRA_LENGTH", cur + (btn == ue_up_btn.get_container() ? step : -step), false);
-}
-
-void FirmwareRetractionPanel::handle_retract_speed(lv_event_t *e) {
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-  lv_obj_t *btn = lv_event_get_current_target(e);
-  if (btn == rs_reset_btn.get_container()) {
-    double d = config_default("retract_speed");
-    if (!std::isnan(d)) set_field(ws, "RETRACT_SPEED", d, true);
-    return;
-  }
-  double cur = cur_value("retract_speed");
-  if (std::isnan(cur)) return;
-  double step = std::stod(lv_btnmatrix_get_btn_text(speed_step_selector.get_selector(),
-    speed_step_selector.get_selected_idx()));
-  set_field(ws, "RETRACT_SPEED", cur + (btn == rs_up_btn.get_container() ? step : -step), true);
-}
-
-void FirmwareRetractionPanel::handle_unretract_speed(lv_event_t *e) {
-  if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-  lv_obj_t *btn = lv_event_get_current_target(e);
-  if (btn == us_reset_btn.get_container()) {
-    double d = config_default("unretract_speed");
-    if (!std::isnan(d)) set_field(ws, "UNRETRACT_SPEED", d, true);
-    return;
-  }
-  double cur = cur_value("unretract_speed");
-  if (std::isnan(cur)) return;
-  double step = std::stod(lv_btnmatrix_get_btn_text(speed_step_selector.get_selector(),
-    speed_step_selector.get_selected_idx()));
-  set_field(ws, "UNRETRACT_SPEED", cur + (btn == us_up_btn.get_container() ? step : -step), true);
 }
