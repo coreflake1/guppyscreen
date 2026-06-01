@@ -481,7 +481,7 @@ void MainPanel::sim_setup_mock_data() {
     State::get_instance()->set_data("printer_state", ps, "/params/0");
 
     json editable;
-    editable["output_pin fan0"] = {{"id", "output_pin fan0"}, {"display_name", "Part Fan"}};
+    editable["output_pin fan0"] = {{"id", "output_pin fan0"}, {"display_name", "Part Cooling Fan"}};
     create_fans(editable);
   }
 

@@ -371,6 +371,34 @@ namespace KUtils {
     return s;
   }
 
+  std::string fan_display_name(const std::string &key) {
+    std::string lower;
+    for (char c : key) {
+      lower += std::tolower(c);
+    }
+    if (lower.find("nozzle") != std::string::npos || lower.find("hotend") != std::string::npos
+        || lower.find("heatbreak") != std::string::npos || key.rfind("heater_fan ", 0) == 0) {
+      return "Hotend Fan";
+    }
+    if (lower.find("mainboard") != std::string::npos || lower.find("board") != std::string::npos) {
+      return "Mainboard Fan";
+    }
+    if (lower.find("controller") != std::string::npos || key.rfind("controller_fan ", 0) == 0) {
+      return "Controller Fan";
+    }
+    if (lower.find("part") != std::string::npos || lower.find("fan0") != std::string::npos
+        || key == "fan") {
+      return "Part Cooling Fan";
+    }
+    // fallback: title-case the short name, ensure it reads as a fan
+    size_t pos = key.find_last_of(' ');
+    std::string name = to_title(pos != std::string::npos ? key.substr(pos + 1) : key);
+    if (name.find("Fan") == std::string::npos) {
+      name += " Fan";
+    }
+    return name;
+  }
+
 
   std::string eta_string(int64_t s) {
     time_t seconds(s);

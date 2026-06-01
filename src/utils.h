@@ -63,6 +63,9 @@ namespace KUtils {
 
   std::string get_obj_name(const std::string &id);
   std::string to_title(std::string s);
+  // Friendly display name for a fan object key (e.g. "output_pin fan0" ->
+  // "Part Cooling Fan", "heater_fan nozzle_fan" -> "Hotend Fan").
+  std::string fan_display_name(const std::string &key);
   std::string eta_string(int64_t s);
   size_t bytes_to_mb(size_t s);
 

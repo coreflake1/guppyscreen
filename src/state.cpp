@@ -287,17 +287,25 @@ json State::get_display_fans() {
     }
   }
 
-  // default to top standard fans
+  // No user config: default to the fans you can actually drive — the part fan,
+  // generic fans, and PWM fan output_pins. heater_fan/controller_fan are
+  // auto-managed by Klipper, so they're left to FanPanel's read-only list.
   if (display_fans.empty()) {
     for (auto &e : fans) {
-      size_t pos = e.find_last_of(' ');
-      std::string display_name = KUtils::to_title(pos != std::string::npos
-        ? e.substr(pos + 1)
-        : "Part Fan");
-      display_fans[e] = {
-  {"id", e},
-  {"display_name", display_name}
-      };
+      if (e == "fan" || e.rfind("fan_generic ", 0) == 0) {
+        display_fans[e] = {{"id", e}, {"display_name", KUtils::fan_display_name(e)}};
+      }
+    }
+    for (auto &e : get_output_pins()) {
+      std::string lower;
+      for (char c : e) { lower += std::tolower(c); }
+      if (lower.find("fan") == std::string::npos) {
+        continue;
+      }
+      auto pwm = get_data(json::json_pointer("/printer_state/configfile/settings/" + lower + "/pwm"));
+      if (pwm.is_boolean() && pwm.template get<bool>()) {  // PWM pin -> a real adjustable fan
+        display_fans[e] = {{"id", e}, {"display_name", KUtils::fan_display_name(e)}};
+      }
     }
   }
 
