@@ -302,10 +302,15 @@ json State::get_display_fans() {
       if (lower.find("fan") == std::string::npos) {
         continue;
       }
-      auto pwm = get_data(json::json_pointer("/printer_state/configfile/settings/" + lower + "/pwm"));
-      if (pwm.is_boolean() && pwm.template get<bool>()) {  // PWM pin -> a real adjustable fan
-        display_fans[e] = {{"id", e}, {"display_name", KUtils::fan_display_name(e)}};
+      // System/auto fans (mainboard, controller, hotend) stay read-only; the
+      // user-adjustable part fan (e.g. "fan0") becomes the editable slider.
+      // (Name-based, not the pwm flag — configfile isn't loaded yet at init.)
+      if (lower.find("board") != std::string::npos || lower.find("controller") != std::string::npos
+          || lower.find("nozzle") != std::string::npos || lower.find("hotend") != std::string::npos
+          || lower.find("heatbreak") != std::string::npos) {
+        continue;
       }
+      display_fans[e] = {{"id", e}, {"display_name", KUtils::fan_display_name(e)}};
     }
   }
 
