@@ -23,20 +23,28 @@ class MiniPrintStatus {
   void hide_chip();
   lv_obj_t *get_chip();
 
-  void update_eta(std::string &eta_str);
+  void update_eta(int64_t eta_secs);   // remaining seconds -> hh:mm:ss
   void update_status(std::string &status_str);
   void update_progress(int p);
   void update_img(const std::string &img_path, size_t twidth);
   void reset();
 
+#ifdef SIMULATOR
+  void sim_thumb();  // placeholder preview so the overlay can be judged in the sim
+#endif
+
  private:
+  void render();
+
   lv_obj_t *cont;
-  lv_obj_t *progress_bar;
   lv_obj_t *thumb;
-  lv_obj_t *status_label;
+  lv_obj_t *info_cont;
+  lv_obj_t *time_label;
+  lv_obj_t *pct_label;
   lv_obj_t *chip;
   std::string status;
-  std::string eta;
+  std::string eta;   // formatted hh:mm:ss (or mm:ss)
+  int progress;
 };
 
 #endif //__MINI_PRINT_STATUS__

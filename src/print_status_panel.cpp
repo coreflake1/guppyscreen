@@ -707,9 +707,9 @@ void PrintStatusPanel::update_time_progress(uint32_t time_passed) {
     }
 
     if (count > 0) {
-      auto eta_str = KUtils::eta_string(static_cast<int64_t>(total / count));
-      time_left.update_label(eta_str.c_str());
-      mini_print_status.update_eta(eta_str);
+      int64_t eta_secs = static_cast<int64_t>(total / count);
+      time_left.update_label(KUtils::eta_string(eta_secs).c_str());
+      mini_print_status.update_eta(eta_secs);
     } else {
       time_left.update_label("...");
     }
@@ -835,6 +835,7 @@ void PrintStatusPanel::sim_setup_mock_data() {
   {
     std::lock_guard<std::mutex> lock(lv_lock);
     update_time_progress(600);
+    mini_print_status.sim_thumb();  // placeholder preview for the home overlay
   }
 
   // preview the completion summary (no real print finishes in the sim)
