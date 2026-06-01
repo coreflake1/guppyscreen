@@ -47,14 +47,16 @@ class FanPanel : public NotifyConsumer {
   };
 
  private:
+  void create_readonly_fans();                  // read-only fans (heater_fan, controller_fan, fan output pins)
+  void update_readonly();
+  bool is_binary_fan(const std::string &key);
+  std::string fmt_ro_value(const std::string &key);
 
   KWebSocketClient &ws;
   lv_obj_t *fanpanel_cont;
   lv_obj_t *fans_cont;
   std::map<std::string, std::shared_ptr<SliderContainer>> fans;
-  /* SliderContainer fan0; */
-  /* SliderContainer fan1; */
-  /* SliderContainer fan2; */
+  std::map<std::string, lv_obj_t*> ro_labels;   // read-only fan id -> value label
   ButtonContainer back_btn;
 };
 

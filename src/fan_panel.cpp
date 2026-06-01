@@ -3,6 +3,9 @@
 #include "utils.h"
 #include "spdlog/spdlog.h"
 
+#include <algorithm>
+#include <cmath>
+
 LV_IMG_DECLARE(cancel);
 LV_IMG_DECLARE(fan_on);
 LV_IMG_DECLARE(back);
@@ -54,11 +57,20 @@ void FanPanel::consume(json &j) {
       f.second->update_value(v);
     }
   }
+  update_readonly();
 }
 
 void FanPanel::create_fans(json &f) {
   std::lock_guard<std::mutex> lock(lv_lock);
   fans.clear();
+  // drop any read-only rows from a previous build (e.g. on reconnect)
+  for (auto &kv : ro_labels) {
+    lv_obj_t *row = lv_obj_get_parent(kv.second);
+    if (row != NULL) {
+      lv_obj_del(row);
+    }
+  }
+  ro_labels.clear();
 
   for (auto &fan : f.items()) {
     std::string key = fan.key();
@@ -78,13 +90,108 @@ void FanPanel::create_fans(json &f) {
     // lv_obj_set_grid_cell(fptr->get_container(), LV_GRID_ALIGN_CENTER, 0, 1, LV_GRID_ALIGN_CENTER, rowidx++, 1);
   }
 
-  if (fans.size() > 3) {
+  create_readonly_fans();
+
+  if (fans.size() + ro_labels.size() > 3) {
     lv_obj_add_flag(fans_cont, LV_OBJ_FLAG_SCROLLABLE);
   } else {
     lv_obj_clear_flag(fans_cont, LV_OBJ_FLAG_SCROLLABLE);
   }
 
   lv_obj_move_foreground(back_btn.get_container());
+}
+
+// Read-only fans: heater_fan / controller_fan (auto-managed by Klipper) and any
+// fan-named output_pin that isn't already an editable slider. Shown as a simple
+// name + value row (no controls).
+void FanPanel::create_readonly_fans() {
+  State *s = State::get_instance();
+  std::vector<std::string> candidates = s->get_fans();
+  for (auto &op : s->get_output_pins()) {
+    std::string lower = op;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    if (lower.find("fan") != std::string::npos) {
+      candidates.push_back(op);
+    }
+  }
+
+  for (auto &key : candidates) {
+    if (fans.count(key) || ro_labels.count(key)) {
+      continue;  // already shown as an editable slider, or already added
+    }
+    lv_obj_t *row = lv_obj_create(fans_cont);
+    lv_obj_set_size(row, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_pad_hor(row, 10, 0);
+    lv_obj_set_style_pad_ver(row, 10, 0);
+    lv_obj_set_style_border_side(row, LV_BORDER_SIDE_TOP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(row, 1, 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    size_t pos = key.find_last_of(' ');
+    std::string disp = KUtils::to_title(pos != std::string::npos ? key.substr(pos + 1) : key);
+    lv_obj_t *name = lv_label_create(row);
+    lv_label_set_text(name, disp.c_str());
+    lv_obj_set_style_text_color(name, lv_palette_lighten(LV_PALETTE_GREY, 2), 0);
+
+    lv_obj_t *val = lv_label_create(row);
+    lv_label_set_text(val, "-");
+    ro_labels[key] = val;
+  }
+
+  update_readonly();
+}
+
+bool FanPanel::is_binary_fan(const std::string &key) {
+  if (key.rfind("heater_fan ", 0) == 0 || key.rfind("controller_fan ", 0) == 0) {
+    return true;  // auto-managed, effectively on/off
+  }
+  if (key.rfind("output_pin ", 0) == 0) {
+    std::string lower = key;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    auto pwm = State::get_instance()->get_data(
+      json::json_pointer("/printer_state/configfile/settings/" + lower + "/pwm"));
+    // output_pin defaults to non-PWM (binary) unless pwm: True is configured
+    return pwm.is_boolean() ? !pwm.template get<bool>() : true;
+  }
+  return false;  // fan_generic etc. -> show a percentage
+}
+
+std::string FanPanel::fmt_ro_value(const std::string &key) {
+  State *s = State::get_instance();
+  double v = 0.0;
+  bool have = false;
+  auto sp = s->get_data(json::json_pointer("/printer_state/" + key + "/speed"));
+  if (sp.is_number()) {
+    v = sp.template get<double>();
+    have = true;
+  } else {
+    auto val = s->get_data(json::json_pointer("/printer_state/" + key + "/value"));
+    if (val.is_number()) {
+      v = val.template get<double>();
+      have = true;
+    }
+  }
+  if (!have) {
+    return "-";
+  }
+  if (is_binary_fan(key)) {
+    return v > 0.0 ? "On" : "Off";
+  }
+  std::string out = fmt::format("{}%", (int)std::lround(v * 100.0));
+  auto rpm = s->get_data(json::json_pointer("/printer_state/" + key + "/rpm"));
+  if (rpm.is_number()) {
+    out += fmt::format("  {} RPM", (int)std::lround(rpm.template get<double>()));
+  }
+  return out;
+}
+
+void FanPanel::update_readonly() {
+  for (auto &kv : ro_labels) {
+    lv_label_set_text(kv.second, fmt_ro_value(kv.first).c_str());
+  }
 }
 
 void FanPanel::foreground() {
@@ -105,6 +212,7 @@ void FanPanel::foreground() {
     }
   }
 
+  update_readonly();
   lv_obj_move_foreground(back_btn.get_container());
   lv_obj_move_foreground(fanpanel_cont);
 }

@@ -462,6 +462,29 @@ void MainPanel::sim_setup_mock_data() {
     }
   }
 
+  /* Seed fans so the Fans screen shows an editable slider (output_pin fan0)
+   * plus read-only rows: a binary heater_fan (On/Off) and a PWM output_pin
+   * (percentage). */
+  {
+    json objs;
+    objs["result"]["objects"] = json::array({
+      "output_pin fan0", "output_pin MainBoardFan", "heater_fan nozzle_fan"});
+    State::get_instance()->set_data("printer_objs", objs, "/result");
+
+    json ps;
+    ps["params"][0]["output_pin fan0"]["value"] = 0.5;
+    ps["params"][0]["output_pin MainBoardFan"]["value"] = 0.4;
+    ps["params"][0]["heater_fan nozzle_fan"]["speed"] = 1.0;
+    auto &set = ps["params"][0]["configfile"]["settings"];
+    set["output_pin mainboardfan"]["pwm"] = true;   // -> percentage
+    set["output_pin fan0"]["pwm"] = true;
+    State::get_instance()->set_data("printer_state", ps, "/params/0");
+
+    json editable;
+    editable["output_pin fan0"] = {{"id", "output_pin fan0"}, {"display_name", "Part Fan"}};
+    create_fans(editable);
+  }
+
   /* Seed a handful of gcode_macros into printer_state so the Macros panel
    * has realistic data to render in the sim: a mix of param/no-param macros,
    * a couple of `_`-private ones (which parse_macros filters out), and enough
