@@ -9,7 +9,8 @@ LV_IMG_DECLARE(arrow_down);
 
 static const char *VIEW_MAP[] = {"Favorites", "All Macros", ""};
 
-MacrosPanel::MacrosPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent)
+MacrosPanel::MacrosPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent,
+			 std::function<void()> on_macro_run)
   : ws(c)
   , lv_lock(l)
   , cont(lv_obj_create(parent))
@@ -26,6 +27,7 @@ MacrosPanel::MacrosPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent)
   , view(FAVORITES)
   , highlight_index(-1)
   , expanded_item(nullptr)
+  , on_macro_run(on_macro_run)
 {
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_pad_all(cont, 0, 0);
@@ -153,7 +155,8 @@ void MacrosPanel::populate() {
       macro_items.push_back(std::make_shared<MacroItem>(
 	ws, top_cont, k, v, kb, fav,
 	[this]() { apply_view(); },
-	[this](MacroItem *m) { highlight_item(m); toggle_expand(m); }));
+	[this](MacroItem *m) { highlight_item(m); toggle_expand(m); },
+	[this]() { if (on_macro_run) on_macro_run(); }));
     }
   }
 

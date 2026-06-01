@@ -33,7 +33,7 @@ MainPanel::MainPanel(KWebSocketClient &websocket,
   , tabview(lv_tabview_create(lv_scr_act(), LV_DIR_LEFT, 60))
   , main_tab(lv_tabview_add_tab(tabview, HOME_SYMBOL))
   , macros_tab(lv_tabview_add_tab(tabview, MACROS_SYMBOL))
-  , macros_panel(ws, lock, macros_tab)
+  , macros_panel(ws, lock, macros_tab, [this]() { show_console(); })
   , console_tab(lv_tabview_add_tab(tabview, CONSOLE_SYMBOL))
   , console_panel(ws, lock, console_tab)
   , printertune_tab(lv_tabview_add_tab(tabview, TUNE_SYMBOL))
@@ -218,6 +218,13 @@ void MainPanel::handle_tab_changed(lv_event_t *event) {
       console_panel.reset_to_terminal();
     }
   }
+}
+
+void MainPanel::show_console() {
+  // console tab is index 2; switch to it and show the terminal so a macro
+  // launched from the Macros screen is visible executing
+  lv_tabview_set_act(tabview, 2, LV_ANIM_OFF);
+  console_panel.reset_to_terminal();
 }
 
 void MainPanel::handle_tab_btn_clicked(lv_event_t *event) {

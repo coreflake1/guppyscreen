@@ -19,7 +19,8 @@ class MacroItem {
 	    lv_obj_t *keyboard,
 	    bool favorite,
 	    std::function<void()> on_favorite_changed,
-	    std::function<void(MacroItem*)> on_activated);
+	    std::function<void(MacroItem*)> on_activated,
+	    std::function<void()> on_play);
 
   ~MacroItem();
 
@@ -82,6 +83,7 @@ class MacroItem {
   bool highlighted;
   std::function<void()> on_favorite_changed;
   std::function<void(MacroItem*)> on_activated;
+  std::function<void()> on_play;
   std::vector<std::pair<lv_obj_t*, lv_obj_t*>> params;
 
 };

@@ -8,10 +8,12 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <functional>
 
 class MacrosPanel {
  public:
-  MacrosPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent);
+  MacrosPanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent,
+	      std::function<void()> on_macro_run);
   ~MacrosPanel();
 
   void populate();
@@ -56,6 +58,7 @@ class MacrosPanel {
   View view;
   int highlight_index;
   MacroItem *expanded_item;
+  std::function<void()> on_macro_run;
   std::vector<std::shared_ptr<MacroItem>> macro_items;
   std::vector<MacroItem*> visible_items;
 

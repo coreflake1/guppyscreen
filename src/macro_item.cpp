@@ -11,7 +11,8 @@ MacroItem::MacroItem(KWebSocketClient &c,
 		     lv_obj_t *keyboard,
 		     bool fav,
 		     std::function<void()> on_fav_changed,
-		     std::function<void(MacroItem*)> on_act)
+		     std::function<void(MacroItem*)> on_act,
+		     std::function<void()> on_play_cb)
   : ws(c)
   , mname(macro_name)
   , cont(lv_obj_create(parent))
@@ -26,6 +27,7 @@ MacroItem::MacroItem(KWebSocketClient &c,
   , highlighted(false)
   , on_favorite_changed(on_fav_changed)
   , on_activated(on_act)
+  , on_play(on_play_cb)
 {
   lv_obj_set_size(cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_COLUMN);
@@ -246,6 +248,12 @@ void MacroItem::handle_send_macro(lv_event_t *e) {
     std::string command = fmt::format("{}", fmt::join(kv, " "));
     spdlog::trace("sending macro: {}", command);
     KUtils::confirm_if_printing("Printer is printing.\nRun this macro anyway?",
-      [this, command]() { ws.gcode_script(command); });
+      [this, command]() {
+        ws.gcode_script(command);
+        // jump to the console so the macro's output/execution is visible
+        if (on_play) {
+          on_play();
+        }
+      });
   }
 }

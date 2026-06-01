@@ -102,6 +102,9 @@ class MainPanel : public NotifyConsumer {
     panel->handle_tab_btn_clicked(event);
   };
 
+  // jump to the console terminal (e.g. after running a macro from the Macros tab)
+  void show_console();
+
  private:
   void create_main(lv_obj_t *parent);
   KWebSocketClient &ws;
