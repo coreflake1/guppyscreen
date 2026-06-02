@@ -31,6 +31,14 @@ namespace KUtils {
   bool is_running_local();
   std::string get_root_path(const std::string root_name);
 
+  // Does the currently-printing gcode use firmware retraction? Scans only a
+  // bounded prefix of the file for G10/G11/SET_RETRACTION and early-exits on
+  // the first hit, so it's cheap even on the printer; reads off local disk when
+  // running on the host, else a single Range request. Verdict cached per
+  // filename. Returns 1 = yes, 0 = no, -1 = couldn't tell (not printing, file
+  // missing/unreadable).
+  int print_uses_firmware_retraction();
+
   // ---- Shared dialog look ----------------------------------------------------
   // One definition of the app's modal look so every popup matches and can't
   // drift. Custom dialogs (their own overlay + box) use the first three; the

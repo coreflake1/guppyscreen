@@ -1,5 +1,6 @@
 #include "hv/requests.h"
 #include "hv/hurl.h"
+#include "utils.h"
 #include "config.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
@@ -141,9 +142,11 @@ namespace KUtils {
     lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, msg.c_str(), NULL, false);
     style_dialog_msgbox(mbox);
     lv_obj_t *txt = ((lv_msgbox_t *)mbox)->text;
-    lv_obj_set_style_text_align(txt, LV_TEXT_ALIGN_CENTER, 0);
+    // Left-align the body so multi-line messages wrap to a clean left margin
+    // instead of ragged centered lines.
+    lv_label_set_long_mode(txt, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_align(txt, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(txt, LV_PCT(100));
-    lv_obj_center(txt);
     lv_obj_set_width(mbox, LV_PCT(70));
     lv_obj_set_height(mbox, LV_SIZE_CONTENT);
     lv_obj_center(mbox);
@@ -199,6 +202,72 @@ namespace KUtils {
     }
 
     return "";
+  }
+
+  // Scan one stream for the first firmware-retraction command, reading at most
+  // MAX_SCAN bytes and stopping on the first hit. Returns 1 if found, 0 if the
+  // bounded prefix held none.
+  static int scan_for_fw_retraction(std::istream &in) {
+    constexpr size_t MAX_SCAN = 1024 * 1024;  // bounded prefix; we early-exit on a hit
+    std::string line;
+    size_t read = 0;
+    while (read < MAX_SCAN && std::getline(in, line)) {
+      read += line.size() + 1;
+      size_t i = line.find_first_not_of(" \t");
+      if (i == std::string::npos) continue;
+      const char *p = line.c_str() + i;
+      // G10 / G11 = retract / unretract. Require a non-digit terminator so we
+      // don't match G100 etc.
+      if ((p[0] == 'G' || p[0] == 'g') && p[1] == '1' && (p[2] == '0' || p[2] == '1')) {
+        char c = p[3];
+        if (c == '\0' || c == ' ' || c == '\t' || c == ';' || c == '\r') return 1;
+      }
+      if (line.compare(i, 14, "SET_RETRACTION") == 0) return 1;
+    }
+    return 0;
+  }
+
+  int print_uses_firmware_retraction() {
+    // Verdict cached per filename so re-opening the menu during one print does
+    // not rescan. -1 = unknown, 0 = no, 1 = yes.
+    static std::string cached_file;
+    static int cached_result = -1;
+
+    auto fn = State::get_instance()->get_data("/printer_state/print_stats/filename"_json_pointer);
+    if (!fn.is_string()) return -1;
+    std::string filename = fn.template get<std::string>();
+    if (filename.empty()) return -1;
+    if (filename == cached_file) return cached_result;
+
+    int result = -1;
+    if (is_running_local()) {
+      // Running on the printer: read the gcode straight off disk (no download).
+      std::string root = get_root_path("gcodes");
+      if (!root.empty()) {
+        std::ifstream in(root + "/" + filename, std::ios::binary);
+        if (in.is_open()) result = scan_for_fw_retraction(in);
+      }
+    } else {
+      // Remote: fetch only the leading prefix with a Range request, never the
+      // whole file.
+      Config *conf = Config::get_instance();
+      std::string url = fmt::format("http://{}:{}/server/files/gcodes/{}",
+        conf->get<std::string>(conf->df() + "moonraker_host"),
+        conf->get<uint32_t>(conf->df() + "moonraker_port"),
+        HUrl::escape(filename));
+      http_headers headers;
+      headers["Range"] = "bytes=0-1048575";
+      auto resp = requests::get(url.c_str(), headers);
+      if (resp != NULL && (resp->status_code == 200 || resp->status_code == 206)) {
+        std::istringstream iss(resp->body);
+        result = scan_for_fw_retraction(iss);
+      }
+    }
+
+    cached_file = filename;
+    cached_result = result;
+    spdlog::debug("firmware-retraction gcode scan for '{}': {}", filename, result);
+    return result;
   }
 
   std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j, double scale) {

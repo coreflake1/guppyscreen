@@ -157,8 +157,28 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
         [this]() { power_panel.foreground(); });
     } else if (btn == retraction_btn.get_container()) {
       spdlog::trace("retraction pressed");
-      // safe to tune live during a print; the panel shows an empty-state if
-      // [firmware_retraction] isn't configured
+      // Check 1: is [firmware_retraction] configured in Klipper at all? When it
+      // is, Klipper exposes a firmware_retraction status object.
+      auto fr = State::get_instance()->get_data(
+        "/printer_state/firmware_retraction"_json_pointer);
+      if (fr.is_null()) {
+        KUtils::notify_toast(
+          "Firmware retraction isn't enabled.\n"
+          "Add [firmware_retraction] to printer.cfg.",
+          4000);
+        return;
+      }
+      // Check 2: only meaningful mid-print. Idle, we let the user tune freely;
+      // printing, we make sure the running file is actually sliced for firmware
+      // retraction (uses G10/G11) or the live values won't do anything.
+      if (KUtils::is_printing()
+          && KUtils::print_uses_firmware_retraction() == 0) {
+        KUtils::notify_toast(
+          "This print isn't sliced for firmware retraction.\n"
+          "These settings won't apply.",
+          4000);
+        return;
+      }
       firmware_retraction_panel.foreground();
     }
   }
