@@ -102,6 +102,17 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 > Use `installer.sh` — **not** `installer-deb.sh` (that one is for aarch64/Debian and will refuse to
 > run on the KE).
 
+### Updating
+
+From **v0.3.0 onward**, update in place from the screen: **Settings → Update Guppy** (it pulls the
+latest release and restarts).
+
+> **Upgrading from v0.2.0 (one-time):** the v0.2.0 in-app updater points at the wrong repository and
+> can't fetch GuppyKE releases, so the **Update Guppy** button won't work on 0.2.0. Just re-run the
+> install command above once — it pulls the latest release, replaces the updater with the fixed one,
+> and **keeps your printer config**. After that, the on-screen Update button works for every future
+> release.
+
 ### Uninstall
 
 ```sh
