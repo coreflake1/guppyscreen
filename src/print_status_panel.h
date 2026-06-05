@@ -6,6 +6,7 @@
 #include "button_container.h"
 #include "image_label.h"
 #include "finetune_panel.h"
+#include "zoffset_panel.h"
 #include "exclude_object_panel.h"
 #include "mini_print_status.h"
 #include "lvgl/lvgl.h"
@@ -43,6 +44,7 @@ class PrintStatusPanel : public NotifyConsumer {
   int current_layer(json &info);
 
   FineTunePanel &get_finetune_panel();
+  ZOffsetPanel &get_zoffset_panel();
   // The floating print overlay container, so the home panel can position it
   // relative to its button cluster.
   lv_obj_t *get_mini_container() { return mini_print_status.get_container(); }
@@ -59,6 +61,7 @@ class PrintStatusPanel : public NotifyConsumer {
  private:
   KWebSocketClient &ws;
   FineTunePanel finetune_panel;
+  ZOffsetPanel zoffset_panel;
   ExcludeObjectPanel exclude_object_panel;
   MiniPrintStatus mini_print_status;
   lv_obj_t *status_cont;

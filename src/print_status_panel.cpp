@@ -32,6 +32,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   : NotifyConsumer(lock)
   , ws(websocket_client)
   , finetune_panel(websocket_client, lock)
+  , zoffset_panel(websocket_client, lock)
   , exclude_object_panel(websocket_client, lock)
   , mini_print_status(mini_parent, &PrintStatusPanel::_handle_callback, this)
   , status_cont(lv_obj_create(lv_scr_act()))
@@ -99,6 +100,10 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   //detail containter row 3
   lv_obj_set_grid_cell(z_offset.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
   lv_obj_set_grid_cell(flow_rate.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+  // tap the Z-offset metric to open the baby-stepping aid during a print
+  lv_obj_add_flag(z_offset.get_container(), LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(z_offset.get_container(), &PrintStatusPanel::_handle_callback,
+    LV_EVENT_CLICKED, this);
 
   //detail containter row 4
   lv_obj_set_grid_cell(layers.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
@@ -651,6 +656,9 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
   } else if (btn == complete_done_btn) {
     lv_obj_move_background(complete_cont);
 
+  } else if (btn == z_offset.get_container()) {
+    zoffset_panel.foreground();
+
   } else if (btn == emergency_btn.get_container()) {
     ws.send_jsonrpc("printer.emergency_stop");
   } else if (btn == pause_btn.get_container()) {
@@ -785,6 +793,10 @@ int PrintStatusPanel::current_layer(json &info) {
 
 FineTunePanel &PrintStatusPanel::get_finetune_panel() {
   return finetune_panel;
+}
+
+ZOffsetPanel &PrintStatusPanel::get_zoffset_panel() {
+  return zoffset_panel;
 }
 
 #ifdef SIMULATOR

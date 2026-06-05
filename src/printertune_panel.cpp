@@ -14,6 +14,7 @@ LV_IMG_DECLARE(limit_img);
 LV_IMG_DECLARE(motor_img);
 LV_IMG_DECLARE(chart_img);
 LV_IMG_DECLARE(retract_img);
+LV_IMG_DECLARE(home_z);
 
 #ifndef ZBOLT
 LV_IMG_DECLARE(belts_calibration_img);
@@ -22,10 +23,11 @@ LV_IMG_DECLARE(power_devices_img);
 LV_IMG_DECLARE(print);
 #endif
 
-PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, FineTunePanel &finetune)
+PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t *parent, FineTunePanel &finetune, ZOffsetPanel &zoffset)
   : cont(lv_obj_create(parent))
   , bedmesh_panel(c, l)
   , finetune_panel(finetune)
+  , zoffset_panel(zoffset)
   , limits_panel(c, l)
   , inputshaper_panel(c, l)
   , belts_calibration_panel(c, l)
@@ -50,6 +52,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   , power_devices_btn(cont, &print, "Power Devices", &PrinterTunePanel::_handle_callback, this)
 #endif
   , retraction_btn(cont, &retract_img, "Retraction", &PrinterTunePanel::_handle_callback, this)
+  , zoffset_btn(cont, &home_z, "Z Offset", &PrinterTunePanel::_handle_callback, this)
 {
   lv_obj_move_background(cont);
 
@@ -80,6 +83,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
 
   // row 3
   lv_obj_set_grid_cell(retraction_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
+  lv_obj_set_grid_cell(zoffset_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
 }
 
 PrinterTunePanel::~PrinterTunePanel() {
@@ -180,6 +184,9 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
         return;
       }
       firmware_retraction_panel.foreground();
+    } else if (btn == zoffset_btn.get_container()) {
+      spdlog::trace("z offset pressed");
+      zoffset_panel.foreground();
     }
   }
 }

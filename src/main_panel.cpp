@@ -42,7 +42,7 @@ MainPanel::MainPanel(KWebSocketClient &websocket,
   , main_cont(lv_obj_create(main_tab))
   , print_status_panel(websocket, lock, main_cont)
   , print_panel(ws, lock, print_status_panel, sm)
-  , printertune_panel(ws, lock, printertune_tab, print_status_panel.get_finetune_panel())
+  , printertune_panel(ws, lock, printertune_tab, print_status_panel.get_finetune_panel(), print_status_panel.get_zoffset_panel())
   , numpad(Numpad(main_cont))
   , extruder_panel(ws, lock, numpad, sm)
   , prompt_panel(websocket, lock, main_cont)
@@ -554,6 +554,17 @@ void MainPanel::sim_setup_mock_data() {
     d["unretract_extra_length"] = 0.0;
     d["unretract_speed"] = 30;
     State::get_instance()->set_data("printer_state", fr, "/params/0");
+  }
+
+  /* Seed gcode_move so the FineTune / Z-Offset panels and the print-status
+   * Z-offset cell render a live value in the sim (no Moonraker to provide it). */
+  {
+    json gm;
+    auto &o = gm["params"][0]["gcode_move"];
+    o["homing_origin"] = json::array({0.0, 0.0, -0.040});
+    o["speed_factor"] = 1.0;
+    o["extrude_factor"] = 1.0;
+    State::get_instance()->set_data("printer_state", gm, "/params/0");
   }
 
   /* Seed the console: recent history, favorites, a gcode.help list spanning the
