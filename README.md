@@ -58,6 +58,21 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 - Thread-safe `State` access, tightened LVGL cadence, and an evdev tracking-id fix.
 - A self-hosted MIPS cross-build toolchain and CI that publishes KE release tarballs.
 
+## Screenshots
+
+> Captured in the desktop simulator at the KE's native 480×272.
+
+| | |
+|:---:|:---:|
+| **Home** | **Live Z-Offset** |
+| ![Home screen](docs/screenshots/home.png) | ![Z-Offset baby-stepping](docs/screenshots/z-offset.png) |
+| **Firmware Retraction** | **Tune menu** |
+| ![Firmware Retraction](docs/screenshots/firmware-retraction.png) | ![Tune menu](docs/screenshots/tune-menu.png) |
+| **Fans** | **Extruder** |
+| ![Fans](docs/screenshots/fans.png) | ![Extruder heating](docs/screenshots/extruder.png) |
+| **Print complete** | **Notifications & homing prompt** |
+| ![Print complete](docs/screenshots/print-complete.png) | ![Notifications and homing prompt](docs/screenshots/notifications.png) |
+
 ## Compatibility
 
 | | |
