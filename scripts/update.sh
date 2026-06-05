@@ -7,7 +7,9 @@ CUSTOM_UPGRADE_SCRIPT=$GUPPY_DIR/custom_upgrade.sh
 if [ -f $VERSION_FILE ]; then
     CURRENT_VERSION=`cat $VERSION_FILE | jq -r .version`
     THEME=`cat $VERSION_FILE | jq -r .theme`
-    ASSET_NAME=`cat $VERSION_FILE | jq .asset_name`
+    # -r so ASSET_NAME is the bare string; the un-rawed value kept its quotes and
+    # broke the jq asset filter below.
+    ASSET_NAME=`cat $VERSION_FILE | jq -r .asset_name`
 fi
 
 CURL=`which curl`
@@ -18,14 +20,24 @@ then
     CURL=/tmp/curl
 fi
 
-$CURL -s https://api.github.com/repos/probielodan/guppyscreen/releases -o /tmp/guppy-releases.json
-latest_version=`jq -r '.[0].tag_name' /tmp/guppy-releases.json`
+# GuppyKE lives at coreflake1/guppyscreen (was probielodan, upstream of this fork).
+$CURL -s https://api.github.com/repos/coreflake1/guppyscreen/releases -o /tmp/guppy-releases.json
+# Only consider stable releases: pushes to main publish a rolling "nightly" prerelease
+# whose tag doesn't version-compare, so ignore prereleases for the update check.
+latest_version=`jq -r '[.[] | select(.prerelease == false)][0].tag_name' /tmp/guppy-releases.json`
+
+if [ -z "$latest_version" ] || [ "$latest_version" = "null" ]; then
+    echo "Could not determine latest release; skipping update."
+    exit 0
+fi
 
 if [ "$(printf '%s\n' "$CURRENT_VERSION" "$latest_version" | sort -V | head -n1)" = "$latest_version" ]; then
     echo "Current version $CURRENT_VERSION is up to date."
     exit 0
 else
-    asset_url=`jq -r ".[0].assets[] | select(.name == "$ASSET_NAME").browser_download_url" /tmp/guppy-releases.json`
+    # --arg passes the asset name safely (no shell-quote breakage) and we pull the asset
+    # from the same stable release chosen above.
+    asset_url=`jq -r --arg n "$ASSET_NAME" '[.[] | select(.prerelease == false)][0].assets[] | select(.name == $n).browser_download_url' /tmp/guppy-releases.json`
     echo "Downloading latest version $latest_version, $asset_url"
     $CURL -L "$asset_url" -o /tmp/guppyscreen.tar.gz
 fi
