@@ -204,9 +204,16 @@ BedMeshPanel::BedMeshPanel(KWebSocketClient &c, std::mutex &l)
   lv_obj_set_parent(fov_zoom_in_btn, rotation_cont);  // FOV+ (plus) fourth
 
 
-  // Setup Z zoom buttons with correct symbols
-  setup_button_with_label(z_zoom_in_btn, LV_SYMBOL_PLUS, 40, 30, &BedMeshPanel::_handle_z_zoom_in);
-  setup_button_with_label(z_zoom_out_btn, LV_SYMBOL_MINUS, 40, 30, &BedMeshPanel::_handle_z_zoom_out);
+  // +/- buttons (larger for easier touch). Tap = view zoom in/out; long-press = Z-height
+  // exaggeration (taller/flatter relief). Orientation is handled by touch-drag.
+  setup_button_with_label(z_zoom_in_btn, LV_SYMBOL_PLUS, 64, 52, nullptr);
+  setup_button_with_label(z_zoom_out_btn, LV_SYMBOL_MINUS, 64, 52, nullptr);
+  lv_obj_add_event_cb(z_zoom_in_btn, &BedMeshPanel::_handle_view_zoom_in, LV_EVENT_SHORT_CLICKED, this);
+  lv_obj_add_event_cb(z_zoom_in_btn, &BedMeshPanel::_handle_z_zoom_in, LV_EVENT_LONG_PRESSED, this);
+  lv_obj_add_event_cb(z_zoom_in_btn, &BedMeshPanel::_handle_z_zoom_in, LV_EVENT_LONG_PRESSED_REPEAT, this);
+  lv_obj_add_event_cb(z_zoom_out_btn, &BedMeshPanel::_handle_view_zoom_out, LV_EVENT_SHORT_CLICKED, this);
+  lv_obj_add_event_cb(z_zoom_out_btn, &BedMeshPanel::_handle_z_zoom_out, LV_EVENT_LONG_PRESSED, this);
+  lv_obj_add_event_cb(z_zoom_out_btn, &BedMeshPanel::_handle_z_zoom_out, LV_EVENT_LONG_PRESSED_REPEAT, this);
 
   // Setup FOV zoom buttons with correct symbols (hidden for now, kept for future debugging)
   setup_button_with_label(fov_zoom_in_btn, LV_SYMBOL_UP, 40, 30, &BedMeshPanel::_handle_fov_zoom_in);
@@ -407,47 +414,44 @@ void BedMeshPanel::refresh_views(json &bm) {
         auto width = lv_obj_get_width(mesh_table);
         spdlog::debug("Table dimensions: {}x{} (forced to {}), display_cont height: {}, mesh size: {}x{}", width, height, target_table_height, display_height, mesh[0].size(), mesh.size());
 
-        // Adjust spacing based on mesh size
+        // Pick the font first so the row-height math knows the glyph height. Drop to
+        // 8pt for large meshes; on the narrow small screen anything past 6 points/axis
+        // (e.g. KAMP 9x9) wraps at 10pt, so drop earlier there.
+        auto table_screen_width = lv_disp_get_physical_hor_res(NULL);
         bool is_large_mesh = (mesh.size() > 6 || mesh[0].size() > 6);
+        bool small_screen_large_mesh = (table_screen_width < 800) && is_large_mesh;
+        bool use_small_font = (mesh.size() > 9 || mesh[0].size() > 9 || small_screen_large_mesh);
+        lv_obj_set_style_text_font(mesh_table,
+          use_small_font ? &lv_font_montserrat_8 : &lv_font_montserrat_10, LV_STATE_DEFAULT);
+        // Approx line height (glyph + leading), slightly over-estimated so rows never
+        // exceed their slice.
+        int glyph_h = use_small_font ? 12 : 16;
 
-        int cel_height, col_width;
-        // Calculate actual row height needed: total height divided by number of rows
-        // Each row needs space for text + top padding + bottom padding
-        int available_row_height = height / mesh.size();
+        // Divide the table height evenly across rows, but cap the row height so a
+        // few-point mesh (KAMP adaptive can be as small as 3x3) doesn't balloon into a
+        // handful of giant cells. Padding = (slice - glyph)/2 so the glyph height is
+        // absorbed into the slice instead of added on top -- the old code added it on
+        // top, so rows overflowed the table and the top/bottom rows clipped (worst
+        // when rows were tall, i.e. exactly the small-mesh case).
+        const int MAX_ROW_HEIGHT = 64;
+        int available_row_height = std::min(MAX_ROW_HEIGHT, (int)(height / mesh.size()));
+        int cel_height = std::max(1, (available_row_height - glyph_h) / 2);
 
-        if (is_large_mesh) {
-          // Minimal padding for large meshes to fit more data
-          cel_height = std::max(1, available_row_height / 3);
-          col_width = std::max(35, (int)(width / mesh[0].size()));
-        } else {
-          // More comfortable padding for small meshes
-          cel_height = std::max(2, available_row_height / 2);
-          col_width = std::max(4, (int)(width / mesh[0].size()));
-        }
+        // Fit columns to the real table width for any count. A fixed minimum (e.g.
+        // 35px) overflowed the narrow small-screen table once the column count grew
+        // (9x9 -> 9*35 > table width), clipping the rightmost columns.
+        int col_width = std::max(1, (int)(width / mesh[0].size()));
 
         lv_obj_set_style_pad_top(mesh_table, cel_height, LV_PART_ITEMS | LV_STATE_DEFAULT);
         lv_obj_set_style_pad_bottom(mesh_table, cel_height, LV_PART_ITEMS | LV_STATE_DEFAULT);
-
-        // Reduce left/right padding for large meshes to prevent text wrapping
-        if (is_large_mesh) {
-          lv_obj_set_style_pad_left(mesh_table, 1, LV_PART_ITEMS | LV_STATE_DEFAULT);
-          lv_obj_set_style_pad_right(mesh_table, 1, LV_PART_ITEMS | LV_STATE_DEFAULT);
-        } else {
-          lv_obj_set_style_pad_left(mesh_table, 3, LV_PART_ITEMS | LV_STATE_DEFAULT);
-          lv_obj_set_style_pad_right(mesh_table, 3, LV_PART_ITEMS | LV_STATE_DEFAULT);
-        }
+        int side_pad = is_large_mesh ? 1 : 3;
+        lv_obj_set_style_pad_left(mesh_table, side_pad, LV_PART_ITEMS | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_right(mesh_table, side_pad, LV_PART_ITEMS | LV_STATE_DEFAULT);
 
         lv_table_set_col_cnt(mesh_table, mesh[0].size());
         for (int i = 0; i < mesh[0].size(); i++) {
           lv_table_set_col_width(mesh_table, i, col_width);
         }
-      }
-
-      // Use minimum 10pt font for readability, only drop to 8pt for very large meshes
-      if (mesh.size() > 9 || mesh[0].size() > 9) {
-        lv_obj_set_style_text_font(mesh_table, &lv_font_montserrat_8, LV_STATE_DEFAULT);
-      } else {
-        lv_obj_set_style_text_font(mesh_table, &lv_font_montserrat_10, LV_STATE_DEFAULT);
       }
 
       for (int i = mesh.size() - 1; i >= 0; i--) {
@@ -1024,6 +1028,12 @@ void BedMeshPanel::draw_axes_and_labels(const std::vector<std::vector<BedMeshPan
 // Convert 3D world coordinates to 2D screen coordinates using perspective projection
 BedMeshPanel::Point3D BedMeshPanel::project_3d_to_2d(double x, double y, double z, int canvas_width, int canvas_height)
 {
+  // Remap the incoming index-space world coordinates onto the bed (physical position +
+  // aspect). All geometry funnels through here, so this single affine repositions the
+  // surface, axes, grid and labels consistently. Identity transform = original layout.
+  x = render_xform_scale_x * x + render_xform_offset_x;
+  y = render_xform_scale_y * y + render_xform_offset_y;
+
   // Camera parameters for perspective projection using dynamic camera distance
   double fov_scale = this->fov_scale;
 
@@ -1400,6 +1410,139 @@ void BedMeshPanel::draw_3d_quad(const Quad3D& quad, int canvas_width, int canvas
   }
 }
 
+void BedMeshPanel::setup_world_transform(int mesh_rows, int mesh_cols)
+{
+  // Default: identity -> original index-based layout (also the fallback when we lack a
+  // usable physical mesh region or bed config).
+  render_xform_scale_x = 1.0; render_xform_offset_x = 0.0;
+  render_xform_scale_y = 1.0; render_xform_offset_y = 0.0;
+  render_bed_world_w = (mesh_cols - 1) * MESH_SCALE;
+  render_bed_world_h = (mesh_rows - 1) * MESH_SCALE;
+  render_have_bed_frame = false;
+
+  // Physical extent of this mesh (captured from the profile's mesh_params).
+  double mx0 = mesh_min_x, mx1 = mesh_max_x, my0 = mesh_min_y, my1 = mesh_max_y;
+  if (!(mx1 > mx0) || !(my1 > my0)) {
+    return;  // no usable region -> keep identity layout
+  }
+
+  // Bed frame: prefer the configured full probe area so the mesh shows its true bed
+  // position; fall back to the mesh's own extent (mesh fills the frame, still aspect-correct).
+  double bx0 = mx0, bx1 = mx1, by0 = my0, by1 = my1;
+  auto bmin = State::get_instance()->get_data("/printer_state/configfile/settings/bed_mesh/mesh_min"_json_pointer);
+  auto bmax = State::get_instance()->get_data("/printer_state/configfile/settings/bed_mesh/mesh_max"_json_pointer);
+  if (bmin.is_array() && bmin.size() == 2 && bmax.is_array() && bmax.size() == 2) {
+    double cx0 = bmin[0].template get<double>(), cy0 = bmin[1].template get<double>();
+    double cx1 = bmax[0].template get<double>(), cy1 = bmax[1].template get<double>();
+    if (cx1 > cx0 && cy1 > cy0) {
+      bx0 = cx0; by0 = cy0; bx1 = cx1; by1 = cy1;
+      render_have_bed_frame = true;
+    }
+  }
+
+  double bed_w = bx1 - bx0, bed_h = by1 - by0;
+  double bed_span = std::max(bed_w, bed_h);
+  if (bed_span <= 0.0) {
+    render_have_bed_frame = false;
+    return;
+  }
+  double ws = BED_WORLD_SPAN / bed_span;          // mm -> world units; same on both axes => aspect preserved
+  double bed_cx = (bx0 + bx1) / 2.0, bed_cy = (by0 + by1) / 2.0;
+
+  double dx = (mesh_cols > 1) ? (mx1 - mx0) / (mesh_cols - 1) : (mx1 - mx0);
+  double dy = (mesh_rows > 1) ? (my1 - my0) / (mesh_rows - 1) : (my1 - my0);
+
+  // Derived so that index coord (col - cols/2)*MESH_SCALE maps to (phys_x - bed_cx)*ws.
+  render_xform_scale_x = (mesh_cols > 1) ? dx * ws / MESH_SCALE : 1.0;
+  render_xform_offset_x = ws * (mx0 + (mesh_cols / 2.0) * dx - bed_cx);
+  render_xform_scale_y = (mesh_rows > 1) ? dy * ws / MESH_SCALE : 1.0;
+  render_xform_offset_y = ws * (my0 + (mesh_rows / 2.0) * dy - bed_cy);
+
+  render_bed_world_w = bed_w * ws;
+  render_bed_world_h = bed_h * ws;
+}
+
+void BedMeshPanel::draw_bed_outline(double grid_reference_z, int canvas_width, int canvas_height)
+{
+  // Only meaningful when we mapped onto a real configured bed frame.
+  if (!render_have_bed_frame) {
+    return;
+  }
+  // The bed frame spans +/- bed_world/2 in physical-world coords. project_3d_to_2d applies
+  // the affine, so feed it the pre-transform (index-space) coords that map there:
+  //   index = (physical_world - offset) / scale.
+  if (render_xform_scale_x == 0.0 || render_xform_scale_y == 0.0) {
+    return;
+  }
+  double wx_lo = (-render_bed_world_w / 2.0 - render_xform_offset_x) / render_xform_scale_x;
+  double wx_hi = ( render_bed_world_w / 2.0 - render_xform_offset_x) / render_xform_scale_x;
+  double wy_lo = (-render_bed_world_h / 2.0 - render_xform_offset_y) / render_xform_scale_y;
+  double wy_hi = ( render_bed_world_h / 2.0 - render_xform_offset_y) / render_xform_scale_y;
+
+  Point3D c[4] = {
+    project_3d_to_2d(wx_lo, wy_lo, grid_reference_z, canvas_width, canvas_height),
+    project_3d_to_2d(wx_hi, wy_lo, grid_reference_z, canvas_width, canvas_height),
+    project_3d_to_2d(wx_hi, wy_hi, grid_reference_z, canvas_width, canvas_height),
+    project_3d_to_2d(wx_lo, wy_hi, grid_reference_z, canvas_width, canvas_height),
+  };
+
+  lv_draw_line_dsc_t bed_dsc;
+  lv_draw_line_dsc_init(&bed_dsc);
+  bed_dsc.color = lv_color_make(110, 110, 140); // muted blue-grey bed boundary
+  bed_dsc.width = 1;
+  bed_dsc.opa = LV_OPA_50;
+
+  for (int i = 0; i < 4; i++) {
+    const Point3D& a = c[i];
+    const Point3D& b = c[(i + 1) % 4];
+    lv_point_t seg[2] = {{a.screen_x, a.screen_y}, {b.screen_x, b.screen_y}};
+    lv_canvas_draw_line(mesh_canvas, seg, 2, &bed_dsc);
+  }
+}
+
+void BedMeshPanel::refine_fov_to_fill(int canvas_width, int canvas_height, double z_top_world)
+{
+  if (render_xform_scale_x == 0.0 || render_xform_scale_y == 0.0) {
+    return;
+  }
+  // Pre-transform (index-space) coords whose affine image is the bed-frame extent; feed
+  // these to project_3d_to_2d (which re-applies the transform).
+  double wx_lo = (-render_bed_world_w / 2.0 - render_xform_offset_x) / render_xform_scale_x;
+  double wx_hi = ( render_bed_world_w / 2.0 - render_xform_offset_x) / render_xform_scale_x;
+  double wy_lo = (-render_bed_world_h / 2.0 - render_xform_offset_y) / render_xform_scale_y;
+  double wy_hi = ( render_bed_world_h / 2.0 - render_xform_offset_y) / render_xform_scale_y;
+  double xs[2] = {wx_lo, wx_hi};
+  double ys[2] = {wy_lo, wy_hi};
+  double zs[2] = {-z_top_world, z_top_world};
+
+  // A screen position is base + perspective, and perspective is linear in fov_scale, so
+  // scaling fov by k moves each corner to base + k*(corner - base). Find the largest k
+  // that still keeps every corner inside the padded drawable box (this respects the
+  // off-centre projection origin, where a simple bbox-fill would clip the top).
+  double base_x = GRADIENT_BAND_TOTAL_WIDTH + (canvas_width - GRADIENT_BAND_TOTAL_WIDTH) / 2.0;
+  double base_y = canvas_height * Z_ORIGIN_VERTICAL_POSITION;
+  double pad_x = canvas_width * CANVAS_PADDING_RATIO;
+  double pad_y = canvas_height * CANVAS_PADDING_RATIO;
+  double lo_x = GRADIENT_BAND_TOTAL_WIDTH + pad_x, hi_x = canvas_width - pad_x;
+  double lo_y = pad_y, hi_y = canvas_height - pad_y;
+
+  double k = 5.0;  // upper guard
+  for (int xi = 0; xi < 2; xi++) {
+    for (int yi = 0; yi < 2; yi++) {
+      for (int zi = 0; zi < 2; zi++) {
+        Point3D p = project_3d_to_2d(xs[xi], ys[yi], zs[zi], canvas_width, canvas_height);
+        double ox = p.screen_x - base_x, oy = p.screen_y - base_y;
+        if (ox > 1e-6)      k = std::min(k, (hi_x - base_x) / ox);
+        else if (ox < -1e-6) k = std::min(k, (lo_x - base_x) / ox);
+        if (oy > 1e-6)      k = std::min(k, (hi_y - base_y) / oy);
+        else if (oy < -1e-6) k = std::min(k, (lo_y - base_y) / oy);
+      }
+    }
+  }
+  k = std::max(0.2, std::min(5.0, k));  // guard against degenerate projections
+  fov_scale *= k * user_zoom;           // user_zoom is the +/- tap view-zoom on top of the fit
+}
+
 void BedMeshPanel::draw_3d_mesh()
 {
   if (mesh.empty()) {
@@ -1418,6 +1561,10 @@ void BedMeshPanel::draw_3d_mesh()
   int canvas_height = lv_obj_get_height(mesh_canvas);
   int mesh_rows = mesh.size();
   int mesh_cols = mesh[0].size();
+
+  // Build the index-space -> physical-bed transform before any projection so the surface,
+  // axes, grid, FOV fit and bed outline all use the same mapping.
+  setup_world_transform(mesh_rows, mesh_cols);
 
   spdlog::debug("Drawing proper 3D mesh: canvas {}x{}, mesh {}x{}", canvas_width, canvas_height, mesh_rows, mesh_cols);
 
@@ -1441,8 +1588,18 @@ void BedMeshPanel::draw_3d_mesh()
     z_scale = std::max(DEFAULT_Z_MIN_SCALE, std::min(DEFAULT_Z_MAX_SCALE, z_scale));
   }
 
-  // Calculate dynamic FOV scale to fit mesh in canvas with padding
-  fov_scale = calculate_dynamic_fov_scale(mesh_rows, mesh_cols, canvas_width, canvas_height);
+  // Calculate dynamic FOV scale to fit mesh in canvas with padding.
+  // Pass the vertical Z reach (surface + axis extension, after display scaling) so a
+  // tall/amplified surface doesn't project past the top/bottom edges once tilted.
+  double world_z_half_extent = z_range * Z_AXIS_EXTENSION * z_scale * z_display_scale;
+  fov_scale = calculate_dynamic_fov_scale(mesh_rows, mesh_cols, canvas_width, canvas_height,
+                                          world_z_half_extent);
+
+  // The analytic fit is conservative (assumes worst-case rotation), so under the default
+  // tilt/spin it leaves the bed small with lots of empty canvas. Refine it by measuring
+  // the actual projected bed cuboid and scaling the FOV to fill the available space --
+  // this enlarges a small adaptive patch along with the bed, making it readable.
+  refine_fov_to_fill(canvas_width, canvas_height, z_range * Z_AXIS_EXTENSION * z_scale);
 
   spdlog::debug("Bed mesh display: rotation={:.1f}°, Z range=[{:.3f} to {:.3f}]mm (span={:.3f}mm), scale={:.2f}, fov={:.1f}, camera_distance={:.1f}",
                 VIEW_ANGLE_X_DEGREES, min_z, max_z, z_range, z_scale, fov_scale, camera_distance);
@@ -1480,6 +1637,11 @@ void BedMeshPanel::draw_3d_mesh()
   // Draw coordinate axes and labels FIRST (behind the mesh)
   draw_axes_and_labels(point_grid, mesh_rows, mesh_cols, canvas_width, canvas_height, min_z, max_z, z_scale);
 
+  // Outline the full bed at the grid reference plane so an adaptive mesh's position is
+  // visible. grid_reference_z matches draw_axes_and_labels' floor plane.
+  double grid_reference_z = (-(max_z - min_z) * Z_AXIS_EXTENSION) * z_scale;
+  draw_bed_outline(grid_reference_z, canvas_width, canvas_height);
+
   // Sort quads by depth (back-to-front rendering for proper overlapping)
   sort_quads_by_depth(quads);
 
@@ -1508,15 +1670,11 @@ void BedMeshPanel::handle_z_zoom_in(lv_event_t *event)
 
   if (z_display_scale > MAX_Z_SCALE) z_display_scale = MAX_Z_SCALE;
 
-  spdlog::debug("Z+ ZOOM IN: display_scale {} -> {}",
+  spdlog::debug("Z+ (long-press) exaggerate: display_scale {} -> {}",
                 old_display_scale, z_display_scale);
 
-  // Update button states
-  lv_obj_clear_state(z_zoom_out_btn, LV_STATE_DISABLED);
-  if (z_display_scale >= MAX_Z_SCALE) {
-    lv_obj_add_state(z_zoom_in_btn, LV_STATE_DISABLED);
-  }
-
+  // No button disabling: these buttons are dual-purpose (tap = zoom), so disabling them
+  // at the Z limit would also block zooming. The clamp above is enough.
   draw_3d_mesh();
 }
 
@@ -1529,15 +1687,26 @@ void BedMeshPanel::handle_z_zoom_out(lv_event_t *event)
 
   if (z_display_scale < MIN_Z_SCALE) z_display_scale = MIN_Z_SCALE;
 
-  spdlog::debug("Z- ZOOM OUT: display_scale {} -> {}",
+  spdlog::debug("Z- (long-press) flatten: display_scale {} -> {}",
                 old_display_scale, z_display_scale);
 
-  // Update button states
-  lv_obj_clear_state(z_zoom_in_btn, LV_STATE_DISABLED);
-  if (z_display_scale <= MIN_Z_SCALE) {
-    lv_obj_add_state(z_zoom_out_btn, LV_STATE_DISABLED);
-  }
+  // No button disabling (dual-purpose buttons, see handle_z_zoom_in).
+  draw_3d_mesh();
+}
 
+void BedMeshPanel::handle_view_zoom_in(lv_event_t *event)
+{
+  // Tap +: zoom the whole view in. Applied as a multiplier on top of the fill-fit.
+  user_zoom = std::min(4.0, user_zoom * 1.15);
+  spdlog::debug("view zoom in: user_zoom -> {}", user_zoom);
+  draw_3d_mesh();
+}
+
+void BedMeshPanel::handle_view_zoom_out(lv_event_t *event)
+{
+  // Tap -: zoom the whole view out.
+  user_zoom = std::max(0.4, user_zoom * 0.87);
+  spdlog::debug("view zoom out: user_zoom -> {}", user_zoom);
   draw_3d_mesh();
 }
 
@@ -1824,7 +1993,10 @@ void BedMeshPanel::setup_button_with_label(lv_obj_t* btn, const char* text, int 
   lv_obj_t *label = lv_label_create(btn);
   lv_label_set_text(label, text);
   lv_obj_center(label);
-  lv_obj_add_event_cb(btn, callback, LV_EVENT_CLICKED, this);
+  // A null callback lets the caller attach its own (e.g. distinct tap vs long-press) events.
+  if (callback != nullptr) {
+    lv_obj_add_event_cb(btn, callback, LV_EVENT_CLICKED, this);
+  }
 }
 
 void BedMeshPanel::draw_grid_lines_parallel_to_axis(int axis_count, bool is_x_axis, int rows, int cols, double grid_reference_z, int canvas_width, int canvas_height, const lv_draw_line_dsc_t& line_dsc)
@@ -1875,14 +2047,26 @@ void BedMeshPanel::extract_mesh_parameter_values(const json& mesh_params, const 
   }
 }
 
-double BedMeshPanel::calculate_dynamic_fov_scale(int mesh_rows, int mesh_cols, int canvas_width, int canvas_height)
+double BedMeshPanel::calculate_dynamic_fov_scale(int mesh_rows, int mesh_cols, int canvas_width, int canvas_height,
+                                                 double world_z_half_extent)
 {
   // Calculate the 2D bounding box of the mesh in world coordinates
-  double mesh_world_width = (mesh_cols - 1) * MESH_SCALE;
-  double mesh_world_height = (mesh_rows - 1) * MESH_SCALE;
+  // Fit the rendered bed frame (set by setup_world_transform). For a full mesh this is
+  // the whole bed; for an adaptive mesh it stays the full bed so the small patch shows
+  // its true position. Falls back to the index-based size if no frame was computed.
+  double mesh_world_width = (render_bed_world_w > 0.0) ? render_bed_world_w : (mesh_cols - 1) * MESH_SCALE;
+  double mesh_world_height = (render_bed_world_h > 0.0) ? render_bed_world_h : (mesh_rows - 1) * MESH_SCALE;
 
   // Account for the rotation by using the diagonal as the conservative bound
   double mesh_diagonal = sqrt(mesh_world_width * mesh_world_width + mesh_world_height * mesh_world_height);
+
+  // Fold in the vertical Z swing. When the mesh is tilted, the surface + axis box can
+  // extend a full world_z_half_extent above and below the flat footprint; ignoring it
+  // (the old behaviour) let amplified meshes clip off the top/bottom. Combining it into
+  // the fitted extent can only enlarge the bound, i.e. only ever zoom out — never worse.
+  double full_height = mesh_world_height + 2.0 * world_z_half_extent;
+  mesh_diagonal = std::max(mesh_diagonal,
+                           sqrt(mesh_world_width * mesh_world_width + full_height * full_height));
 
   // Calculate available canvas space after padding and gradient band
   double effective_canvas_width = canvas_width - GRADIENT_BAND_TOTAL_WIDTH;

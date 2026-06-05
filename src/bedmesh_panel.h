@@ -32,6 +32,8 @@ class BedMeshPanel : public NotifyConsumer {
   void handle_z_zoom_out(lv_event_t *event);
   void handle_fov_zoom_in(lv_event_t *event);
   void handle_fov_zoom_out(lv_event_t *event);
+  void handle_view_zoom_in(lv_event_t *event);
+  void handle_view_zoom_out(lv_event_t *event);
   void handle_canvas_drag(lv_event_t *event);
   void handle_toggle_view(lv_event_t *event);
   // Table view is the default; the 3D view is a fullscreen mode (canvas + Back only).
@@ -98,7 +100,8 @@ class BedMeshPanel : public NotifyConsumer {
   void draw_grid_lines_parallel_to_axis(int axis_count, bool is_x_axis, int rows, int cols, double grid_reference_z, int canvas_width, int canvas_height, const lv_draw_line_dsc_t& line_dsc);
   bool create_and_check_label_area(lv_area_t& area, int x, int y, int width, int height, int canvas_width, int canvas_height);
   void extract_mesh_parameter_values(const json& mesh_params, const std::vector<const char*>& param_names, std::vector<int>& values);
-  double calculate_dynamic_fov_scale(int mesh_rows, int mesh_cols, int canvas_width, int canvas_height);
+  double calculate_dynamic_fov_scale(int mesh_rows, int mesh_cols, int canvas_width, int canvas_height,
+                                     double world_z_half_extent = 0.0);
 
   // Axis tick drawing helper functions
   void draw_axis_tick_values(int count, bool is_x_axis, int rows, int cols, double grid_reference_z,
@@ -109,9 +112,18 @@ class BedMeshPanel : public NotifyConsumer {
   void draw_axis_label(const char* label_text, double x, double y, double z, int offset_x, int offset_y,
                       int canvas_width, int canvas_height, lv_draw_label_dsc_t& label_dsc);
 
+  // Compute the index-space -> physical-bed affine transform for the current mesh.
+  void setup_world_transform(int mesh_rows, int mesh_cols);
+  // Draw the full configured bed outline so an adaptive mesh's position is visible.
+  void draw_bed_outline(double grid_reference_z, int canvas_width, int canvas_height);
+  // Scale fov_scale so the projected bed cuboid fills the available canvas (exact, since
+  // screen spread is linear in fov_scale). z_top_world is the half Z reach pre-display-scale.
+  void refine_fov_to_fill(int canvas_width, int canvas_height, double z_top_world);
+
   // Rendering constants
   static constexpr int CULLING_MARGIN = 50;        // Pixels beyond canvas bounds to include for triangle culling
   static constexpr double MESH_SCALE = 50.0;       // Base spacing between mesh points in 3D world units
+  static constexpr double BED_WORLD_SPAN = 300.0;  // The full bed's longer side maps to this many 3D world units
   static constexpr double DEFAULT_Z_SCALE = 60.0;  // Height amplification factor for dramatic Z-axis visualization (increased for better visibility)
 
   // Dynamic Z-scaling constants for adaptive height visualization
@@ -121,8 +133,8 @@ class BedMeshPanel : public NotifyConsumer {
 
   // 3D projection constants for camera positioning and field of view
   static constexpr double CAMERA_DISTANCE = 450.0;         // Distance of camera from origin (affects perspective strength)
-  static constexpr double CANVAS_PADDING_RATIO = 0.1;      // Padding as ratio of canvas size (0.1 = 10% padding on each side)
-  static constexpr double VIEW_ANGLE_X_DEGREES = -85.0;   // Initial X-axis rotation (-85 degrees) for optimal perspective
+  static constexpr double CANVAS_PADDING_RATIO = 0.05;     // Padding as ratio of canvas size (0.05 = 5% padding on each side)
+  static constexpr double VIEW_ANGLE_X_DEGREES = -60.0;   // Initial X-axis tilt. -85 was nearly edge-on, collapsing small/adaptive meshes (e.g. KAMP 3x3) into a thin sliver; -60 shows the surface face.
   static constexpr double VIEW_ANGLE_Z_DEGREES = 10.0;    // Initial Z-axis rotation (10 degrees) for optimal perspective
   static constexpr double Z_ORIGIN_VERTICAL_POSITION = 0.4; // Position of Z=0 plane in canvas (0.0=top, 0.4=upper center, 1.0=bottom)
 
@@ -206,6 +218,16 @@ class BedMeshPanel : public NotifyConsumer {
     panel->handle_fov_zoom_out(event);
   };
 
+  static void _handle_view_zoom_in(lv_event_t *event) {
+    BedMeshPanel *panel = (BedMeshPanel*)event->user_data;
+    panel->handle_view_zoom_in(event);
+  };
+
+  static void _handle_view_zoom_out(lv_event_t *event) {
+    BedMeshPanel *panel = (BedMeshPanel*)event->user_data;
+    panel->handle_view_zoom_out(event);
+  };
+
   static void _handle_canvas_drag(lv_event_t *event) {
     BedMeshPanel *panel = (BedMeshPanel*)event->user_data;
     panel->handle_canvas_drag(event);
@@ -269,6 +291,19 @@ class BedMeshPanel : public NotifyConsumer {
   double mesh_max_x;
   double mesh_min_y;
   double mesh_max_y;
+
+  // Physical-coordinate world transform for the 3D view. The geometry is generated in
+  // index space ((idx - count/2)*MESH_SCALE); this affine remaps that onto the bed in
+  // project_3d_to_2d so adaptive meshes render at their true position/aspect. Identity
+  // (scale 1, offset 0) reproduces the original index layout and is the safe fallback.
+  double render_xform_scale_x = 1.0;
+  double render_xform_offset_x = 0.0;
+  double render_xform_scale_y = 1.0;
+  double render_xform_offset_y = 0.0;
+  double render_bed_world_w = 0.0;   // bed-frame extent in world units (for FOV fit)
+  double render_bed_world_h = 0.0;
+  bool render_have_bed_frame = false; // true when a real configured bed frame is in use
+  double user_zoom = 1.0;            // user view-zoom multiplier on top of the fill-fit (+/- tap)
 
   // Touch drag state for rotation control
   bool is_dragging;
