@@ -12,7 +12,7 @@ ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
   , reset_btn(lv_btn_create(panel_cont))
   , auto_save_hint(lv_label_create(panel_cont))
   , back_btn(lv_btn_create(panel_cont))
-  , step_selector(panel_cont, "Step (mm)", {"0.01", "0.025", "0.05", ""}, 0,
+  , step_selector(panel_cont, "Step (mm)", {"0.005", "0.01", "0.025", "0.05", ""}, 1,
       &ZOffsetPanel::_handle_callback, this)
 {
   lv_obj_move_background(panel_cont);
