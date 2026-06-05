@@ -6,7 +6,7 @@ X11, Wayland, or display server required — and replaces the stock interface wi
 calibration tools, and an interactive 3D bed mesh.
 
 This is a KE-focused fork of [GuppyScreen](https://github.com/ballaswag/guppyscreen). Current release:
-**GuppyKE (`v0.2.0-GuppyKE`)**.
+**GuppyKE (`v0.3.0-GuppyKE`)**.
 
 <p align="center">
   <a href="https://github.com/coreflake1/guppyscreen/releases"><img alt="Release" src="https://img.shields.io/github/v/release/coreflake1/guppyscreen?style=flat-square&include_prereleases"></a>
@@ -41,6 +41,8 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 - **Tap-to-exclude object map** — cancel a single failed object by tapping it on a live bed map during a print.
 - **Console** redesigned as a drill-down command browser (history, favourites, quick-filter groups).
 - **Macros** redesigned — favourites, collapsible rows, button navigation; jumps to the console when a macro runs.
+- **Power Settings** (renamed from Power Devices) with **Power Loss Recovery** — after a mid-print power
+  outage, resume the interrupted print from where it stopped (uses the printer's saved breakpoint).
 
 **Improved UX**
 - **On-screen notifications** — Klipper events surface as toasts, with separate modals and a dedicated
@@ -50,6 +52,8 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
   "Paused" chip; ETA now matches Mainsail by averaging the file/filament/slicer estimates.
 - **Mid-print safety** — view the bed mesh during a print (mutating actions blocked); Homing/Extrude allowed
   while paused with the overlay hidden.
+- **Adaptive bed mesh rendering** — the table and 3D views now render correctly for KAMP adaptive meshes and
+  denser grids (true bed position/aspect, bed outline, fill-to-canvas), not just the stock 5×5.
 - **Extruder** — filament actions heat to the selected temperature first, with clearer labels and feedback.
 - **Spoolman** — confirm the active filament at print start.
 
