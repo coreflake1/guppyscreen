@@ -2,6 +2,7 @@
 #include "state.h"
 #include "spdlog/spdlog.h"
 #include "config.h"
+#include "utils.h"
 
 #include <algorithm>
 
@@ -180,6 +181,14 @@ void FineTunePanel::handle_callback(lv_event_t *e) {
 void FineTunePanel::handle_zoffset(lv_event_t *e) {
   if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
     lv_obj_t *btn = lv_event_get_current_target(e);
+
+    // Every Z button here sends SET_GCODE_OFFSET ... MOVE=1, which needs a homed
+    // axis. Unhomed, the offset would change live but the move fails (and the
+    // save macro aborts), so block and prompt to home first instead.
+    if (!KUtils::is_homed()) {
+      KUtils::show_homing_prompt(ws);
+      return;
+    }
 
     if (btn == zreset_btn.get_container()) {
       spdlog::trace("clicked zoffset reset");

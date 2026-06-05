@@ -11,8 +11,15 @@
 
 using json = nlohmann::json;
 
+class KWebSocketClient;
+
 namespace KUtils {
   bool is_homed();
+  // Actionable "Homing required" modal (Home / Cancel); the Home button sends
+  // G28. Shared by the notification manager (on a Klipper "Must home axis first"
+  // error) and by panels that guard a homing-dependent action before sending it.
+  // Self-deduping: a second call while one is open is a no-op.
+  void show_homing_prompt(KWebSocketClient &ws);
   // True while a print job is active (printing or paused). Panels that move axes,
   // home, or run calibration must not act in this state.
   bool is_printing();

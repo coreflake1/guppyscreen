@@ -11,7 +11,6 @@ NotificationManager::NotificationManager(KWebSocketClient &websocket_client, std
   : NotifyConsumer(lock)
   , ws(websocket_client)
   , cont(lv_obj_create(lv_layer_top()))
-  , homing_mbox(NULL)
   , baselined(false)
 {
   // toast stack: top of screen, right of the tab bar, stacking downward.
@@ -246,22 +245,5 @@ void NotificationManager::_timer_cb(lv_timer_t *t) {
 // ---- homing-required modal ----
 
 void NotificationManager::show_homing_prompt() {
-  if (homing_mbox != NULL) {
-    return;  // already open — don't stack
-  }
-  static const char *btns[] = {"Home", "Cancel", ""};
-  homing_mbox = lv_msgbox_create(NULL, "Homing required",
-    "The printer must be homed first.", btns, false);
-  KUtils::style_lock_mbox(homing_mbox, 90);  // same centered card + blue buttons as other dialogs
-  lv_obj_add_event_cb(homing_mbox, &NotificationManager::_homing_mbox_cb, LV_EVENT_VALUE_CHANGED, this);
-}
-
-void NotificationManager::_homing_mbox_cb(lv_event_t *e) {
-  auto *self = (NotificationManager *)lv_event_get_user_data(e);
-  lv_obj_t *mbox = lv_obj_get_parent(lv_event_get_target(e));
-  if (lv_msgbox_get_active_btn(mbox) == 0) {  // "Home now"
-    self->ws.gcode_script("G28");
-  }
-  self->homing_mbox = NULL;
-  lv_msgbox_close(mbox);
+  KUtils::show_homing_prompt(ws);
 }

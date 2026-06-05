@@ -1,6 +1,7 @@
 #include "zoffset_panel.h"
 #include "state.h"
 #include "config.h"
+#include "utils.h"
 
 ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
   : NotifyConsumer(l)
@@ -100,6 +101,15 @@ void ZOffsetPanel::update_value(double z) {
 }
 
 void ZOffsetPanel::apply_step(bool raise) {
+  // SET_GCODE_OFFSET ... MOVE=1 needs a homed axis: unhomed, Klipper still sets
+  // the offset (the readout would change) but the move fails and the Helper
+  // Script's save macro aborts before SAVE_VARIABLE — so it'd be applied live,
+  // not moved, and never saved. Guard before sending so the three never drift.
+  if (!KUtils::is_homed()) {
+    KUtils::show_homing_prompt(ws);
+    return;
+  }
+
   const char *step = lv_btnmatrix_get_btn_text(step_selector.get_selector(),
     step_selector.get_selected_idx());
 
@@ -143,6 +153,10 @@ void ZOffsetPanel::handle_callback(lv_event_t *e) {
   } else if (btn == down_btn) {
     apply_step(false);
   } else if (btn == reset_btn) {
+    if (!KUtils::is_homed()) {
+      KUtils::show_homing_prompt(ws);
+      return;
+    }
     ws.gcode_script("SET_GCODE_OFFSET Z=0 MOVE=1");
   } else if (btn == back_btn) {
     lv_obj_move_background(panel_cont);

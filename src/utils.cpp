@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "config.h"
 #include "state.h"
+#include "websocket_client.h"
 #include "spdlog/spdlog.h"
 #include "platform.h"
 #include "lvgl/lvgl.h"
@@ -35,6 +36,31 @@ namespace KUtils {
         && homed_axes.find("z") != std::string::npos;
     }
     return false;
+  }
+
+  // The open homing prompt (or NULL). Static so the dedup spans every caller —
+  // a panel guard and a Klipper-error path won't stack two identical modals.
+  static lv_obj_t *homing_prompt_mbox = NULL;
+
+  static void homing_prompt_cb(lv_event_t *e) {
+    auto *ws = (KWebSocketClient *)lv_event_get_user_data(e);
+    lv_obj_t *mbox = lv_obj_get_parent(lv_event_get_target(e));
+    if (lv_msgbox_get_active_btn(mbox) == 0) {  // "Home"
+      ws->gcode_script("G28");
+    }
+    homing_prompt_mbox = NULL;
+    lv_msgbox_close(mbox);
+  }
+
+  void show_homing_prompt(KWebSocketClient &ws) {
+    if (homing_prompt_mbox != NULL) {
+      return;  // already open — don't stack
+    }
+    static const char *btns[] = {"Home", "Cancel", ""};
+    homing_prompt_mbox = lv_msgbox_create(NULL, "Homing required",
+      "The printer must be homed first.", btns, false);
+    style_lock_mbox(homing_prompt_mbox, 90);  // same card + blue buttons as other dialogs
+    lv_obj_add_event_cb(homing_prompt_mbox, homing_prompt_cb, LV_EVENT_VALUE_CHANGED, &ws);
   }
 
   bool is_printing() {
