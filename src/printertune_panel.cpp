@@ -47,9 +47,9 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   , tmc_tune_btn(cont, &motor_img, "TMC Autotune", &PrinterTunePanel::_handle_callback, this)
   , tmc_status_btn(cont, &chart_img, "TMC Metrics", &PrinterTunePanel::_handle_callback, this)
 #ifndef ZBOLT
-  , power_devices_btn(cont, &power_devices_img, "Power Devices", &PrinterTunePanel::_handle_callback, this)
+  , power_devices_btn(cont, &power_devices_img, "Power Settings", &PrinterTunePanel::_handle_callback, this)
 #else
-  , power_devices_btn(cont, &print, "Power Devices", &PrinterTunePanel::_handle_callback, this)
+  , power_devices_btn(cont, &print, "Power Settings", &PrinterTunePanel::_handle_callback, this)
 #endif
   , retraction_btn(cont, &retract_img, "Retraction", &PrinterTunePanel::_handle_callback, this)
   , zoffset_btn(cont, &home_z, "Z Offset", &PrinterTunePanel::_handle_callback, this)

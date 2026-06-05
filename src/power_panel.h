@@ -27,6 +27,13 @@ class PowerPanel {
     void create_device(json &j);
     void handle_device_callback(json &j);
 
+    // Power-loss recovery section (rendered at the top of the panel).
+    void build_recovery_section();
+    void refresh_recovery();
+    // Returns the gcodes-relative path of a recoverable interrupted print (or "" if none)
+    // and sets `display` to its basename. Reads Creality's saved-state file when local.
+    std::string recoverable_print(std::string &display);
+
     KWebSocketClient &ws;
     std::mutex &lv_lock;
 
@@ -34,7 +41,13 @@ class PowerPanel {
     ButtonContainer back_btn;
 
     std::map<std::string, lv_obj_t*> devices;
-  
+
+    lv_obj_t *recovery_cont = nullptr;
+    lv_obj_t *recovery_status = nullptr;
+    lv_obj_t *recovery_resume_btn = nullptr;
+    lv_obj_t *recovery_dismiss_btn = nullptr;
+    std::string recovery_relpath;
+
 };
 
 #endif //__POWER_PANEL_H__
