@@ -37,9 +37,10 @@ WifiPanel::WifiPanel(std::mutex &l)
   , password_input(lv_textarea_create(prompt_cont))
   , back_btn(cont, &back, "Back", &WifiPanel::_handle_back_btn, this)
   , kb(lv_keyboard_create(cont))
-  , pm_cont(lv_obj_create(cont))
-  , pm_toggle(lv_switch_create(pm_cont))
-  , pm_label(lv_label_create(pm_cont))
+  , pm_cont(lv_obj_create(wifi_right))
+  , pm_btn(lv_btn_create(pm_cont))
+  , pm_label(lv_label_create(pm_btn))
+  , pm_hint(lv_label_create(pm_cont))
 {
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_pad_all(cont, 0, 0);
@@ -104,35 +105,42 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_add_event_cb(prompt_cont, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
   lv_obj_add_event_cb(wifi_label, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
 
-  // WiFi power-save toggle: a bottom bar (switch + label). Checked = power
-  // saving OFF (`wl PM 0`) for lower, steadier latency on the Broadcom radio;
-  // unchecked restores the stock fast power-save. The right side is padded to
-  // clear the floating Back button.
+  // WiFi power-save control: a single tappable button in the right column,
+  // under the connection/IP info, plus a hint line. The button toggles its own
+  // ON/OFF label; checked = power saving OFF (`wl PM 0`) for lower, steadier
+  // latency, unchecked = stock fast power-save.
   lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_width(pm_cont, LV_PCT(100));
-  lv_obj_set_height(pm_cont, LV_SIZE_CONTENT);
+  lv_obj_set_size(pm_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_set_style_border_width(pm_cont, 0, 0);
-  lv_obj_set_style_pad_ver(pm_cont, 2, 0);
-  lv_obj_set_style_pad_left(pm_cont, 8, 0);
-  lv_obj_set_style_pad_right(pm_cont, 130, 0);
-  lv_obj_set_style_pad_column(pm_cont, 10, 0);
-  lv_obj_set_flex_flow(pm_cont, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(pm_cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_bg_opa(pm_cont, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_pad_all(pm_cont, 0, 0);
+  lv_obj_set_style_pad_row(pm_cont, 6, 0);
+  lv_obj_set_flex_flow(pm_cont, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(pm_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_align(pm_cont, LV_ALIGN_CENTER, 0, 20);
 
-  lv_label_set_long_mode(pm_label, LV_LABEL_LONG_WRAP);
-  lv_label_set_text(pm_label, "WiFi power saving\noff for lower latency");
-  lv_obj_set_flex_grow(pm_label, 1);
-  lv_obj_set_style_text_font(pm_label, &lv_font_montserrat_14, 0);
+  lv_obj_add_flag(pm_btn, LV_OBJ_FLAG_CHECKABLE);
+  lv_obj_set_width(pm_btn, 210);
+  lv_obj_set_height(pm_btn, LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_ver(pm_btn, 10, 0);
+  lv_label_set_text(pm_label, "WiFi power saving: ON");
+  lv_obj_set_style_text_font(pm_label, &lv_font_montserrat_16, 0);
+  lv_obj_center(pm_label);
+
+  lv_label_set_text(pm_hint, "off = lower latency");
+  lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(pm_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
 
   {
     auto v = Config::get_instance()->get_json("/wifi_low_latency");
     if (!v.is_null() && v.template get<bool>()) {
-      lv_obj_add_state(pm_toggle, LV_STATE_CHECKED);
+      lv_obj_add_state(pm_btn, LV_STATE_CHECKED);
     } else {
-      lv_obj_clear_state(pm_toggle, LV_STATE_CHECKED);
+      lv_obj_clear_state(pm_btn, LV_STATE_CHECKED);
     }
   }
-  lv_obj_add_event_cb(pm_toggle, &WifiPanel::_handle_pm_toggle, LV_EVENT_VALUE_CHANGED, this);
+  refresh_pm_label();
+  lv_obj_add_event_cb(pm_btn, &WifiPanel::_handle_pm_toggle, LV_EVENT_VALUE_CHANGED, this);
 
   lv_obj_move_background(cont);
   lv_obj_move_foreground(spinner);
@@ -172,15 +180,22 @@ void WifiPanel::handle_back_btn(lv_event_t *e) {
   }
 }
 
+void WifiPanel::refresh_pm_label() {
+  bool low_latency = lv_obj_has_state(pm_btn, LV_STATE_CHECKED);
+  lv_label_set_text(pm_label, low_latency ? "WiFi power saving: OFF"
+                                          : "WiFi power saving: ON");
+}
+
 void WifiPanel::handle_pm_toggle(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED) {
     return;
   }
-  bool low_latency = lv_obj_has_state(pm_toggle, LV_STATE_CHECKED);
+  bool low_latency = lv_obj_has_state(pm_btn, LV_STATE_CHECKED);
   KUtils::set_wifi_low_latency(low_latency);
   Config *conf = Config::get_instance();
   conf->set<bool>("/wifi_low_latency", low_latency);
   conf->save();
+  refresh_pm_label();
   spdlog::debug("wifi low-latency toggled: {}", low_latency);
 }
 
