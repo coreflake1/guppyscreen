@@ -295,6 +295,14 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
     lv_obj_clear_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
   } else if (event.rfind("<3>CTRL-EVENT-CONNECTED", 0) == 0) {
+    // The driver resets WiFi power-save to PM 2 on every link-up (reconnect or
+    // network switch), silently reverting PM 0. Re-apply the preference here so
+    // the toggle stays truthful. Runs on the wpa monitor thread (no LVGL).
+    auto pm = Config::get_instance()->get_json("/wifi_low_latency");
+    if (!pm.is_null() && pm.template get<bool>()) {
+      KUtils::set_wifi_low_latency(true);
+    }
+
     if (find_current_network()) {
       spdlog::trace("cur_network {}", cur_network);
       std::vector<std::pair<std::string, int>> pairs;
