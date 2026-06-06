@@ -6,7 +6,7 @@ X11, Wayland, or display server required — and replaces the stock interface wi
 calibration tools, and an interactive 3D bed mesh.
 
 This is a KE-focused fork of [GuppyScreen](https://github.com/ballaswag/guppyscreen). Current release:
-**GuppyKE (`v0.3.0-GuppyKE`)**.
+**GuppyKE (`v0.4.0-GuppyKE`)**.
 
 <p align="center">
   <a href="https://github.com/coreflake1/guppyscreen/releases"><img alt="Release" src="https://img.shields.io/github/v/release/coreflake1/guppyscreen?style=flat-square&include_prereleases"></a>
@@ -33,6 +33,9 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). On top of those, this edition adds:
 
 **New panels & tools**
+- **Axis Twist Compensation wizard** *(new in v0.4)* — a guided, on-screen calibration (Tune tab) that fixes
+  the classic "first layer fine in the middle, squished on one side, lifting on the other" left-to-right
+  error that bed mesh alone can't. Walks you through the 5-point paper test and saves the result.
 - **Live Z-Offset baby-stepping** — dedicated panel (Tune tab, or tap the Z-offset metric mid-print) with
   0.005 / 0.01 / 0.025 / 0.05 mm steps, Raise/Lower, Reset. Adjustments save automatically (see setup below),
   and are blocked with a "Home first" prompt when the printer isn't homed.
@@ -45,6 +48,9 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
   outage, resume the interrupted print from where it stopped (uses the printer's saved breakpoint).
 
 **Improved UX**
+- **WiFi power-saving toggle** *(new in v0.4)* — one tap in the WiFi panel turns off the radio's power-save
+  mode for noticeably lower, steadier latency (snappier Mainsail/Fluidd and screen response). The choice
+  persists and re-applies across reboots and reconnects.
 - **On-screen notifications** — Klipper events surface as toasts, with separate modals and a dedicated
   print-done screen.
 - **Fans** — friendly names, read-only fans (heater_fan / output-pin fans) shown, correct editable/read-only split.

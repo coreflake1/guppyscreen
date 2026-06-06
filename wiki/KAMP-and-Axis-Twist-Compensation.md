@@ -1,49 +1,77 @@
-# First-Layer Mods: KAMP & Axis Twist Compensation (Ender-3 V3 KE)
+# Getting a Perfect First Layer (KAMP + Axis Twist Compensation)
 
-Two Klipper modifications that, together, give a near-perfect first layer across the **entire** bed on the
-Ender-3 V3 KE:
+This guide fixes the single most common Ender-3 V3 KE complaint: **a first layer that looks great in the
+middle of the bed but is squished on one side and lifting/too-high on the other** — usually worse going
+left-to-right. If you've leveled, re-leveled, meshed, and tweaked Z-offset and it *still* does this, you're
+in the right place. We'll fix it properly, and it stays fixed.
 
-- **KAMP** (Klipper Adaptive Meshing & Purging) — meshes only the area the print actually occupies, parks
-  near the part for final heat-up, and lays an adaptive purge line beside it.
-- **Axis Twist Compensation** — corrects the left-to-right Z error caused by tiny X-gantry twist combined
-  with the probe's non-zero `y_offset`. This is the classic *"first layer too far on the left, too close on
-  the right"* symptom that **bed mesh alone cannot fix** (the mesh trusts the biased probe reading). The two
-  are complementary: KAMP feeds the probe, axis twist compensation makes the probe honest.
-
-> ⚠️ **These are root-filesystem changes and a Creality OTA firmware flash will erase all of them.** That is
-> exactly why this page exists — so you can reinstall in minutes instead of re-deriving everything. After any
-> firmware update, walk this page again.
+You don't need to be a programmer. If you can copy-paste commands into a terminal, you can do this.
 
 ---
 
-## Scope — verified configuration
+## Will this actually help me?
 
-| Property | Value |
+**Yes, if:** your first layer is inconsistent *across the bed* — one side smooshed, the other side barely
+sticking — even though the bed is clean and not visibly warped, and bed mesh hasn't solved it.
+
+**Probably not the whole story, if:** the bed physically rocks/has play (check by gently pushing the corners),
+or one spot is dramatically high/low. Fix loose hardware first, then come back.
+
+### Why this happens (in plain English)
+
+Your printer probes the bed before a print to build a "map" (a *bed mesh*) and corrects for bumps. The probe
+sits a couple of centimetres **behind** the nozzle. Here's the catch: the X-axis (the bar the nozzle rides
+on) twists by a tiny fraction of a degree as it moves left to right. That twist tilts the probe just enough
+that the height it measures **isn't** the height the nozzle will actually print at. The bed mesh faithfully
+records this *wrong* number — so no amount of re-meshing fixes it.
+
+**Axis Twist Compensation** measures that error at a few points and corrects it, so the probe finally tells
+the truth. **KAMP** is a complementary upgrade that meshes only the area your print actually covers (faster,
+more accurate) and lays a tidy purge line right next to the print. Together they give a clean first layer edge
+to edge.
+
+You can do **either one on its own** — they're independent. Axis Twist is the one that fixes the
+left/right problem; KAMP is a quality-of-life bonus.
+
+---
+
+## Before you start
+
+- ⏱️ **Time:** about 30–45 minutes, most of it the guided calibration.
+- 🧰 **You need:** the printer on your network, a computer, and a sheet of paper. No tools, no disassembly.
+- 💻 **Skill:** comfortable opening a terminal and pasting commands. That's it.
+- ↩️ **Safe to try:** every change here is reversible (see [Undoing it](#undoing-it)), and none of it touches
+  your prints until you run the calibration.
+
+> ### ⚠️ One important warning — read this
+> These changes live in the printer's system files. **A Creality firmware update will erase them.** That's
+> not a disaster — this whole page is written so you can redo it in a few minutes — but it's why you should
+> bookmark it. After any firmware update, just run through the [Quick reinstall](#quick-reinstall-after-a-firmware-update) at the bottom.
+
+### What this guide was tested on
+
+| | |
 |---|---|
 | Printer | Creality Ender-3 V3 KE |
-| Firmware | **V1.1.0.15** (`/etc/ota_info` → `ota_version=1.1.0.15`, board `F005`) |
-| Probe | **BLTouch/CR-Touch**, `x_offset: 0`, `y_offset: 27` (probe behind nozzle) |
-| Klipper | Creality's modified fork (Python 3.8, old `probe.py` structure) |
-| Front-end | Mainsail (Fluidd works the same) |
-| Last verified | 2026-06-06 |
+| Firmware | **V1.1.0.15** |
+| Probe | CR-Touch / BLTouch (the standard KE probe) |
+| Interface | Mainsail (Fluidd works too) |
 
-> **Firmware matters.** The popular Reddit/lmutt `probe.py` *patch file* is a line-numbered context diff built
-> for **V1.1.0.14** and **fails on V1.1.0.15** (`Hunk #1 FAILED at 129`) because Creality rewrote `_probe`.
-> This guide uses a **hand-graft keyed on a code anchor, not line numbers**, so it survives across firmware
-> revisions. If a future firmware renames the anchor line, adjust the `ANCHOR` string in the snippet below.
+---
 
-## Prerequisites
+## Connecting to your printer
 
-- **Root SSH access** to the printer: `ssh root@<printer-ip>` (default Creality root login).
-- **Mainsail or Fluidd** for the Klipper console (calibration is run from there).
-- `[exclude_object]` enabled and the slicer **labeling objects** — required by KAMP's adaptive mesh.
-  On this printer it is already present:
-  - `gcode_macro.cfg` contains `[exclude_object]`
-  - `moonraker.conf` has `enable_object_processing: True`
-- Config dir: `/usr/data/printer_data/config` (referred to below as `$CFG`).
-- Klipper extras dir: `/usr/share/klipper/klippy/extras` (referred to below as `$EXTRAS`).
+Everything below is typed into your printer over **SSH** (a remote terminal). From your computer:
 
-**Always back up first:**
+```sh
+ssh root@<your-printer-ip>
+```
+
+Replace `<your-printer-ip>` with your printer's address (e.g. `192.168.0.231` — you can find it on the
+printer's WiFi screen). When it asks for a password, use your printer's root password. Windows users: download
+[PuTTY](https://www.putty.org/) and connect the same way.
+
+**Make a safety backup first** (so you can always undo):
 
 ```sh
 cd /usr/data/printer_data/config
@@ -51,14 +79,131 @@ cp -a printer.cfg printer.cfg.bak-$(date +%Y%m%d)
 cp -a /usr/share/klipper/klippy/extras/probe.py /usr/share/klipper/klippy/extras/probe.py.bak-$(date +%Y%m%d)
 ```
 
+You'll also run a few commands in the **Klipper console** — that's the input box in Mainsail/Fluidd (the web
+page you open in a browser to control the printer). We'll say "in the console" when that's the case.
+
 ---
 
-# Part A — KAMP (Adaptive Meshing & Purging)
+# Part B — Axis Twist Compensation (the left/right first-layer fix)
 
-### A1. Install the KAMP files
+> Doing just this part? Great — it's the one that fixes the uneven first layer. KAMP (Part A) is optional and
+> can be added later.
 
-Clone upstream and copy the configuration set into the config directory (do **not** symlink — Mainsail
-needs real files):
+### Step 1 — Add the compensation tool to Klipper
+
+Paste this into your SSH terminal. It downloads one small file that teaches Klipper how to do the correction:
+
+```sh
+wget --no-check-certificate \
+  "https://raw.githubusercontent.com/Klipper3d/klipper/v0.12.0/klippy/extras/axis_twist_compensation.py" \
+  -O /usr/share/klipper/klippy/extras/axis_twist_compensation.py
+```
+
+### Step 2 — Connect the tool to the probe
+
+By itself, the file from Step 1 does nothing — Klipper needs a small edit to actually *use* it during probing.
+Just paste this whole block into SSH; it makes the edit for you, safely. (It refuses to run twice and won't
+break anything if your printer is too different.)
+
+```sh
+python3 - <<'PY'
+import py_compile, sys
+p = '/usr/share/klipper/klippy/extras/probe.py'
+s = open(p).read()
+ANCHOR = '        msg = "probe at %.3f,%.3f is z=%.6f" % (epos[0], epos[1], epos[2] - self.z_offset)'
+if 'axis_twist_compensation' in s:
+    sys.exit('Already done — nothing to change.')
+if s.count(ANCHOR) != 1:
+    sys.exit('STOP: your firmware differs from what this expects. See "If Step 2 says STOP" below.')
+graft = (
+    "        # --- axis_twist_compensation (added by hand) ---\n"
+    "        axis_twist_compensation = self.printer.lookup_object(\n"
+    "            'axis_twist_compensation', None)\n"
+    "        if axis_twist_compensation is not None:\n"
+    "            epos[2] += axis_twist_compensation.get_z_compensation_value(pos)\n"
+)
+open(p, 'w').write(s.replace(ANCHOR, graft + ANCHOR, 1))
+py_compile.compile(p, doraise=True)
+print('Success: the probe is now connected to axis twist compensation.')
+PY
+```
+
+You want to see **"Success:"**. If you see "STOP", jump to [If Step 2 says STOP](#if-step-2-says-stop) — it's
+rare and fixable.
+
+> **Why not the popular Reddit patch?** The widely-shared `.patch` file only works on one exact firmware
+> version (V1.1.0.14) and silently fails on others — that's why so many people report "I followed the guide
+> and nothing changed." The block above does the same edit but adapts to your file, so it keeps working across
+> firmware versions.
+
+### Step 3 — Tell Klipper to use it
+
+Open `printer.cfg` (easiest in Mainsail: **Machine** tab → `printer.cfg`). Add these lines **anywhere above**
+the line that says `#*# <---------------------- SAVE_CONFIG ---------------------->`:
+
+```ini
+[axis_twist_compensation]
+calibrate_start_x: 20
+calibrate_end_x: 200
+calibrate_y: 110
+```
+
+Save the file. These numbers are already correct for the KE — you don't need to change them.
+
+### Step 4 — Restart and calibrate
+
+In the **Klipper console**, restart:
+
+```
+FIRMWARE_RESTART
+```
+
+When it comes back, start the guided calibration. **No heating needed** — just make sure the nozzle tip is
+clean (no plastic blob):
+
+```
+BED_MESH_CLEAR
+AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5
+```
+
+The printer will probe, then move the nozzle to the first of **5 spots** across the bed and show a small
+**"Manual Probe"** box. At each spot you do the classic paper test:
+
+1. The nozzle starts about 5 mm up. Bring it down in steps using the buttons in the box (or `TESTZ Z=-1`,
+   then smaller).
+2. Slide a sheet of paper under the nozzle and keep lowering in **small** steps (`-0.1`, then `-0.05`,
+   `-0.01`) until you feel **light drag** on the paper — the same feel as setting Z-offset. Too far? Back off
+   with `+0.01`.
+3. Tap **ACCEPT**. The nozzle lifts and moves to the next spot. Repeat.
+
+> 🎯 **The one trick that matters:** use the *exact same* paper feel at all 5 spots. The tool only cares about
+> the *difference* between spots, so consistency is everything.
+
+After the 5th spot, it prints the results. Lock them in permanently:
+
+```
+SAVE_CONFIG
+```
+
+Klipper restarts and you're done. Run a print (or a first-layer test) that covers the whole bed — the
+left/right unevenness should be gone. 🎉
+
+*(If the overall height feels slightly off now, just nudge your Z-offset a touch as usual — the twist is
+fixed, this is only fine-tuning.)*
+
+> **Using GuppyKE?** There's now a built-in wizard for this — **Tune → Axis Twist** — that walks you through
+> the same 5-point calibration on the printer's screen, no console needed. (It still needs Steps 1–3 done
+> first, since those add the tool to Klipper.)
+
+---
+
+# Part A — KAMP (optional: smarter meshing + auto purge line)
+
+KAMP makes the printer mesh only the footprint of your print (instead of the whole bed every time) and draw a
+clean purge line right beside it. It's optional but nice. It needs the **Exclude Object** feature, which the
+KE already has on by default.
+
+### Step 1 — Download KAMP
 
 ```sh
 cd /tmp
@@ -68,43 +213,21 @@ cp -r /tmp/kamp-src/Configuration ./KAMP
 cp /tmp/kamp-src/Configuration/KAMP_Settings.cfg ./KAMP_Settings.cfg
 ```
 
-You should end up with:
+### Step 2 — One required edit for the KE
 
-```
-$CFG/KAMP_Settings.cfg
-$CFG/KAMP/Adaptive_Meshing.cfg
-$CFG/KAMP/Line_Purge.cfg
-$CFG/KAMP/Smart_Park.cfg
-$CFG/KAMP/Voron_Purge.cfg
-```
+KAMP normally *replaces* the printer's built-in meshing command, which doesn't play nicely with the KE's older
+Klipper. We'll make it a **separate** command instead. Open `KAMP/Adaptive_Meshing.cfg` and make three small
+changes:
 
-### A2. KE-safe edit to `KAMP/Adaptive_Meshing.cfg`
+1. Change the first line of the macro from
+   `[gcode_macro BED_MESH_CALIBRATE]` to `[gcode_macro ADAPTIVE_BED_MESH_CALIBRATE]`
+2. **Delete** the line that starts with `rename_existing:`
+3. Near the bottom, find the line that begins with `_BED_MESH_CALIBRATE` and remove the leading underscore so
+   it reads `BED_MESH_CALIBRATE mesh_min=...` (just delete the `_`).
 
-Upstream ships the adaptive macro **as an override of** `BED_MESH_CALIBRATE` (using `rename_existing`). On
-this old Creality fork that is fragile and collides with the built-in. Make the macro a **separate command**
-that calls the native built-in instead. Apply these three edits:
+### Step 3 — KAMP settings
 
-1. Rename the macro header:
-   ```ini
-   [gcode_macro BED_MESH_CALIBRATE]      →      [gcode_macro ADAPTIVE_BED_MESH_CALIBRATE]
-   ```
-2. **Delete** the `rename_existing:` line (e.g. `rename_existing: _BED_MESH_CALIBRATE`).
-3. At the bottom of the macro, change the internal call from the renamed alias to the **native** built-in:
-   ```ini
-   _BED_MESH_CALIBRATE mesh_min=... mesh_max=... ALGORITHM=... PROBE_COUNT=...
-   →
-   BED_MESH_CALIBRATE   mesh_min=... mesh_max=... ALGORITHM=... PROBE_COUNT=...
-   ```
-
-This leaves the stock `G29` macro and the native `BED_MESH_CALIBRATE` untouched, and exposes a new
-`ADAPTIVE_BED_MESH_CALIBRATE` command. (On the KE, `BED_MESH_CALIBRATE` is the Klipper built-in — there is
-**no** `[gcode_macro BED_MESH_CALIBRATE]` override anywhere, so it accepts `mesh_min`/`mesh_max`/`probe_count`
-params directly.)
-
-### A3. KAMP settings (`KAMP_Settings.cfg`)
-
-Enable the three modules we use (Voron_Purge stays off) and set the purge/park values verified on this
-machine:
+Open `KAMP_Settings.cfg` and make it look like this (these values are tuned for the KE):
 
 ```ini
 [include ./KAMP/Adaptive_Meshing.cfg]
@@ -121,206 +244,99 @@ variable_purge_margin: 10
 variable_purge_amount: 30
 variable_flow_rate: 12
 variable_smart_park_height: 10
-# (probe_dock settings left at defaults / disabled)
 ```
 
-### A4. `printer.cfg` — include + bed mesh density
+### Step 4 — Turn it on in `printer.cfg`
 
-Add the include alongside the other includes near the top:
+Add this line near the top of `printer.cfg`, with the other `[include ...]` lines:
 
 ```ini
 [include KAMP_Settings.cfg]
 ```
 
-And set the bed mesh to a richer grid. **Two KE-fork gotchas:**
+And make your `[bed_mesh]` section look like this. **Two settings the KE is fussy about** are flagged:
 
 ```ini
 [bed_mesh]
 speed: 350
 horizontal_move_z: 8
-mesh_min: 5,10           # need to handle head distance with bl_touch
-mesh_max: 215,215        # max probe range
+mesh_min: 5,10
+mesh_max: 215,215
 probe_count: 9,9
-algorithm: bicubic       # REQUIRED for probe_count > 6 (lagrange caps at 6/axis on this fork)
+algorithm: bicubic       # ← required when probe_count is above 6, or Klipper errors out
 fade_start: 1
 fade_end: 10
 ```
 
-- ❗ `probe_count: 9,9` **requires** `algorithm: bicubic` — the default `lagrange` errors with *"cannot
-  exceed a probe_count of 6 when using lagrange."*
-- ❗ Do **not** add `zero_reference_position` (not a valid option on this fork) and do **not** use
-  `relative_reference_index` — the fixed grid index is incompatible with KAMP's shrinking adaptive mesh.
+> Don't add `zero_reference_position` or `relative_reference_index` here — they either aren't supported on the
+> KE or conflict with KAMP. If you copied a config that has them, remove them.
 
-### A5. Restart and verify
+Restart (`FIRMWARE_RESTART`). KAMP is installed.
 
-```
-FIRMWARE_RESTART
-```
+### Step 5 — Tell your slicer to use it (OrcaSlicer)
 
-In the console, confirm these commands now exist: `ADAPTIVE_BED_MESH_CALIBRATE`, `LINE_PURGE`, `SMART_PARK`,
-and `_KAMP_Settings`. The stock `G29` and native `BED_MESH_CALIBRATE` should still work.
-
-### A6. Slicer start G-code (OrcaSlicer)
-
-KAMP runs from the **slicer's machine start G-code** (the KE has no `PRINT_START` macro — the start sequence
-lives slicer-side). Enable **Label Objects** in Orca, then use a machine start sequence along these lines:
+KAMP runs from your slicer's **Machine start G-code**. In Orca, turn on **Label Objects**, then set your
+machine start G-code to run things in this order:
 
 ```gcode
-M140 S[bed_temperature_initial_layer_single]   ; start bed heat
-M104 S[nozzle_temperature_initial_layer]       ; start nozzle heat (no wait)
-G28                                             ; home all
-ADAPTIVE_BED_MESH_CALIBRATE                     ; adaptive mesh of the print area
-M190 S[bed_temperature_initial_layer_single]   ; wait for bed
-SMART_PARK                                      ; park near the part
-M109 S[nozzle_temperature_initial_layer]       ; wait for nozzle
-LINE_PURGE                                      ; adaptive purge line beside the part
+M140 S[bed_temperature_initial_layer_single]   ; start heating bed
+M104 S[nozzle_temperature_initial_layer]       ; start heating nozzle (don't wait)
+G28                                             ; home
+ADAPTIVE_BED_MESH_CALIBRATE                     ; mesh just the print area
+M190 S[bed_temperature_initial_layer_single]   ; wait for bed temp
+SMART_PARK                                      ; park next to the print to finish heating
+M109 S[nozzle_temperature_initial_layer]       ; wait for nozzle temp
+LINE_PURGE                                      ; purge a line beside the print
 ```
 
-> The exact macro/temperature tokens depend on your Orca version; the **order** is what matters:
-> home → adaptive mesh → (bed heat) → smart park → (nozzle heat) → line purge.
+The exact temperature tokens vary by Orca version; what matters is the **order**: home → mesh → heat → park →
+purge.
 
 ---
 
-# Part B — Axis Twist Compensation
+## Undoing it
 
-### B1. Install the module
+Everything reverts cleanly.
 
-Drop in the stock Klipper **v0.12.0** module (it pairs cleanly with this old fork — it calls
-`probe.run_probe(gcmd)`, a method this `probe.py` has):
-
+**Axis Twist Compensation:**
 ```sh
-wget --no-check-certificate \
-  "https://raw.githubusercontent.com/Klipper3d/klipper/v0.12.0/klippy/extras/axis_twist_compensation.py" \
-  -O /usr/share/klipper/klippy/extras/axis_twist_compensation.py
+cp -a /usr/share/klipper/klippy/extras/probe.py.bak-<date> /usr/share/klipper/klippy/extras/probe.py
+rm /usr/share/klipper/klippy/extras/axis_twist_compensation.py
 ```
+…then delete the `[axis_twist_compensation]` block from `printer.cfg` and `FIRMWARE_RESTART`.
 
-Sanity-check it compiles: `python3 -m py_compile /usr/share/klipper/klippy/extras/axis_twist_compensation.py`
-(expected md5 `28da5f89fa4ede80e833ce0756793fbd`).
+**KAMP:**
+```sh
+rm -rf /usr/data/printer_data/config/KAMP /usr/data/printer_data/config/KAMP_Settings.cfg
+```
+…then remove `[include KAMP_Settings.cfg]` from `printer.cfg` and `FIRMWARE_RESTART`.
 
-### B2. Graft the hook into `probe.py` (the part the gist patch botches)
+---
 
-The module does nothing until `probe.py` applies its correction. The required change is just four lines
-inside `PrinterProbe._probe`, immediately after the probing move and before the result is returned:
+## If Step 2 says STOP
 
-```python
-        # --- axis_twist_compensation (hand-grafted; stock v0.12.0 probe.py hook) ---
+This only happens if your firmware's `probe.py` is structured differently than expected (e.g. a much newer or
+older firmware). You can still do the edit by hand:
+
+1. Open `/usr/share/klipper/klippy/extras/probe.py`.
+2. Find the function `def _probe` and, just before its `return epos[:3]` line, paste:
+   ```python
         axis_twist_compensation = self.printer.lookup_object(
             'axis_twist_compensation', None)
         if axis_twist_compensation is not None:
             epos[2] += axis_twist_compensation.get_z_compensation_value(pos)
-```
-
-Apply it safely with this anchor-based Python snippet (works regardless of line numbers; refuses to run twice
-or if the anchor moved):
-
-```sh
-python3 - <<'PY'
-import py_compile, sys
-p = '/usr/share/klipper/klippy/extras/probe.py'
-s = open(p).read()
-ANCHOR = '        msg = "probe at %.3f,%.3f is z=%.6f" % (epos[0], epos[1], epos[2] - self.z_offset)'
-if 'axis_twist_compensation' in s:
-    sys.exit('already grafted — nothing to do')
-if s.count(ANCHOR) != 1:
-    sys.exit('ABORT: anchor not found uniquely (firmware differs — graft by hand near the end of _probe)')
-graft = (
-    "        # --- axis_twist_compensation (hand-grafted; stock v0.12.0 probe.py hook) ---\n"
-    "        axis_twist_compensation = self.printer.lookup_object(\n"
-    "            'axis_twist_compensation', None)\n"
-    "        if axis_twist_compensation is not None:\n"
-    "            epos[2] += axis_twist_compensation.get_z_compensation_value(pos)\n"
-)
-open(p, 'w').write(s.replace(ANCHOR, graft + ANCHOR, 1))
-py_compile.compile(p, doraise=True)
-print('OK: probe.py grafted and compiles clean')
-PY
-```
-
-If the anchor isn't found (a future firmware changed that line), open `probe.py`, find `def _probe`, and paste
-the four-line block right before the method's `return epos[:3]`.
-
-### B3. Add the config block
-
-Add to `printer.cfg`, **above** the `#*# <---------------------- SAVE_CONFIG ---------------------->` marker:
-
-```ini
-[axis_twist_compensation]
-calibrate_start_x: 20
-calibrate_end_x: 200
-calibrate_y: 110
-```
-
-Geometry note for the KE (`x_offset: 0`, `y_offset: 27`): these defaults keep the probe on the bed and inside
-the `5,10 → 215,215` mesh region. The stock offsets are already correct on this machine — **do not** retune
-them (the "fix your offsets first" advice in the Reddit thread was for the Ender-3 V3 **SE**).
-
-### B4. Restart, calibrate, save
-
-```
-FIRMWARE_RESTART
-```
-
-Confirm Klipper comes back `ready` and `AXIS_TWIST_COMPENSATION_CALIBRATE` is registered. Then calibrate
-(nozzle clean; **no heating needed**):
-
-```
-BED_MESH_CLEAR
-AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5
-```
-
-A **Manual Probe** dialog appears at each of 5 X positions, starting ~5 mm above the bed:
-
-1. Lower in coarse steps (`-1`) toward ~1 mm, watching the nozzle.
-2. Approach with `-0.1`, slide a sheet of paper under the nozzle.
-3. Fine-tune with `-0.05` / `-0.01` until the paper has **light drag** (back off with `+0.01`/`+0.05`).
-4. **ACCEPT.** The head lifts and moves to the next point — repeat with the *same* paper feel each time
-   (consistency between points is what makes the result accurate).
-
-The console prints the per-point offsets and mean z_offset. Persist permanently:
-
-```
-SAVE_CONFIG
-```
-
-Klipper restarts and writes the results into the auto-generated section of `printer.cfg`. (`SAVE_CONFIG` is
-registered on this fork alongside Creality's `CXSAVE_CONFIG` and works correctly.)
-
-Finally, run a fresh mesh and a wide first-layer test — the left/right bias should be gone.
+   ```
+3. Save, then `FIRMWARE_RESTART`. If Klipper comes back happy, continue from Step 3.
 
 ---
 
-## Reverting
+## Quick reinstall (after a firmware update)
 
-Either mod reverts cleanly:
+A firmware update wipes these. To put them back in a few minutes:
 
-**Axis twist compensation**
-```sh
-cp -a /usr/share/klipper/klippy/extras/probe.py.bak-<date> /usr/share/klipper/klippy/extras/probe.py
-rm /usr/share/klipper/klippy/extras/axis_twist_compensation.py
-# remove the [axis_twist_compensation] block from printer.cfg
-FIRMWARE_RESTART
-```
+1. SSH in; back up `printer.cfg` and `probe.py` (the two `cp` commands at the top).
+2. **Axis Twist:** redo Steps 1–3, restart, recalibrate (Step 4), `SAVE_CONFIG`.
+3. **KAMP (if you use it):** redo Steps 1–4. Your slicer start G-code lives on your computer, so it survives
+   the update — but double-check it after any OrcaSlicer update.
 
-**KAMP**
-```sh
-# remove [include KAMP_Settings.cfg] from printer.cfg (and revert [bed_mesh] if desired)
-rm -rf /usr/data/printer_data/config/KAMP /usr/data/printer_data/config/KAMP_Settings.cfg
-FIRMWARE_RESTART
-```
-
----
-
-## Quick reinstall checklist (after a firmware flash)
-
-1. `ssh root@<printer-ip>`; back up `printer.cfg` and `probe.py`.
-2. **KAMP:** clone → copy `KAMP/` + `KAMP_Settings.cfg`; apply the 3 edits to `Adaptive_Meshing.cfg`
-   (A2); set `KAMP_Settings.cfg` values (A3); add `[include KAMP_Settings.cfg]` and the `[bed_mesh]`
-   `probe_count: 9,9` + `algorithm: bicubic` (A4).
-3. **Axis twist:** `wget` the v0.12.0 module (B1); run the graft snippet (B2); add the
-   `[axis_twist_compensation]` block (B3).
-4. `FIRMWARE_RESTART` → verify both load.
-5. `BED_MESH_CLEAR` → `AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5` → paper test ×5 → `SAVE_CONFIG`.
-6. Re-check the slicer start G-code still has the KAMP sequence + Label Objects (A6) — slicer profiles are
-   not on the printer, so they survive a flash, but verify after any Orca update.
-
-> Reminder: re-run this whole checklist after **every** Creality OTA firmware update.
+> Bookmark this page. Re-run it after **every** Creality firmware update.

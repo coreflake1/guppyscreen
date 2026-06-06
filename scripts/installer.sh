@@ -161,7 +161,7 @@ rm -rf /root/.cache
 wget -q --no-check-certificate https://raw.githubusercontent.com/ballaswag/k1-discovery/main/bin/curl -O /tmp/curl
 chmod +x /tmp/curl
 
-PINNED_RELEASE="v0.3.0-GuppyKE"
+PINNED_RELEASE="v0.4.0-GuppyKE"
 ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_RELEASE}/$ASSET_NAME.tar.gz"
 
 printf "${green} Downloading asset: $ASSET_NAME.tar.gz ${white}\n"
