@@ -15,6 +15,7 @@ LV_IMG_DECLARE(motor_img);
 LV_IMG_DECLARE(chart_img);
 LV_IMG_DECLARE(retract_img);
 LV_IMG_DECLARE(home_z);
+LV_IMG_DECLARE(layers_img);
 
 #ifndef ZBOLT
 LV_IMG_DECLARE(belts_calibration_img);
@@ -35,6 +36,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   , tmc_status_panel(c, l)
   , power_panel(c, l)
   , firmware_retraction_panel(c, l)
+  , axis_twist_panel(c, l)
   , bedmesh_btn(cont, &bedmesh_img, "Bed Mesh", &PrinterTunePanel::_handle_callback, this)
   , finetune_btn(cont, &fine_tune_img, "Fine Tune", &PrinterTunePanel::_handle_callback, this)
   , inputshaper_btn(cont, &inputshaper_img, "Input Shaper", &PrinterTunePanel::_handle_callback, this)
@@ -53,6 +55,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
 #endif
   , retraction_btn(cont, &retract_img, "Retraction", &PrinterTunePanel::_handle_callback, this)
   , zoffset_btn(cont, &home_z, "Z Offset", &PrinterTunePanel::_handle_callback, this)
+  , axis_twist_btn(cont, &layers_img, "Axis Twist", &PrinterTunePanel::_handle_callback, this)
 {
   lv_obj_move_background(cont);
 
@@ -84,6 +87,7 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   // row 3
   lv_obj_set_grid_cell(retraction_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
   lv_obj_set_grid_cell(zoffset_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
+  lv_obj_set_grid_cell(axis_twist_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
 }
 
 PrinterTunePanel::~PrinterTunePanel() {
@@ -187,6 +191,20 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
     } else if (btn == zoffset_btn.get_container()) {
       spdlog::trace("z offset pressed");
       zoffset_panel.foreground();
+    } else if (btn == axis_twist_btn.get_container()) {
+      spdlog::trace("axis twist pressed");
+      // Detect via the config section: the v0.12.0 module has no get_status, so
+      // it never shows up as a live printer object — only configfile.settings.
+      if (!AxisTwistPanel::is_enabled()) {
+        KUtils::notify_toast(
+          "Axis Twist Compensation isn't enabled.\n"
+          "Add [axis_twist_compensation] to printer.cfg.",
+          4000);
+        return;
+      }
+      // Calibration probes the bed; never mid-print.
+      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
+      axis_twist_panel.foreground();
     }
   }
 }

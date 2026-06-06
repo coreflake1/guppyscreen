@@ -11,6 +11,7 @@
 #include "tmc_status_panel.h"
 #include "power_panel.h"
 #include "firmware_retraction_panel.h"
+#include "axis_twist_panel.h"
 #include "button_container.h"
 #include "lvgl/lvgl.h"
 
@@ -43,6 +44,7 @@ class PrinterTunePanel {
   TmcStatusPanel tmc_status_panel;
   PowerPanel power_panel;
   FirmwareRetractionPanel firmware_retraction_panel;
+  AxisTwistPanel axis_twist_panel;
   ButtonContainer bedmesh_btn;
   ButtonContainer finetune_btn;
   ButtonContainer inputshaper_btn;
@@ -53,6 +55,7 @@ class PrinterTunePanel {
   ButtonContainer power_devices_btn;
   ButtonContainer retraction_btn;
   ButtonContainer zoffset_btn;
+  ButtonContainer axis_twist_btn;
 
 };
 
