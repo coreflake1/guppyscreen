@@ -19,6 +19,7 @@ public:
   void foreground();
   void handle_back_btn(lv_event_t *event);
   void handle_callback(lv_event_t *event);
+  void handle_pm_toggle(lv_event_t *event);
   void handle_wpa_event(const std::string &events);
   void handle_kb_input(lv_event_t *e);
   void connect(const char *);
@@ -32,6 +33,11 @@ public:
   static void _handle_callback(lv_event_t *event) {
     WifiPanel *panel = (WifiPanel *)event->user_data;
     panel->handle_callback(event);
+  };
+
+  static void _handle_pm_toggle(lv_event_t *event) {
+    WifiPanel *panel = (WifiPanel *)event->user_data;
+    panel->handle_pm_toggle(event);
   };
 
   static void _handle_kb_input(lv_event_t *e) {
@@ -52,6 +58,9 @@ private:
   lv_obj_t *password_input;
   ButtonContainer back_btn;
   lv_obj_t *kb;
+  lv_obj_t *pm_cont;
+  lv_obj_t *pm_toggle;
+  lv_obj_t *pm_label;
   std::string selected_network;
   std::string cur_network;
   std::map<std::string, std::string> list_networks;

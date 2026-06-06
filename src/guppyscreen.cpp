@@ -96,6 +96,14 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   spdlog::set_default_logger(klogger);
   klogger->flush_on(ll);
 
+  // Re-apply the WiFi low-latency preference on every startup/respawn — the
+  // driver resets to fast power-save (PM 2) on reboot/reconnect, so persisting
+  // the choice here keeps `wl PM 0` in effect. No-op when `wl` is absent.
+  if (!conf->get_json("/wifi_low_latency").empty()
+      && conf->get<bool>("/wifi_low_latency")) {
+    KUtils::set_wifi_low_latency(true);
+  }
+
 #ifdef GUPPYSCREEN_VERSION
   spdlog::info("Guppy Screen Version: {}", GUPPYSCREEN_VERSION);
 #endif  // GUPPYSCREEN_VERSION

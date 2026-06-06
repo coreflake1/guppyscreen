@@ -93,6 +93,12 @@ namespace KUtils {
   int backlight_get();
   void backlight_set(int value);
 
+  // WiFi power-save. on=true disables NIC power-save (Broadcom `wl PM 0`) for
+  // lower/steadier latency; on=false restores fast power-save (`wl PM 2`).
+  // Shells out to /usr/bin/wl; a harmless no-op when that tool is absent
+  // (non-Broadcom hardware / simulator). Returns true if the command was run.
+  bool set_wifi_low_latency(bool on);
+
   template<typename T, typename U> void sort_map_values(std::map<T, U> v,
     std::vector<U> &out_vect,
     std::function<bool(U &, U &)> sorter) {

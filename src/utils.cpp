@@ -18,6 +18,7 @@
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <cstdlib>
 #include <cstring>
 #include <experimental/filesystem>
 #include <regex>
@@ -591,6 +592,21 @@ namespace KUtils {
     } else {
       spdlog::warn("backlight_set: failed to write {}/brightness", d);
     }
+  }
+
+  bool set_wifi_low_latency(bool on) {
+    // Broadcom `wl` tool only; absent on other hardware and in the simulator,
+    // where this is a harmless no-op.
+    if (access("/usr/bin/wl", X_OK) != 0) {
+      spdlog::debug("set_wifi_low_latency: /usr/bin/wl not present, skipping");
+      return false;
+    }
+    // PM 0 = power-save off (lower, steadier latency); PM 2 = fast power-save.
+    const char *cmd = on ? "/usr/bin/wl PM 0 > /dev/null 2>&1"
+                         : "/usr/bin/wl PM 2 > /dev/null 2>&1";
+    int rc = system(cmd);
+    spdlog::info("set_wifi_low_latency: {} (rc={})", on ? "PM 0" : "PM 2", rc);
+    return true;
   }
 
   std::map<std::string, std::map<std::string, std::string>> parse_macros(json &m) {
