@@ -13,6 +13,7 @@ safety locks, wake/sleep display fixes, and a hardened on-printer installer.
 
 - **[Installation](Installation.md)** — install/uninstall on the Ender-3 V3 KE
 - **[Configuration](Configuration.md)** — `guppyconfig.json` fields and build-time options
+- **[KAMP & Axis Twist Compensation](KAMP-and-Axis-Twist-Compensation.md)** — first-layer mods for the KE (reinstall guide; survives firmware flashes)
 - **[Building from Source](Building-from-Source.md)** — submodules, patches, simulator, MIPS/aarch64
 - **[Development and Simulator](Development-and-Simulator.md)** — local dev workflow and the SDL simulator
 - **[Architecture](Architecture.md)** — components, repository layout, how it fits together

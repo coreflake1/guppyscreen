@@ -3,6 +3,7 @@
 - [Home](Home.md)
 - [Installation](Installation.md)
 - [Configuration](Configuration.md)
+- [KAMP & Axis Twist Comp. (KE)](KAMP-and-Axis-Twist-Compensation.md)
 - [Building from Source](Building-from-Source.md)
 - [Development & Simulator](Development-and-Simulator.md)
 - [Architecture](Architecture.md)
