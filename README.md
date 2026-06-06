@@ -151,6 +151,7 @@ Everything beyond installing lives in the **[`wiki/`](wiki/Home.md)** docs:
 
 - [Installation](wiki/Installation.md) — install/uninstall and what it changes
 - [Configuration](wiki/Configuration.md) — `guppyconfig.json` and build options
+- [KAMP & Axis Twist Compensation](wiki/KAMP-and-Axis-Twist-Compensation.md) — first-layer mods for the KE (reinstall guide; survives firmware flashes)
 - [Building from Source](wiki/Building-from-Source.md) — submodules, simulator, MIPS cross-build
 - [Development & Simulator](wiki/Development-and-Simulator.md) — local dev workflow
 - [Architecture](wiki/Architecture.md) — how it's put together
