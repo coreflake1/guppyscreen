@@ -112,6 +112,23 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   /*LittlevGL init*/
   lv_init();
 
+  // Boot-race guard for WiFi low-latency: the immediate apply above can be
+  // overridden a moment later when wlan0 associates (the driver resets PM=2),
+  // and that connect event is missed because the wpa monitor isn't attached
+  // yet. Re-assert PM 0 a few times over the first ~minute so it lands once
+  // association has settled; each fire re-checks config so a mid-window
+  // toggle-off is respected. The live reconnect hook handles everything after.
+  if (!conf->get_json("/wifi_low_latency").empty()
+      && conf->get<bool>("/wifi_low_latency")) {
+    lv_timer_t *wifi_ll_timer = lv_timer_create([](lv_timer_t *) {
+      auto v = Config::get_instance()->get_json("/wifi_low_latency");
+      if (!v.is_null() && v.template get<bool>()) {
+        KUtils::set_wifi_low_latency(true);
+      }
+    }, 12000, NULL);
+    lv_timer_set_repeat_count(wifi_ll_timer, 5);  // ~12,24,...60s, then auto-deletes
+  }
+
 #if !defined(SIMULATOR) && !defined(OS_ANDROID)
   /*Linux frame buffer device init*/
   fbdev_init();
