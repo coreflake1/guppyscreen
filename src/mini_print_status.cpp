@@ -61,15 +61,31 @@ MiniPrintStatus::MiniPrintStatus(lv_obj_t *parent,
   lv_img_set_size_mode(thumb, LV_IMG_SIZE_MODE_REAL);
   lv_obj_add_flag(thumb, LV_OBJ_FLAG_HIDDEN);
 
-  // info column: remaining time (hh:mm:ss) prominent, progress % under it
-  lv_obj_set_size(info_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  // info column: remaining time (hh:mm:ss) prominent, progress % under it.
+  // Fixed width so the overlay's right edge stays static as the ETA/percent digit widths
+  // change each second (it was SIZE_CONTENT, so the whole box jittered). Width is measured
+  // from the widest string we can ever show — "ETA  88:88:88" at the time font — so it
+  // can't clip and tracks the font instead of a magic number. The spare room becomes
+  // trailing whitespace via the left-aligned (START) labels below, which pins the text's
+  // left edge ("ETA"/status stay put). The digits themselves still shift a pixel or two
+  // as they count — Montserrat's figures aren't equal-width ('1' is ~95u vs '0' ~171u) —
+  // which is accepted; only a monospaced font could remove it, and we keep Montserrat.
+  lv_point_t info_w;
+  lv_txt_get_size(&info_w, "ETA  88:88:88", &lv_font_montserrat_16, 0, 0, LV_COORD_MAX, 0);
+  lv_obj_set_size(info_cont, info_w.x, LV_SIZE_CONTENT);
   lv_obj_clear_flag(info_cont, LV_OBJ_FLAG_SCROLLABLE);
+  // Make the whole overlay one tap target. A plain container is clickable by default and
+  // was swallowing presses over the text, so only the (non-clickable) preview image
+  // opened the status screen. Clearing it lets text presses fall through to `cont`.
+  lv_obj_clear_flag(info_cont, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_set_style_pad_all(info_cont, 0, 0);
   lv_obj_set_style_pad_row(info_cont, 2, 0);
   lv_obj_set_style_border_width(info_cont, 0, 0);
   lv_obj_set_style_bg_opa(info_cont, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_flow(info_cont, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(info_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  // cross-axis START = left-align, so the time/percent text grows rightward into the
+  // trailing whitespace and its left edge stays put (no per-second wiggle).
+  lv_obj_set_flex_align(info_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
 
   lv_obj_set_style_text_font(time_label, &lv_font_montserrat_16, 0);
   lv_obj_set_style_text_font(pct_label, &lv_font_montserrat_12, 0);
