@@ -92,3 +92,13 @@ SpinBoxSelector::~SpinBoxSelector() {
 void SpinBoxSelector::update_value(int v) {
   lv_spinbox_set_value(sb, v);
 }
+
+void SpinBoxSelector::set_hidden(bool h) {
+  if (cont != NULL) {
+    if (h) {
+      lv_obj_add_flag(cont, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_clear_flag(cont, LV_OBJ_FLAG_HIDDEN);
+    }
+  }
+}

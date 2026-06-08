@@ -19,6 +19,7 @@ class SpinBoxSelector {
   ~SpinBoxSelector();
 
   void update_value(int v);
+  void set_hidden(bool h);
 
  private:
   lv_obj_t *cont;

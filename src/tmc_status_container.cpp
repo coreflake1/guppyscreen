@@ -113,7 +113,15 @@ TmcStatusContainer::TmcStatusContainer(KWebSocketClient &c,
   lv_obj_set_style_pad_column(stepper_config, 0, 0);
   lv_obj_set_style_pad_all(stepper_config, 0, 0);
   lv_obj_set_flex_align(stepper_config, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  
+
+  // CoolStep fields (semin/semax/seup/sedn) exist only on StallGuard-capable
+  // drivers (TMC2209+). Hide by default; update() reveals them only if the
+  // driver actually reports them. Prevents "value does not exist" errors when
+  // adjusting them on a TMC2208 (e.g. the Ender-3 V3 KE).
+  semin_sb.set_hidden(true);
+  semax_sb.set_hidden(true);
+  seup_sb.set_hidden(true);
+  sedn_sb.set_hidden(true);
 }
 
 TmcStatusContainer::~TmcStatusContainer()
@@ -134,6 +142,7 @@ void TmcStatusContainer::update(json &stepper) {
     
     v = stepper["/semin"_json_pointer];
     int semin = 0;
+    semin_sb.set_hidden(v.is_null());
     if (!v.is_null()) {
       semin = v.template get<int>();
       lv_chart_set_next_value(chart, semin_series, semin * 32);
@@ -141,18 +150,21 @@ void TmcStatusContainer::update(json &stepper) {
     }
 
     v = stepper["/semax"_json_pointer];
+    semax_sb.set_hidden(v.is_null());
     if (!v.is_null()) {
       auto semax = v.template get<int>();
       lv_chart_set_next_value(chart, semax_series, (semin + semax + 1) * 32);
-      semax_sb.update_value(semax);      
+      semax_sb.update_value(semax);
     }
 
     v = stepper["/seup"_json_pointer];
+    seup_sb.set_hidden(v.is_null());
     if (!v.is_null()) {
       seup_sb.update_value(v.template get<int>());
     }
-    
+
     v = stepper["/sedn"_json_pointer];
+    sedn_sb.set_hidden(v.is_null());
     if (!v.is_null()) {
       sedn_sb.update_value(v.template get<int>());
     }
