@@ -20,6 +20,7 @@ This is a KE-focused fork of [GuppyScreen](https://github.com/ballaswag/guppyscr
 
 - 🖨️ **Print control & status** — temperatures, fans, LED, movement, homing
 - 🟦 **Interactive 3D bed mesh** — colour height map you can rotate, zoom, and pan (plus a table view)
+- 🎯 **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset baby-stepping
 - 📈 **Input shaper & belt calibration** with PSD graphs
 - 🎚️ **Fine tune mid-print** — speed, flow, Z-offset, pressure advance
 - 📂 File browser (with USB thumb-drive support), macro/console shell, Spoolman, TMC metrics
@@ -33,12 +34,22 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). On top of those, this edition adds:
 
 **New panels & tools**
+- **Skew Correction** *(new)* — square up functional parts entirely from the screen. Ships a ready-to-print
+  calibration frame (`GuppyKE_Skew_Calibration.gcode`); print it, measure three lengths with calipers, type
+  them into **Tune → Skew**, and it applies `SET_SKEW` + saves. See the
+  [Skew Correction guide](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction).
+- **TMC Autotune** *(new)* — on-screen stepper-driver autotuning (quieter, cooler, smoother). Pick each
+  motor and a tuning goal in **Tune → TMC Autotune**; it computes optimal driver registers from the motor's
+  specs on every boot. Recommended on the KE: **X/Y = performance, Z = silent** (or `auto`, which picks the
+  same).
+- **TMC Metrics fixed for TMC2208** *(new)* — the live driver dashboard previously crashed Klipper on the
+  KE's 2208 drivers; it's now guarded (and the CoolStep adjusters that don't exist on a 2208 are hidden).
 - **Axis Twist Compensation wizard** *(new in v0.4)* — a guided, on-screen calibration (Tune tab) that fixes
   the classic "first layer fine in the middle, squished on one side, lifting on the other" left-to-right
   error that bed mesh alone can't. Walks you through the 5-point paper test and saves the result.
 - **Live Z-Offset baby-stepping** — dedicated panel (Tune tab, or tap the Z-offset metric mid-print) with
-  0.005 / 0.01 / 0.025 / 0.05 mm steps, Raise/Lower, Reset. Adjustments save automatically (see setup below),
-  and are blocked with a "Home first" prompt when the printer isn't homed.
+  **0.001** / 0.005 / 0.01 / 0.025 / 0.05 mm steps, Raise/Lower, Reset. Adjustments save automatically (see
+  setup below), and are blocked with a "Home first" prompt when the printer isn't homed.
 - **Firmware Retraction** live-tuning panel — edit retract length/speed and extra unretract on the fly, with
   clear toasts when `[firmware_retraction]` isn't configured.
 - **Tap-to-exclude object map** — cancel a single failed object by tapping it on a live bed map during a print.
