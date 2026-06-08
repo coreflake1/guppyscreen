@@ -12,6 +12,7 @@
 #include "power_panel.h"
 #include "firmware_retraction_panel.h"
 #include "axis_twist_panel.h"
+#include "skew_correction_panel.h"
 #include "button_container.h"
 #include "lvgl/lvgl.h"
 
@@ -45,6 +46,7 @@ class PrinterTunePanel {
   PowerPanel power_panel;
   FirmwareRetractionPanel firmware_retraction_panel;
   AxisTwistPanel axis_twist_panel;
+  SkewCorrectionPanel skew_correction_panel;
   ButtonContainer bedmesh_btn;
   ButtonContainer finetune_btn;
   ButtonContainer inputshaper_btn;
@@ -56,6 +58,7 @@ class PrinterTunePanel {
   ButtonContainer retraction_btn;
   ButtonContainer zoffset_btn;
   ButtonContainer axis_twist_btn;
+  ButtonContainer skew_btn;
 
 };
 
