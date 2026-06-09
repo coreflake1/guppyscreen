@@ -45,21 +45,19 @@ measures the error from a test print and shears every move by the opposite amoun
 
 ---
 
-## Step 1 — Print the test frame (from the screen)
+## Step 1 — Print a calibration square
 
-GuppyKE ships a ready-to-print calibration frame — **no slicing needed**.
+You need one flat, square print to measure. **Slice it with your own normal profile** — that way the
+extrusion is dialed in for your printer and filament, and the corners come out crisp.
 
-1. On the printer, go to the **Files / Print** screen.
-2. Find **`GuppyKE_Skew_Calibration.gcode`** and start it.
-3. It heats up (PLA: 200 °C nozzle / 60 °C bed — see the note below for other materials), homes, meshes the
-   bed, and prints a **150 mm square frame** a millimetre tall. Takes about 10 minutes.
+What to print: any **XY skew calibration** model, or simply a **large flat square** (a single- or
+double-wall frame, a few layers tall). **Bigger is better** — a ~150 mm square gives far more measurement
+resolution than a small one, because skew error grows with distance. Popular ready-made options on
+Printables/Thingiverse search for *"skew calibration"* (e.g. a frame with labeled A/B/C/D corners), but a
+plain 150 mm square box-bottom works just as well.
 
-> 🧵 **Filament note:** the frame is set for PLA. For PETG/ABS, print your own square at the right temps
-> instead — skew correction only cares about the *shape*, not what it's made of. Any flat, ~150 mm square
-> with crisp corners works.
-
-When it's done and cool, gently pop the frame off the bed. **Keep track of which corner was at the front-left
-of the printer** — that's corner **A**. (If it helps, mark it with a pen as you lift it off.)
+Slice it, print it, let it cool, and gently pop it off the bed. **Keep track of which corner was at the
+front-left of the printer** — that's corner **A**. (Mark it with a pen as you lift it off if that helps.)
 
 ---
 

@@ -34,9 +34,9 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). On top of those, this edition adds:
 
 **New panels & tools**
-- **Skew Correction** *(new)* — square up functional parts entirely from the screen. Ships a ready-to-print
-  calibration frame (`GuppyKE_Skew_Calibration.gcode`); print it, measure three lengths with calipers, type
-  them into **Tune → Skew**, and it applies `SET_SKEW` + saves. See the
+- **Skew Correction** *(new)* — square up functional parts from the screen. Print a flat calibration square
+  (sliced with your own profile), measure three lengths with calipers, type them into **Tune → Skew**, and it
+  applies `SET_SKEW` + saves. See the
   [Skew Correction guide](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction).
 - **TMC Autotune** *(new)* — on-screen stepper-driver autotuning (quieter, cooler, smoother). Pick each
   motor and a tuning goal in **Tune → TMC Autotune**; it computes optimal driver registers from the motor's

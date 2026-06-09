@@ -72,7 +72,7 @@ on-device fixes in this fork are written and verified for the KE.
 - Print status & control (with chamber/MCU temperature on the print screen)
 - Interactive **3D bed mesh** — colour-gradient height map with rotate/zoom/pan, plus a table view (default)
 - **Axis Twist Compensation wizard** — guided 5-point fix for left-to-right first-layer unevenness
-- **Skew Correction** — square up functional parts from the screen (ships a printable test frame)
+- **Skew Correction** — square up functional parts: print a calibration square, measure, enter on-screen
 - **TMC Autotune** — quieter, cooler, smoother steppers; pick motor + goal on-screen
 - **Live Z-offset baby-stepping** — 0.001–0.05 mm steps, auto-saved, mid-print
 - Input shaper (PSD graphs) and belt calibration / excitation
