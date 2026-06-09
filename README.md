@@ -6,7 +6,7 @@ X11, Wayland, or display server required — and replaces the stock interface wi
 calibration tools, and an interactive 3D bed mesh.
 
 This is a KE-focused fork of [GuppyScreen](https://github.com/ballaswag/guppyscreen). Current release:
-**GuppyKE (`v0.4.0-GuppyKE`)**.
+**GuppyKE (`v0.5.0-GuppyKE`)**.
 
 <p align="center">
   <a href="https://github.com/coreflake1/guppyscreen/releases"><img alt="Release" src="https://img.shields.io/github/v/release/coreflake1/guppyscreen?style=flat-square&include_prereleases"></a>
@@ -34,15 +34,15 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). On top of those, this edition adds:
 
 **New panels & tools**
-- **Skew Correction** *(new)* — square up functional parts from the screen. Print a flat calibration square
+- **Skew Correction** *(new in v0.5)* — square up functional parts from the screen. Print a flat calibration square
   (sliced with your own profile), measure three lengths with calipers, type them into **Tune → Skew**, and it
   applies `SET_SKEW` + saves. See the
   [Skew Correction guide](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction).
-- **TMC Autotune** *(new)* — on-screen stepper-driver autotuning (quieter, cooler, smoother). Pick each
+- **TMC Autotune** *(new in v0.5)* — on-screen stepper-driver autotuning (quieter, cooler, smoother). Pick each
   motor and a tuning goal in **Tune → TMC Autotune**; it computes optimal driver registers from the motor's
   specs on every boot. Recommended on the KE: **X/Y = performance, Z = silent** (or `auto`, which picks the
   same).
-- **TMC Metrics fixed for TMC2208** *(new)* — the live driver dashboard previously crashed Klipper on the
+- **TMC Metrics fixed for TMC2208** *(new in v0.5)* — the live driver dashboard previously crashed Klipper on the
   KE's 2208 drivers; it's now guarded (and the CoolStep adjusters that don't exist on a 2208 are hidden).
 - **Axis Twist Compensation wizard** *(new in v0.4)* — a guided, on-screen calibration (Tune tab) that fixes
   the classic "first layer fine in the middle, squished on one side, lifting on the other" left-to-right
