@@ -18,6 +18,7 @@ power-loss recovery.
 - **[Using GuppyKE](Using-GuppyKE.md)** — a plain-English tour of the screen and every tool
 - **[Perfect First Layer — Axis Twist & KAMP](KAMP-and-Axis-Twist-Compensation.md)** — the left-to-right first-layer fix (survives firmware flashes)
 - **[Skew Correction](Skew-Correction.md)** — make functional parts come out truly square, from the screen
+- **[TMC Autotune](TMC-Autotune.md)** — quieter, cooler steppers; enabling the greyed-out button
 - **[Troubleshooting](Troubleshooting.md)** — common problems and fixes
 
 **For developers**

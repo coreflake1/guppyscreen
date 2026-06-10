@@ -65,7 +65,7 @@ need most of them often — but when you want them, they're right on the screen.
 
 | Tool | What it does | When to use it |
 |---|---|---|
-| **TMC Autotune** | Automatically optimizes your stepper drivers (quieter, cooler, smoother) from the motor type. Pick the motor + a goal and it tunes every boot. | Set once and forget — see the recommended settings in the [README](https://github.com/coreflake1/guppyscreen#readme). |
+| **TMC Autotune** | Automatically optimizes your stepper drivers (quieter, cooler, smoother) from the motor type. Pick the motor + a goal and it tunes every boot. | Set once and forget — but the button is greyed out until a small add-on is installed. See the [TMC Autotune guide](TMC-Autotune.md). |
 | **TMC Metrics** | A live read-out of the stepper drivers — current, temperature, and internal settings. A diagnostic dashboard. | Chasing skipped steps or a hot driver. Otherwise ignorable. |
 | **Power Settings** | Power-device toggles and Power-Loss-Recovery (resume a print after a power cut). | Recovering an interrupted print. |
 
@@ -92,7 +92,7 @@ Most people only need to do these once. They're written step-by-step for non-pro
 1. **[Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation.md)** — fixes left-to-right
    first-layer unevenness. The single highest-impact tweak for the KE.
 2. **[Skew correction](Skew-Correction.md)** — makes functional parts come out truly square.
-3. **TMC Autotune** — quieter, cooler motors (see the [README](https://github.com/coreflake1/guppyscreen#readme)).
+3. **[TMC Autotune](TMC-Autotune.md)** — quieter, cooler motors (and how to enable the greyed-out button).
 
 ---
 
