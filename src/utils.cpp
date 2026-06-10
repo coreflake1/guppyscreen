@@ -594,19 +594,57 @@ namespace KUtils {
     }
   }
 
-  bool set_wifi_low_latency(bool on) {
-    // Broadcom `wl` tool only; absent on other hardware and in the simulator,
-    // where this is a harmless no-op.
-    if (access("/usr/bin/wl", X_OK) != 0) {
-      spdlog::debug("set_wifi_low_latency: /usr/bin/wl not present, skipping");
-      return false;
+  // Stop or start the Bluetooth stack. On the KE the WiFi chip is a Broadcom
+  // BCM4343 single-chip WiFi+BT combo sharing one 2.4GHz radio and antenna; an
+  // active BT daemon makes WiFi yield to it (coexistence), injecting latency
+  // spikes into WiFi. In low-latency mode we stop bsa_server to give WiFi the
+  // radio to itself, and restore it via its boot script otherwise. Guarded so
+  // it is a harmless no-op off-device / in the simulator.
+  static void set_bluetooth_running(bool running) {
+    if (running) {
+      if (access("/etc/init.d/S41bt_bsa_download_firmware", X_OK) == 0) {
+        int rc = system("/etc/init.d/S41bt_bsa_download_firmware start > /dev/null 2>&1");
+        spdlog::info("set_bluetooth_running: start (rc={})", rc);
+      }
+    } else if (access("/usr/bin/killall", X_OK) == 0) {
+      int rc = system("/usr/bin/killall bsa_server > /dev/null 2>&1");
+      spdlog::info("set_bluetooth_running: stopped bsa_server (rc={})", rc);
     }
-    // PM 0 = power-save off (lower, steadier latency); PM 2 = fast power-save.
-    const char *cmd = on ? "/usr/bin/wl PM 0 > /dev/null 2>&1"
-                         : "/usr/bin/wl PM 2 > /dev/null 2>&1";
-    int rc = system(cmd);
-    spdlog::info("set_wifi_low_latency: {} (rc={})", on ? "PM 0" : "PM 2", rc);
-    return true;
+  }
+
+  bool set_wifi_low_latency(bool on) {
+    // The Broadcom `wl` tool drives the WiFi knobs; it is absent on other
+    // hardware and in the simulator, where that part is a harmless no-op. The
+    // driver resets every one of these to its default on each link-up, so this
+    // is re-applied on every CONNECTED event and a few times at startup (see
+    // wifi_panel / guppyscreen).
+    bool have_wl = access("/usr/bin/wl", X_OK) == 0;
+    if (have_wl) {
+      // Low-latency bundle vs. stock defaults:
+      //   PM 0/2       power-save off / fast power-save (buffers -> latency)
+      //   mpc 0/1      keep radio powered / let it sleep when idle (wake delay)
+      //   roam_off 1/0 no background roam scans / periodic off-channel scans
+      // (wme_apsd is intentionally left alone: changing it needs `wl down`,
+      //  which would drop the connection.)
+      if (on) {
+        system("/usr/bin/wl PM 0 > /dev/null 2>&1");
+        system("/usr/bin/wl mpc 0 > /dev/null 2>&1");
+        system("/usr/bin/wl roam_off 1 > /dev/null 2>&1");
+      } else {
+        system("/usr/bin/wl PM 2 > /dev/null 2>&1");
+        system("/usr/bin/wl mpc 1 > /dev/null 2>&1");
+        system("/usr/bin/wl roam_off 0 > /dev/null 2>&1");
+      }
+      spdlog::info("set_wifi_low_latency: wl bundle {}",
+                   on ? "low-latency (PM0/mpc0/roam_off1)" : "stock (PM2/mpc1/roam_off0)");
+    } else {
+      spdlog::debug("set_wifi_low_latency: /usr/bin/wl not present, skipping wl bundle");
+    }
+
+    // Free (low-latency) or restore (stock) the shared 2.4GHz radio via BT.
+    set_bluetooth_running(!on);
+
+    return have_wl;
   }
 
   std::map<std::string, std::map<std::string, std::string>> parse_macros(json &m) {

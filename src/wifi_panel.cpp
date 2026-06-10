@@ -107,8 +107,10 @@ WifiPanel::WifiPanel(std::mutex &l)
 
   // WiFi power-save control: a single tappable button in the right column,
   // under the connection/IP info, plus a hint line. The button toggles its own
-  // ON/OFF label; checked = power saving OFF (`wl PM 0`) for lower, steadier
-  // latency, unchecked = stock fast power-save.
+  // ON/OFF label; checked = power saving OFF for lower, steadier latency,
+  // unchecked = stock fast power-save. "Power saving off" drives a whole bundle
+  // (see KUtils::set_wifi_low_latency): WiFi power-save/idle-sleep/roam-scans
+  // off, plus Bluetooth stopped to free the shared 2.4GHz radio.
   lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(pm_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_set_style_border_width(pm_cont, 0, 0);
@@ -127,7 +129,7 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_set_style_text_font(pm_label, &lv_font_montserrat_16, 0);
   lv_obj_center(pm_label);
 
-  lv_label_set_text(pm_hint, "off = lower latency");
+  lv_label_set_text(pm_hint, "off = lowest latency\n(also disables Bluetooth)");
   lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(pm_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
 
@@ -310,9 +312,10 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
     lv_obj_clear_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
   } else if (event.rfind("<3>CTRL-EVENT-CONNECTED", 0) == 0) {
-    // The driver resets WiFi power-save to PM 2 on every link-up (reconnect or
-    // network switch), silently reverting PM 0. Re-apply the preference here so
-    // the toggle stays truthful. Runs on the wpa monitor thread (no LVGL).
+    // The driver resets the WiFi low-latency knobs (PM/mpc/roam_off) to their
+    // defaults on every link-up (reconnect or network switch), silently
+    // reverting them. Re-apply the whole bundle here so the toggle stays
+    // truthful. Runs on the wpa monitor thread (no LVGL).
     auto pm = Config::get_instance()->get_json("/wifi_low_latency");
     if (!pm.is_null() && pm.template get<bool>()) {
       KUtils::set_wifi_low_latency(true);
