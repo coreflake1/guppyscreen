@@ -6,7 +6,7 @@ websocket API. It renders directly to the framebuffer and has **no dependency on
 display server**, which makes it suitable for resource-constrained printer mainboards.
 
 This repository is a **Creality Ender-3 V3 KE–focused fork** (**GuppyKE**, current release
-`v0.5.0-GuppyKE` and beyond). On top of the 480×272 small-screen layout, interactive 3D bed mesh, and
+`v0.5.5-GuppyKE` and beyond). On top of the 480×272 small-screen layout, interactive 3D bed mesh, and
 print-state safety locks, it adds a full suite of on-screen calibration tools: an Axis Twist Compensation
 wizard, Skew Correction, TMC Autotune, live Z-offset baby-stepping, firmware-retraction tuning, and
 power-loss recovery.

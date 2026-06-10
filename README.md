@@ -6,7 +6,7 @@ X11, Wayland, or display server required — and replaces the stock interface wi
 calibration tools, and an interactive 3D bed mesh.
 
 This is a KE-focused fork of [GuppyScreen](https://github.com/ballaswag/guppyscreen). Current release:
-**GuppyKE (`v0.5.0-GuppyKE`)**.
+**GuppyKE (`v0.5.5-GuppyKE`)**.
 
 <p align="center">
   <a href="https://github.com/coreflake1/guppyscreen/releases"><img alt="Release" src="https://img.shields.io/github/v/release/coreflake1/guppyscreen?style=flat-square&include_prereleases"></a>
