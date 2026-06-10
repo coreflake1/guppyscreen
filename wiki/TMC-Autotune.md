@@ -36,8 +36,8 @@ chopper-timing and stealthChop/PWM tuning that autotune computes from the motor 
 
 What the 2208 *doesn't* have is **CoolStep** and **StallGuard** (those are 2209-and-up features). So:
 
-- The **"Sensorless Threshold"** field on the autotune screen does nothing on the KE — it's only used by
-  drivers with StallGuard. Leave it alone.
+- You won't see a **"Sensorless Threshold"** field on the KE. The panel only shows it for drivers that
+  support StallGuard (2209/2130/2240/2660/5160); on the 2208 it's hidden. So you've nothing to set there.
 - Don't expect a transformative change. Think "noticeably calmer and cooler," not "a different printer."
 
 If your motors are already quiet and you have no thermal concerns, this is a nice-to-have, not a must-do.
@@ -155,7 +155,9 @@ For each axis, choose the **Motor** from the dropdown, then a **Tuning Goal**, t
 - **`performance`** keeps the motor in spreadCycle (crisp, accurate motion) — good for the moving X/Y.
 - **`silent`** uses stealthChop (quietest) — ideal for the Z lead-screw, which doesn't need the precision.
 - **`auto`** picks sensible defaults and, on the KE, lands on essentially the same result.
-- Leave **Sensorless Threshold** untouched — it's inert on the KE's 2208 drivers (see above).
+
+You'll see just the two dropdowns per axis — there's no "Sensorless Threshold" field on the KE, because
+the 2208 drivers don't have StallGuard (the panel hides it).
 
 Tap **Save/Restart**. Klipper writes your choice into its auto-save block, restarts, and applies the tuned
 driver registers. From now on it re-applies them automatically on every boot — set once and forget.
@@ -210,5 +212,6 @@ back in a couple of minutes:
   `[guppy_config_helper]` to `GuppyScreen/guppy_cmd.cfg` and restart.
 - **I see a config error about `motor_constants`** — you have `autotune_tmc.py` but not
   `motor_constants.py`. Re-run the Step 1 block (it grabs all three).
-- **The Sensorless Threshold number won't do anything** — correct; it's unused on the KE's TMC2208
-  drivers. Ignore it.
+- **Where's the Sensorless Threshold field?** — it isn't shown on the KE. GuppyKE only displays it for
+  drivers with StallGuard (2209 and up); the KE's TMC2208 drivers don't have it, so the panel hides it.
+  Nothing's broken — there's just nothing to set there.
