@@ -152,9 +152,19 @@ For each axis, choose the **Motor** from the dropdown, then a **Tuning Goal**, t
 | `stepper_y` | `creality-42-34` | **performance** |
 | `stepper_z` | `creality-42-40` | **silent** |
 
-- **`performance`** keeps the motor in spreadCycle (crisp, accurate motion) — good for the moving X/Y.
-- **`silent`** uses stealthChop (quietest) — ideal for the Z lead-screw, which doesn't need the precision.
-- **`auto`** picks sensible defaults and, on the KE, lands on essentially the same result.
+The Tuning Goal dropdown has **four** choices:
+
+- **`auto`** *(the default)* — picks for you based on the motor: **performance** for X/Y, **silent** for Z.
+  On the KE this lands on exactly the recommended table above, so `auto` is a perfectly good "just do the
+  right thing" choice.
+- **`performance`** — spreadCycle at all speeds (crisp, accurate motion, a bit more audible). Good for the
+  moving X/Y.
+- **`silent`** — stealthChop at all speeds (quietest). Ideal for the Z lead-screw, which doesn't need the
+  precision.
+- **`autoswitch`** — **experimental.** Runs stealthChop at low speed and switches to spreadCycle once the
+  motor moves fast enough. The idea is "quiet when slow, strong when fast." It's flagged experimental in the
+  add-on and isn't needed on the KE — stick with `auto`/`performance`/`silent` unless you're deliberately
+  experimenting.
 
 You'll see just the two dropdowns per axis — there's no "Sensorless Threshold" field on the KE, because
 the 2208 drivers don't have StallGuard (the panel hides it).
