@@ -130,7 +130,7 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_center(pm_label);
 
   lv_label_set_text(pm_hint, "on = steadier WiFi\n(no power-save / roam / BT)");
-  lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_12, 0);
   lv_obj_set_style_text_color(pm_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
 
   {
