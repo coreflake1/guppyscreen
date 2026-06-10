@@ -105,12 +105,12 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_add_event_cb(prompt_cont, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
   lv_obj_add_event_cb(wifi_label, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
 
-  // WiFi power-save control: a single tappable button in the right column,
-  // under the connection/IP info, plus a hint line. The button toggles its own
-  // ON/OFF label; checked = power saving OFF for lower, steadier latency,
-  // unchecked = stock fast power-save. "Power saving off" drives a whole bundle
-  // (see KUtils::set_wifi_low_latency): WiFi power-save/idle-sleep/roam-scans
-  // off, plus Bluetooth stopped to free the shared 2.4GHz radio.
+  // "Low Latency" control: a single tappable button in the right column, under
+  // the connection/IP info, plus a hint line. The button toggles its own ON/OFF
+  // label; checked = Low Latency ON, unchecked = stock. When ON it drives a
+  // whole bundle (see KUtils::set_wifi_low_latency): WiFi power-save / idle radio
+  // sleep / background roam-scans all off, plus Bluetooth stopped to free the
+  // shared 2.4GHz radio — for lower, steadier latency.
   lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(pm_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_set_style_border_width(pm_cont, 0, 0);
@@ -125,11 +125,11 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_set_width(pm_btn, 210);
   lv_obj_set_height(pm_btn, LV_SIZE_CONTENT);
   lv_obj_set_style_pad_ver(pm_btn, 10, 0);
-  lv_label_set_text(pm_label, "WiFi power saving: ON");
+  lv_label_set_text(pm_label, "Low Latency: OFF");
   lv_obj_set_style_text_font(pm_label, &lv_font_montserrat_16, 0);
   lv_obj_center(pm_label);
 
-  lv_label_set_text(pm_hint, "off = lowest latency\n(also disables Bluetooth)");
+  lv_label_set_text(pm_hint, "on = steadier WiFi\n(no power-save / roam / BT)");
   lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(pm_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
 
@@ -184,8 +184,8 @@ void WifiPanel::handle_back_btn(lv_event_t *e) {
 
 void WifiPanel::refresh_pm_label() {
   bool low_latency = lv_obj_has_state(pm_btn, LV_STATE_CHECKED);
-  lv_label_set_text(pm_label, low_latency ? "WiFi power saving: OFF"
-                                          : "WiFi power saving: ON");
+  lv_label_set_text(pm_label, low_latency ? "Low Latency: ON"
+                                          : "Low Latency: OFF");
 }
 
 void WifiPanel::handle_pm_toggle(lv_event_t *e) {
