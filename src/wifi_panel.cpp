@@ -132,6 +132,10 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_label_set_text(pm_hint, "on = steadier WiFi\n(no power-save / roam / BT)");
   lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_12, 0);
   lv_obj_set_style_text_color(pm_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+  // Match the button width and left-align both lines so they sit flush under
+  // the button's left edge (cleaner than centered).
+  lv_obj_set_width(pm_hint, 210);
+  lv_obj_set_style_text_align(pm_hint, LV_TEXT_ALIGN_LEFT, 0);
 
   {
     auto v = Config::get_instance()->get_json("/wifi_low_latency");
