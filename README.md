@@ -41,7 +41,8 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 - **TMC Autotune** *(new in v0.5)* — on-screen stepper-driver autotuning (quieter, cooler, smoother). Pick each
   motor and a tuning goal in **Tune → TMC Autotune**; it computes optimal driver registers from the motor's
   specs on every boot. Recommended on the KE: **X/Y = performance, Z = silent** (or `auto`, which picks the
-  same).
+  same). The button is greyed out until a small Klipper add-on is installed — see the
+  [TMC Autotune guide](wiki/TMC-Autotune.md).
 - **TMC Metrics fixed for TMC2208** *(new in v0.5)* — the live driver dashboard previously crashed Klipper on the
   KE's 2208 drivers; it's now guarded (and the CoolStep adjusters that don't exist on a 2208 are hidden).
 - **Axis Twist Compensation wizard** *(new in v0.4)* — a guided, on-screen calibration (Tune tab) that fixes
@@ -172,6 +173,7 @@ the repo):
 - [Configuration](wiki/Configuration.md) — `guppyconfig.json` and build options
 - [KAMP & Axis Twist Compensation](wiki/KAMP-and-Axis-Twist-Compensation.md) — first-layer mods for the KE (reinstall guide; survives firmware flashes)
 - [Skew Correction](wiki/Skew-Correction.md) — square up functional parts from the screen
+- [TMC Autotune](wiki/TMC-Autotune.md) — quieter, cooler steppers; enabling the greyed-out button (reinstall guide)
 - [Building from Source](wiki/Building-from-Source.md) — submodules, simulator, MIPS cross-build
 - [Development & Simulator](wiki/Development-and-Simulator.md) — local dev workflow
 - [Architecture](wiki/Architecture.md) — how it's put together
