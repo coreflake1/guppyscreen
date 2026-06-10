@@ -12,6 +12,7 @@
 | Websocket reconnects every ~2 s in the simulator | Expected when no printer/Moonraker is connected. |
 | Wrong sensors shown after upgrade | The MCU-temp default applies to fresh installs only; edit the on-device `guppyconfig.json` to change `monitored_sensors`. |
 | aarch64 (`guppyscreen-arm.tar.gz`) won't run on the KE | The KE is MIPS; use the `guppyscreen-smallscreen.tar.gz` (MIPS) asset. |
+| Mainsail/screen laggy or webcam stutters, signal is fine | Turn on **Low Latency** in the WiFi panel (WiFi power-save / idle-sleep / roam-scans off + Bluetooth stopped, since WiFi and BT share one 2.4 GHz radio). Also fix the basics off-device: avoid 2.4 GHz channel congestion and strong nearby emitters (e.g. a printer's Wi-Fi-Direct). See [Using GuppyKE](Using-GuppyKE.md#settings--system). |
 
 ## Logs
 

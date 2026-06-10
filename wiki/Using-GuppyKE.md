@@ -76,8 +76,12 @@ need most of them often — but when you want them, they're right on the screen.
 
 ## Settings & system
 
-- **Network** — connect to WiFi, see your IP, and a **low-latency toggle** that disables the radio's
-  power-save for a snappier remote connection (handy if Mainsail feels laggy).
+- **Network** — connect to WiFi, see your IP, and a **Low Latency** toggle for a snappier remote connection
+  (handy if Mainsail feels laggy or video stutters). Switching it on turns off the WiFi radio's power-save,
+  stops it sleeping when idle, disables background network scans, **and turns off Bluetooth** — on the KE,
+  WiFi and Bluetooth share a single 2.4 GHz radio and antenna, so leaving BT running (it's unused here) makes
+  WiFi periodically yield to it and stutter. The setting sticks across reboots and network changes; turn it
+  off to go back to stock (which also re-enables Bluetooth).
 - **System info** — temperatures, load, versions.
 - **Macros / Console** — run any gcode macro, or type commands directly (a drill-down command browser with
   history).

@@ -60,9 +60,12 @@ Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
   outage, resume the interrupted print from where it stopped (uses the printer's saved breakpoint).
 
 **Improved UX**
-- **WiFi power-saving toggle** *(new in v0.4)* — one tap in the WiFi panel turns off the radio's power-save
-  mode for noticeably lower, steadier latency (snappier Mainsail/Fluidd and screen response). The choice
-  persists and re-applies across reboots and reconnects.
+- **WiFi Low Latency toggle** *(expanded in v0.5.5; was the v0.4 "power-saving" toggle)* — one tap in the
+  WiFi panel for noticeably lower, steadier latency (snappier Mainsail/Fluidd and screen response). It drives
+  a whole bundle on the KE's Broadcom combo chip: WiFi power-save off (`PM 0`), radio kept awake (`mpc 0`),
+  background roam-scans off (`roam_off 1`), **and Bluetooth stopped** — because WiFi and BT share one 2.4 GHz
+  radio/antenna, so an idle BT stack still injects latency spikes into WiFi. The choice persists and
+  re-applies across reboots and reconnects; turning it off restores stock behaviour (and restarts Bluetooth).
 - **On-screen notifications** — Klipper events surface as toasts, with separate modals and a dedicated
   print-done screen.
 - **Fans** — friendly names, read-only fans (heater_fan / output-pin fans) shown, correct editable/read-only split.

@@ -80,7 +80,7 @@ on-device fixes in this fork are written and verified for the KE.
 - Firmware-retraction tuning, power-loss recovery, machine limits
 - Temperature control, fans, LED, movement/homing; fine tune (speed/flow/Z/PA) mid-print
 - Macro/console shell and file browser (auto-reload, USB thumb-drive support)
-- Spoolman integration, TMC metrics, WiFi low-latency toggle, multi-printer support
+- Spoolman integration, TMC metrics, WiFi **Low Latency** toggle (power-save / roam / Bluetooth off), multi-printer support
 - Print-state safety locks — panels that could disrupt a running job are gated/confirmed mid-print
 - Cross-platform release artifacts (MIPS / ARM / x86)
 
