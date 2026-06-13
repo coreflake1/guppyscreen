@@ -19,6 +19,7 @@ power-loss recovery.
 - **[Perfect First Layer — Axis Twist & KAMP](KAMP-and-Axis-Twist-Compensation.md)** — the left-to-right first-layer fix (survives firmware flashes)
 - **[Skew Correction](Skew-Correction.md)** — make functional parts come out truly square, from the screen
 - **[TMC Autotune](TMC-Autotune.md)** — quieter, cooler steppers; enabling the greyed-out button
+- **[Layer shift after pause/resume](Pause-Park-Layer-Shift-Fix.md)** — the one-line `y_park` fix for the stock KE pause crash
 - **[Troubleshooting](Troubleshooting.md)** — common problems and fixes
 
 **For developers**

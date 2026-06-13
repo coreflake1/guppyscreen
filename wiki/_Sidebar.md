@@ -7,6 +7,7 @@
 - [Perfect First Layer — Axis Twist & KAMP](KAMP-and-Axis-Twist-Compensation.md)
 - [Skew Correction](Skew-Correction.md)
 - [TMC Autotune (quieter steppers)](TMC-Autotune.md)
+- [Layer shift after pause/resume](Pause-Park-Layer-Shift-Fix.md)
 - [Troubleshooting](Troubleshooting.md)
 
 **For developers**
