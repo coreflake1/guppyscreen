@@ -98,12 +98,12 @@ SysInfoPanel::SysInfoPanel()
   , y_icon_toggle_cont(lv_obj_create(left_cont))
   , y_icon_toggle(lv_switch_create(y_icon_toggle_cont))
 
-  // log level
-  , theme_cont(lv_obj_create(left_cont))
+  // theme + default temp live in the right column to balance the panel
+  , theme_cont(lv_obj_create(right_cont))
   , theme_dd(lv_dropdown_create(theme_cont))
   , theme(0)
 
-  , def_temp_cont(lv_obj_create(left_cont))
+  , def_temp_cont(lv_obj_create(right_cont))
   , def_temp_dd(lv_dropdown_create(def_temp_cont))
 
   , factory_reset_btn(cont, &cancel, "Factory\nReset", &SysInfoPanel::_handle_callback, this, "Reset GuppyScreen to default settings?", [](){
@@ -326,7 +326,7 @@ SysInfoPanel::SysInfoPanel()
   lv_obj_set_size(def_temp_cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(def_temp_cont, 0, 0);
   l = lv_label_create(def_temp_cont);
-  lv_label_set_text(l, "Def. Extruder Temp");
+  lv_label_set_text(l, "Def. Temp");
   lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
   lv_obj_align(def_temp_dd, LV_ALIGN_RIGHT_MID, 0, 0);
   lv_dropdown_set_options(def_temp_dd, "180\n200\n220\n240\n260\n280\n300");
@@ -357,6 +357,18 @@ SysInfoPanel::SysInfoPanel()
     lv_obj_get_width(right_cont)
       - lv_obj_get_width(factory_reset_btn.get_container()) - 4);
   lv_label_set_long_mode(network_label, LV_LABEL_LONG_WRAP);
+
+  // The Theme/Def-Temp rows now share the right column with the network text.
+  // A long network list (e.g. many interfaces) can push these rows down into
+  // the Back button's band, so reserve clearance for the WIDER of the two
+  // floating corner buttons (Factory Reset top-right, Back bottom-right) plus a
+  // comfortable margin, otherwise a right-aligned dropdown tucks under a button.
+  lv_coord_t corner_btn_w = std::max(
+      lv_obj_get_width(factory_reset_btn.get_container()),
+      lv_obj_get_width(back_btn.get_container()));
+  lv_coord_t right_row_w = lv_obj_get_width(right_cont) - corner_btn_w - 12;
+  lv_obj_set_width(theme_cont, right_row_w);
+  lv_obj_set_width(def_temp_cont, right_row_w);
 }
 
 SysInfoPanel::~SysInfoPanel() {
