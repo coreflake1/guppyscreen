@@ -178,6 +178,7 @@ the repo):
 - [Skew Correction](wiki/Skew-Correction.md) — square up functional parts from the screen
 - [TMC Autotune](wiki/TMC-Autotune.md) — quieter, cooler steppers; enabling the greyed-out button (reinstall guide)
 - [Layer shift after pause/resume](wiki/Pause-Park-Layer-Shift-Fix.md) — the one-line `y_park` fix for the stock KE pause crash
+- [Camera image tuning](wiki/Camera-Image-Tuning.md) — improve the Nebula image and persist the settings across reboots
 - [Building from Source](wiki/Building-from-Source.md) — submodules, simulator, MIPS cross-build
 - [Development & Simulator](wiki/Development-and-Simulator.md) — local dev workflow
 - [Architecture](wiki/Architecture.md) — how it's put together

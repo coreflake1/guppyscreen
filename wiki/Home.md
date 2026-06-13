@@ -20,6 +20,7 @@ power-loss recovery.
 - **[Skew Correction](Skew-Correction.md)** — make functional parts come out truly square, from the screen
 - **[TMC Autotune](TMC-Autotune.md)** — quieter, cooler steppers; enabling the greyed-out button
 - **[Layer shift after pause/resume](Pause-Park-Layer-Shift-Fix.md)** — the one-line `y_park` fix for the stock KE pause crash
+- **[Camera image tuning](Camera-Image-Tuning.md)** — improve the Nebula image and make the settings persist across reboots
 - **[Troubleshooting](Troubleshooting.md)** — common problems and fixes
 
 **For developers**

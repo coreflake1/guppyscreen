@@ -8,6 +8,7 @@
 - [Skew Correction](Skew-Correction.md)
 - [TMC Autotune (quieter steppers)](TMC-Autotune.md)
 - [Layer shift after pause/resume](Pause-Park-Layer-Shift-Fix.md)
+- [Camera image tuning (save settings)](Camera-Image-Tuning.md)
 - [Troubleshooting](Troubleshooting.md)
 
 **For developers**
