@@ -95,6 +95,9 @@ SysInfoPanel::SysInfoPanel()
   , z_icon_toggle_cont(lv_obj_create(left_cont))
   , z_icon_toggle(lv_switch_create(z_icon_toggle_cont))
 
+  , y_icon_toggle_cont(lv_obj_create(left_cont))
+  , y_icon_toggle(lv_switch_create(y_icon_toggle_cont))
+
   // log level
   , theme_cont(lv_obj_create(left_cont))
   , theme_dd(lv_dropdown_create(theme_cont))
@@ -270,6 +273,32 @@ SysInfoPanel::SysInfoPanel()
   lv_obj_add_event_cb(z_icon_toggle, &SysInfoPanel::_handle_callback,
     LV_EVENT_VALUE_CHANGED, this);
 
+  /* Y direction (bed-slinger): the up-arrow/Y+ jog moves the bed, which on a
+   * bed-slinger travels opposite to the toolhead frame, so the arrows can feel
+   * reversed. This flips the homing-panel Y jog like Invert Z does for Z. */
+  lv_obj_set_size(y_icon_toggle_cont, LV_PCT(100), LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_all(y_icon_toggle_cont, 0, 0);
+
+  l = lv_label_create(y_icon_toggle_cont);
+  lv_label_set_text(l, "Invert Y Direction");
+  lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
+  lv_obj_align(y_icon_toggle, LV_ALIGN_RIGHT_MID, 0, 0);
+
+  v = conf->get_json("/invert_y_direction");
+  if (!v.is_null()) {
+    if (v.template get<bool>()) {
+      lv_obj_add_state(y_icon_toggle, LV_STATE_CHECKED);
+    } else {
+      lv_obj_clear_state(y_icon_toggle, LV_STATE_CHECKED);
+    }
+  } else {
+    // Default is cleared
+    lv_obj_clear_state(y_icon_toggle, LV_STATE_CHECKED);
+  }
+
+  lv_obj_add_event_cb(y_icon_toggle, &SysInfoPanel::_handle_callback,
+    LV_EVENT_VALUE_CHANGED, this);
+
   // theme dropdown
   lv_obj_set_size(theme_cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(theme_cont, 0, 0);
@@ -396,6 +425,10 @@ void SysInfoPanel::handle_callback(lv_event_t *e)
     } else if (obj == z_icon_toggle) {
       bool inverted = lv_obj_has_state(z_icon_toggle, LV_STATE_CHECKED);
       conf->set<bool>("/invert_z_direction", inverted);
+      conf->save();
+    } else if (obj == y_icon_toggle) {
+      bool inverted = lv_obj_has_state(y_icon_toggle, LV_STATE_CHECKED);
+      conf->set<bool>("/invert_y_direction", inverted);
       conf->save();
     } else if (obj == theme_dd) {
       auto idx = lv_dropdown_get_selected(theme_dd);

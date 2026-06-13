@@ -206,6 +206,12 @@ void HomingPanel::handle_callback(lv_event_t *event) {
       invert_z = invert_z_json.get<bool>();
     }
 
+    bool invert_y = false;
+    auto invert_y_json = Config::get_instance()->get_json("/invert_y_direction");
+    if (invert_y_json.is_boolean()) {
+      invert_y = invert_y_json.get<bool>();
+    }
+
     if (btn == x_up_btn.get_container()) {
       spdlog::debug("x up pressed");
       double target_x = std::clamp(current_x + move_dist, min_pos[0], max_pos[0]);
@@ -215,12 +221,14 @@ void HomingPanel::handle_callback(lv_event_t *event) {
       double target_x = std::clamp(current_x - move_dist, min_pos[0], max_pos[0]);
       move_op = fmt::format("G0 X{:.4f} F{}", target_x, speed_mm_min);
     } else if (btn == y_up_btn.get_container()) {
-      spdlog::debug("y up pressed");
-      double target_y = std::clamp(current_y + move_dist, min_pos[1], max_pos[1]);
+      spdlog::debug("y up pressed{}", invert_y ? " (inverted)" : "");
+      double y_offset = invert_y ? -move_dist : +move_dist;
+      double target_y = std::clamp(current_y + y_offset, min_pos[1], max_pos[1]);
       move_op = fmt::format("G0 Y{:.4f} F{}", target_y, speed_mm_min);
     } else if (btn == y_down_btn.get_container()) {
-      spdlog::debug("y down pressed");
-      double target_y = std::clamp(current_y - move_dist, min_pos[1], max_pos[1]);
+      spdlog::debug("y down pressed{}", invert_y ? " (inverted)" : "");
+      double y_offset = invert_y ? +move_dist : -move_dist;
+      double target_y = std::clamp(current_y + y_offset, min_pos[1], max_pos[1]);
       move_op = fmt::format("G0 Y{:.4f} F{}", target_y, speed_mm_min);
     } else if (btn == z_up_btn.get_container()) {
       spdlog::debug("z up pressed{}", invert_z ? " (inverted)" : "");

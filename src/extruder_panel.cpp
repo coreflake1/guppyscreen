@@ -17,6 +17,15 @@ static const uint32_t HEAT_TIMEOUT_MS = 5 * 60 * 1000;
 // response. Long enough for a 50mm slow load; trips only if the ws dies.
 static const uint32_t ACTION_TIMEOUT_MS = 5 * 60 * 1000;
 
+// Chunked load: total filament fed and the size of each individually-issued
+// step. The stock LOAD_MATERIAL macro feeds 150mm as one G1 E150 move that
+// can't be interrupted; we feed the same total in LOAD_CHUNK_MM steps so the
+// user can stop between chunks. LOAD_FEED is the per-chunk feedrate (mm/min);
+// 300 = 5 mm/s, so a chunk takes ~2s = the worst-case stop latency.
+static const int LOAD_TOTAL_MM = 150;
+static const int LOAD_CHUNK_MM = 10;
+static const int LOAD_FEED = 300;
+
 LV_IMG_DECLARE(back);
 LV_IMG_DECLARE(spoolman_img);
 LV_IMG_DECLARE(extrude_img);
@@ -242,7 +251,7 @@ int ExtruderPanel::effective_temp() {
 }
 
 void ExtruderPanel::refresh_button_state() {
-  bool busy = action_in_flight || pending_kind != PA_NONE;
+  bool busy = action_in_flight || pending_kind != PA_NONE || load_active;
 
   if (action_in_flight) {
     // A gcode is executing on klipper; lock everything until the response.
@@ -251,6 +260,14 @@ void ExtruderPanel::refresh_button_state() {
     load_btn.disable();
     unload_btn.disable();
     cooldown_btn.disable();
+  } else if (load_active) {
+    // Chunked load feeding. Cooldown stays clickable and doubles as Stop — it
+    // halts the load after the in-flight chunk; the rest are blocked.
+    extrude_btn.disable();
+    retract_btn.disable();
+    load_btn.disable();
+    unload_btn.disable();
+    cooldown_btn.enable();
   } else if (pending_kind != PA_NONE) {
     // Waiting for the hotend to heat. Cooldown stays clickable so the user
     // can cancel; the other actions are blocked until heat-up completes.
@@ -283,7 +300,14 @@ void ExtruderPanel::update_busy_caption() {
     return;
   }
 
-  if (pending_kind != PA_NONE) {
+  if (load_active) {
+    // Show progress + how to stop, so the slow feed never looks like a hang.
+    int done = LOAD_TOTAL_MM - load_remaining_mm;
+    lv_label_set_text(busy_label,
+      fmt::format("Loading filament {}/{} mm\nTap Cooldown to stop",
+        done, LOAD_TOTAL_MM).c_str());
+    lv_obj_clear_flag(busy_label, LV_OBJ_FLAG_HIDDEN);
+  } else if (pending_kind != PA_NONE) {
     // Heating toward the action. Show live current->target so the number
     // visibly climbs and it's obvious the press registered. (ASCII arrow/dots:
     // the small montserrat font lacks the U+2192 / U+2026 glyphs.)
@@ -305,7 +329,13 @@ void ExtruderPanel::arm_safety_timer(uint32_t ms) {
   safety_timer = lv_timer_create([](lv_timer_t *t) {
     auto *self = (ExtruderPanel *)t->user_data;
     self->safety_timer = NULL;  // one-shot, LVGL deletes after this callback
-    if (self->action_in_flight) {
+    if (self->load_active) {
+      // A load chunk's response never arrived — stop feeding rather than
+      // leaving the load stuck mid-way with the buttons locked.
+      spdlog::warn("load chunk response timeout, stopping load");
+      self->finish_load();
+      KUtils::notify_toast("Load timed out.");
+    } else if (self->action_in_flight) {
       // Response never arrived — assume the ws/klipper lost it and recover.
       spdlog::warn("extruder action response timeout, unlocking buttons");
       self->action_in_flight = false;
@@ -359,9 +389,55 @@ void ExtruderPanel::clear_pending() {
 }
 
 void ExtruderPanel::fire_pending() {
+  PendingKind kind = pending_kind;
   std::string gcode = pending_gcode;
-  clear_pending();   // resets pending state + button enables; send_action re-locks
-  send_action(gcode);  // action_name carries over so the caption stays correct
+  clear_pending();   // resets pending state + button enables; the call below re-locks
+  // action_name carries over so the caption stays correct.
+  if (kind == PA_LOAD) {
+    begin_load();    // chunked, stoppable — not a one-shot macro
+  } else {
+    send_action(gcode);
+  }
+}
+
+void ExtruderPanel::begin_load() {
+  load_active = true;
+  load_stop = false;
+  load_remaining_mm = LOAD_TOTAL_MM;
+  action_name = "Load";
+  refresh_button_state();  // spinner + caption; Cooldown stays live as Stop
+  send_load_chunk();
+}
+
+void ExtruderPanel::send_load_chunk() {
+  if (!load_active) {
+    return;
+  }
+  if (load_stop || load_remaining_mm <= 0) {
+    finish_load();
+    return;
+  }
+  int chunk = std::min(LOAD_CHUNK_MM, load_remaining_mm);
+  load_remaining_mm -= chunk;
+  update_busy_caption();
+  // Per-chunk watchdog: if the response never arrives (ws died), stop feeding
+  // rather than hang. The next chunk is only sent from the response callback,
+  // so the feed naturally halts the moment load_stop is set.
+  arm_safety_timer(ACTION_TIMEOUT_MS);
+  ws.gcode_script(fmt::format("M83\nG1 E{} F{}", chunk, LOAD_FEED),
+    [this](json &) {
+      std::lock_guard<std::mutex> lock(lv_lock);
+      cancel_safety_timer();
+      send_load_chunk();  // feed the next chunk, or finish_load() when done/stopped
+    });
+}
+
+void ExtruderPanel::finish_load() {
+  load_active = false;
+  load_stop = false;
+  load_remaining_mm = 0;
+  cancel_safety_timer();
+  refresh_button_state();
 }
 
 void ExtruderPanel::run_when_hot(PendingKind kind, const std::string &name,
@@ -378,7 +454,11 @@ void ExtruderPanel::run_when_hot(PendingKind kind, const std::string &name,
   }
 
   if (current_temp + HEAT_TOLERANCE >= want) {
-    send_action(gcode);
+    if (kind == PA_LOAD) {
+      begin_load();  // chunked, stoppable feed instead of a one-shot macro
+    } else {
+      send_action(gcode);
+    }
     return;
   }
 
@@ -418,7 +498,8 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
     lv_obj_t *btn = lv_event_get_current_target(e);
 
     if (btn == back_btn.get_container()) {
-      clear_pending();  // don't auto-extrude after the user navigates away
+      clear_pending();   // don't auto-extrude after the user navigates away
+      load_stop = true;  // and stop any in-flight chunked load
       lv_obj_move_background(panel_cont);
       return;
     }
@@ -429,9 +510,19 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
     }
 
     if (btn == cooldown_btn.get_container()) {
-      // Cooldown doubles as the cancel for a pending heat-up. Always allowed
-      // (unless a gcode is already in flight, in which case refresh disables it).
+      // Cooldown doubles as the cancel for a pending heat-up and the Stop for a
+      // running chunked load. Always allowed unless a one-shot gcode is already
+      // in flight (in which case refresh_button_state disables the button).
       if (action_in_flight) {
+        return;
+      }
+      if (load_active) {
+        // Stop the load: send_load_chunk() won't queue another chunk, and we
+        // drop the heater now. finish_load() runs from the in-flight chunk's
+        // response, so motion ceases within ~one chunk.
+        load_stop = true;
+        ws.gcode_script(cooldown_macro);
+        KUtils::notify_toast("Stopping load...");
         return;
       }
       clear_pending();
@@ -443,7 +534,7 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
     // Remaining actions: blocked while another action is running OR while a
     // heat-up is pending. refresh_button_state() also disables their widgets,
     // but check the flags too in case of an event in flight before refresh.
-    if (action_in_flight || pending_kind != PA_NONE) {
+    if (action_in_flight || pending_kind != PA_NONE || load_active) {
       return;
     }
 
@@ -475,16 +566,12 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
     }
 
     if (btn == load_btn.get_container()) {
-      std::string gcode;
-      if (load_filament_macro == "_GUPPY_LOAD_MATERIAL") {
-        const char *len = lv_btnmatrix_get_btn_text(length_selector.get_selector(),
-          length_selector.get_selected_idx());
-        gcode = fmt::format("{} EXTRUDER_TEMP={} EXTRUDE_LEN={}",
-          load_filament_macro, effective_temp(), len);
-      } else {
-        gcode = load_filament_macro;
-      }
-      run_when_hot(PA_LOAD, "Load", gcode);
+      // Heat to the selected temp, then feed in bounded chunks we can stop
+      // (run_when_hot -> begin_load) rather than firing the configured load
+      // macro. The stock LOAD_MATERIAL is a single G1 E150 F180 move that can't
+      // be interrupted once queued — the source of the "never stops" report —
+      // so the macro is intentionally bypassed here for a stoppable load.
+      run_when_hot(PA_LOAD, "Load", "");
       return;
     }
   }

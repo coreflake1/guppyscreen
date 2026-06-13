@@ -71,6 +71,16 @@ class ExtruderPanel : public NotifyConsumer {
   // (Moonraker only replies when the script has finished executing).
   bool action_in_flight = false;
 
+  // Chunked, stoppable filament load. Instead of delegating to the stock
+  // LOAD_MATERIAL macro (one uninterruptible G1 E150 move that can't be
+  // cancelled once queued), guppyscreen feeds the filament in small bounded
+  // chunks it issues itself, so Cooldown can halt it between chunks (<~2s).
+  // load_active is true while chunks are being fed; load_stop is set by
+  // Cooldown/Back to end the load after the in-flight chunk completes.
+  bool load_active = false;
+  bool load_stop = false;
+  int load_remaining_mm = 0;
+
   // One timer at a time, used for whichever wait we're currently in:
   //   pending_kind != PA_NONE  -> heat timeout (clears pending if temp stalls)
   //   action_in_flight          -> response timeout (fallback unlock if ws dies)
@@ -92,6 +102,11 @@ class ExtruderPanel : public NotifyConsumer {
   void run_when_hot(PendingKind kind, const std::string &name, const std::string &gcode);
   void fire_pending();
   void clear_pending();
+  // Chunked filament load: feed LOAD_TOTAL_MM in LOAD_CHUNK_MM steps, each its
+  // own gcode_script, stopping between chunks if load_stop is set.
+  void begin_load();
+  void send_load_chunk();
+  void finish_load();
   void refresh_button_state();
   void update_busy_caption();
   void arm_safety_timer(uint32_t ms);

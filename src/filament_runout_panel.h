@@ -9,9 +9,10 @@
 #include <string>
 
 // Watches the filament sensor; on runout during a print it pops a styled dialog
-// (same look as the app's other msgbox dialogs) offering: Load filament (runs
-// the configured load macro), Continue (re-checks the sensor, then RESUME),
-// Cancel (CANCEL_PRINT).
+// (same look as the app's other msgbox dialogs). The first button feeds filament
+// in stoppable chunks and toggles its label Load <-> Stop while feeding; the
+// others are Continue (re-checks the sensor, then RESUME) and Cancel
+// (CANCEL_PRINT).
 class FilamentRunoutPanel : public NotifyConsumer {
  public:
   FilamentRunoutPanel(KWebSocketClient &ws, std::mutex &lock);
@@ -30,7 +31,15 @@ class FilamentRunoutPanel : public NotifyConsumer {
   void close();
   bool printing_or_paused() const;
   bool filament_present() const;     // current sensor reading from State
-  std::string load_macro_gcode() const;
+
+  // Chunked, stoppable filament feed. The stock LOAD_MATERIAL macro feeds 150mm
+  // as one uninterruptible G1 E150 move; instead we feed it in small bounded
+  // chunks driven from each chunk's response, so a second Load tap stops it.
+  void begin_load();
+  void send_load_chunk();
+  void finish_load();
+  void set_mbox_text(const char *txt);
+  void set_load_btn(bool loading);   // relabel the first button Load <-> Stop
 
   KWebSocketClient &ws;
   lv_obj_t *mbox;                    // open runout dialog, or NULL
@@ -38,6 +47,10 @@ class FilamentRunoutPanel : public NotifyConsumer {
   bool baselined;
   std::string fil_key;               // "filament_switch_sensor <name>" or ""
   bool last_detected;
+
+  bool load_active = false;          // chunked feed in progress
+  bool load_stop = false;            // set to halt the feed after the in-flight chunk
+  int load_remaining_mm = 0;
 };
 
 #endif  // __FILAMENT_RUNOUT_PANEL_H__
