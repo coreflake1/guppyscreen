@@ -57,6 +57,11 @@ void FilamentRunoutPanel::close() {
   // callback bail instead of feeding into a closed dialog.
   load_stop = true;
   load_active = false;
+  cancelling = false;
+  if (cancel_timeout != NULL) {
+    lv_timer_del(cancel_timeout);
+    cancel_timeout = NULL;
+  }
   if (mbox != NULL) {
     lv_msgbox_close(mbox);
     mbox = NULL;
@@ -142,6 +147,14 @@ void FilamentRunoutPanel::finish_load() {
 void FilamentRunoutPanel::consume(json &j) {
   std::lock_guard<std::mutex> lock(lv_lock);
 
+  // A Cancel is in flight: as soon as the printer actually leaves printing/
+  // paused, the cancel has taken effect, so tear down the "Cancelling print..."
+  // dialog. (Closing here rather than from the button event also avoids the
+  // sensor re-firing during CANCEL_PRINT and re-popping a just-closed dialog.)
+  if (cancelling && !printing_or_paused()) {
+    close();
+  }
+
   if (!baselined) {
     // discover the sensor + its current reading from full state, fire nothing
     auto ps = State::get_instance()->get_data("/printer_state"_json_pointer);
@@ -188,6 +201,9 @@ void FilamentRunoutPanel::handle_mbox(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED || mbox == NULL) {
     return;
   }
+  if (cancelling) {
+    return;  // cancel already in progress; ignore further taps until it lands
+  }
   uint16_t id = lv_msgbox_get_active_btn(mbox);
   if (id == 0) {            // First button: "Load" when idle, "Stop" while feeding
     if (load_active) {
@@ -211,7 +227,27 @@ void FilamentRunoutPanel::handle_mbox(lv_event_t *e) {
     }
   } else if (id == 2) {     // Cancel print
     load_stop = true;       // CANCEL_PRINT halts motion; stop our feed loop too
+    cancelling = true;
     ws.gcode_script("CANCEL_PRINT");
-    close();
+    // Don't close now: CANCEL_PRINT takes a few seconds and the sensor can
+    // re-fire while it runs, which would immediately re-pop a freshly-closed
+    // dialog. Show progress + lock the buttons; consume() closes it once the
+    // print actually leaves printing/paused.
+    set_mbox_text("Cancelling print...");
+    lv_obj_t *btnm = lv_msgbox_get_btns(mbox);
+    if (btnm != NULL) {
+      lv_obj_add_state(btnm, LV_STATE_DISABLED);
+    }
+    // Fallback: if state never transitions (e.g. CANCEL_PRINT macro error),
+    // force-close after 10s so the dialog can't get stuck up forever. repeat-1
+    // so LVGL deletes the timer itself after it fires.
+    if (cancel_timeout == NULL) {
+      cancel_timeout = lv_timer_create([](lv_timer_t *tm) {
+        auto *self = (FilamentRunoutPanel *)tm->user_data;
+        self->cancel_timeout = NULL;  // LVGL frees this repeat-1 timer post-fire
+        self->close();
+      }, 10000, this);
+      lv_timer_set_repeat_count(cancel_timeout, 1);
+    }
   }
 }

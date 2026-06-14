@@ -51,6 +51,16 @@ class FilamentRunoutPanel : public NotifyConsumer {
   bool load_active = false;          // chunked feed in progress
   bool load_stop = false;            // set to halt the feed after the in-flight chunk
   int load_remaining_mm = 0;
+
+  // Cancel-in-progress: set between the user pressing Cancel (CANCEL_PRINT sent)
+  // and print_stats actually leaving printing/paused. CANCEL_PRINT takes a few
+  // seconds, during which the sensor can throw another runout edge that would
+  // instantly re-pop a freshly-closed dialog. So while cancelling we keep the
+  // dialog up showing "Cancelling print...", lock its buttons, and let consume()
+  // tear it down once the print really ends. cancel_timeout is a fallback that
+  // force-closes if state never transitions (e.g. a CANCEL_PRINT macro error).
+  bool cancelling = false;
+  lv_timer_t *cancel_timeout = NULL;
 };
 
 #endif  // __FILAMENT_RUNOUT_PANEL_H__
