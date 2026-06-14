@@ -1,0 +1,19 @@
+#!/bin/sh
+DIR=/usr/data/h264cam
+killprocs() {
+  for p in $(pidof go2rtc) $(pidof memfd_h264_dump) $(pidof ffmpeg); do kill "$p" 2>/dev/null; done
+}
+case "$1" in
+  start)
+    echo "Starting h264cam (go2rtc)..."
+    $DIR/go2rtc -config $DIR/go2rtc.yaml >$DIR/go2rtc.log 2>&1 &
+    ;;
+  stop)
+    echo "Stopping h264cam..."
+    killprocs
+    ;;
+  restart)
+    killprocs; sleep 2; $0 start
+    ;;
+  *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
+esac

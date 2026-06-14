@@ -1,0 +1,11 @@
+log:
+  level: info
+api:
+  listen: ":1984"
+  origin: "*"
+rtsp:
+  listen: ":8554"
+webrtc:
+  listen: ":8555"
+streams:
+  nebula: exec:/usr/data/h264cam/h264cam.sh {output}

@@ -21,6 +21,7 @@ power-loss recovery.
 - **[TMC Autotune](TMC-Autotune.md)** — quieter, cooler steppers; enabling the greyed-out button
 - **[Layer shift after pause/resume](Pause-Park-Layer-Shift-Fix.md)** — the one-line `y_park` fix for the stock KE pause crash
 - **[Camera image tuning](Camera-Image-Tuning.md)** — improve the Nebula image and make the settings persist across reboots
+- **[Hardware H.264 camera stream](Camera-H264-Stream.md)** — add a low-bandwidth WebRTC/RTSP feed (the hardware H.264) alongside the stock MJPEG
 - **[Troubleshooting](Troubleshooting.md)** — common problems and fixes
 
 **For developers**

@@ -9,6 +9,7 @@
 - [TMC Autotune (quieter steppers)](TMC-Autotune.md)
 - [Layer shift after pause/resume](Pause-Park-Layer-Shift-Fix.md)
 - [Camera image tuning (save settings)](Camera-Image-Tuning.md)
+- [Hardware H.264 camera stream](Camera-H264-Stream.md)
 - [Troubleshooting](Troubleshooting.md)
 
 **For developers**
