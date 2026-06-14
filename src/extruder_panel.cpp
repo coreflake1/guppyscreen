@@ -509,6 +509,16 @@ void ExtruderPanel::on_action_response() {
   action_in_flight = false;
   cancel_safety_timer();
   refresh_button_state();
+  maybe_auto_cooldown();  // extrude/retract/unload finished -> drop the heater
+}
+
+void ExtruderPanel::maybe_auto_cooldown() {
+  if (!auto_cool_after) {
+    return;
+  }
+  auto_cool_after = false;  // clear first so the cooldown action can't re-trigger
+  action_name = "Cooldown";
+  send_action(cooldown_macro);
 }
 
 void ExtruderPanel::clear_pending() {
@@ -548,7 +558,7 @@ void ExtruderPanel::send_load_chunk() {
     return;
   }
   if (load_stop || load_remaining_mm <= 0) {
-    finish_load();
+    finish_load(!load_stop);  // natural completion only when not stopped
     return;
   }
   int chunk = std::min(LOAD_CHUNK_MM, load_remaining_mm);
@@ -566,17 +576,23 @@ void ExtruderPanel::send_load_chunk() {
     });
 }
 
-void ExtruderPanel::finish_load() {
+void ExtruderPanel::finish_load(bool natural) {
   load_active = false;
   load_stop = false;
   load_remaining_mm = 0;
   cancel_safety_timer();
   refresh_button_state();
+  if (natural) {
+    maybe_auto_cooldown();  // load fed to completion -> drop the heater
+  }
 }
 
 void ExtruderPanel::run_when_hot(PendingKind kind, const std::string &name,
                                  const std::string &gcode) {
   action_name = name;
+  // Extrude/retract/load/unload all heat the hotend just for the action; cool it
+  // back down once the action completes (on_action_response / finish_load).
+  auto_cool_after = true;
   int want = effective_temp();
 
   // Non-blocking heat request. Avoids the M109 hang from #65 — we watch the
@@ -650,6 +666,8 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
       if (action_in_flight) {
         return;
       }
+      // Manual cooldown: this IS the cooldown, so don't let it auto-chain another.
+      auto_cool_after = false;
       if (load_active) {
         // Stop the load: send_load_chunk() won't queue another chunk, and we
         // drop the heater now. finish_load() runs from the in-flight chunk's

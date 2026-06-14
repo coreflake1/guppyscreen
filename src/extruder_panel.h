@@ -95,6 +95,13 @@ class ExtruderPanel : public NotifyConsumer {
   // (Moonraker only replies when the script has finished executing).
   bool action_in_flight = false;
 
+  // Auto-cooldown: an extrude/retract/load/unload heats the hotend just for that
+  // action, so once it finishes we drop the heater back to 0 instead of leaving
+  // it hot (and oozing). Set true by run_when_hot() for all four actions, cleared
+  // when the cooldown is fired or the manual Cooldown button is used (so cooldown
+  // never chains into another cooldown).
+  bool auto_cool_after = false;
+
   // Chunked, stoppable filament load. Instead of delegating to the stock
   // LOAD_MATERIAL macro (one uninterruptible G1 E150 move that can't be
   // cancelled once queued), guppyscreen feeds the filament in small bounded
@@ -121,6 +128,10 @@ class ExtruderPanel : public NotifyConsumer {
 
   void send_action(const std::string &gcode);
   void on_action_response();
+  // If auto_cool_after is set, drop the heater to 0 now (used after an
+  // extrude/retract/load/unload completes). Clears the flag first so the
+  // cooldown action it sends can't re-trigger itself.
+  void maybe_auto_cooldown();
   // Heat to effective_temp() if needed, then run gcode; if the hotend is cold,
   // queue it and fire from consume() once we reach temperature.
   void run_when_hot(PendingKind kind, const std::string &name, const std::string &gcode);
@@ -130,7 +141,9 @@ class ExtruderPanel : public NotifyConsumer {
   // own gcode_script, stopping between chunks if load_stop is set.
   void begin_load();
   void send_load_chunk();
-  void finish_load();
+  // natural=true means the feed ran to completion (vs stopped via Cooldown/Back
+  // or a timeout); only then do we auto-cooldown.
+  void finish_load(bool natural = false);
   void refresh_button_state();
   void update_busy_caption();
   void arm_safety_timer(uint32_t ms);
