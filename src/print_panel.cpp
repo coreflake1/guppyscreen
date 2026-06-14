@@ -169,10 +169,10 @@ PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatu
   lv_obj_set_size(filament_box, LV_PCT(80), LV_PCT(74));
   lv_obj_align(filament_box, LV_ALIGN_CENTER, 0, 0);
 
-  // header
-  label = lv_label_create(filament_box);
-  lv_label_set_text(label, "Use the same filament?");
-  KUtils::style_dialog_title(label);
+  // header (text swapped per spool state in show_filament_dialog)
+  filament_title_label = lv_label_create(filament_box);
+  lv_label_set_text(filament_title_label, "Use the same filament?");
+  KUtils::style_dialog_title(filament_title_label);
 
   // content block: a centered group of rows, centered in the box
   lv_obj_remove_style_all(filament_content_cont);
@@ -487,11 +487,13 @@ void PrintPanel::show_filament_dialog() {
   json spool = sm.get_active_spool();
 
   if (spool.is_null()) {
+    lv_label_set_text(filament_title_label, "No spool selected - print anyway?");
     lv_obj_add_flag(filament_swatch, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(filament_name_label, "None selected");
+    lv_label_set_text(filament_name_label, "");
     lv_label_set_text(filament_detail_label, "");
     lv_label_set_text(filament_enough_label, "");
   } else {
+    lv_label_set_text(filament_title_label, "Use the same filament?");
     // name: "Vendor - Name"
     auto vendor_json = spool["/filament/vendor/name"_json_pointer];
     auto vendor = !vendor_json.is_null() ? vendor_json.template get<std::string>() : "";

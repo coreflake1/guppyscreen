@@ -87,6 +87,7 @@ private:
   lv_obj_t *filament_box;
   lv_obj_t *filament_content_cont;
   lv_obj_t *filament_row_cont;
+  lv_obj_t *filament_title_label = NULL;
   lv_obj_t *filament_swatch;
   lv_obj_t *filament_name_label;
   lv_obj_t *filament_detail_label;

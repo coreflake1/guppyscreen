@@ -199,6 +199,8 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
       }
     }
   }
+
+  build_filament_dialog();
 }
 
 ExtruderPanel::~ExtruderPanel() {
@@ -206,6 +208,10 @@ ExtruderPanel::~ExtruderPanel() {
   if (panel_cont != NULL) {
     lv_obj_del(panel_cont);
     panel_cont = NULL;
+  }
+  if (fil_cont != NULL) {
+    lv_obj_del(fil_cont);
+    fil_cont = NULL;
   }
 }
 
@@ -215,6 +221,134 @@ void ExtruderPanel::foreground() {
 
 void ExtruderPanel::enable_spoolman() {
   spoolman_btn.enable();
+  spoolman_enabled = true;
+}
+
+void ExtruderPanel::build_filament_dialog() {
+  fil_cont = lv_obj_create(lv_scr_act());
+  fil_box = lv_obj_create(fil_cont);
+  fil_content_cont = lv_obj_create(fil_box);
+  fil_row_cont = lv_obj_create(fil_content_cont);
+  fil_swatch = lv_obj_create(fil_row_cont);
+  fil_name_label = lv_label_create(fil_row_cont);
+  fil_detail_label = lv_label_create(fil_content_cont);
+  fil_yes_btn = lv_btn_create(fil_box);
+  fil_no_btn = lv_btn_create(fil_box);
+
+  KUtils::style_dialog_overlay(fil_cont);
+  lv_obj_add_flag(fil_cont, LV_OBJ_FLAG_HIDDEN);
+
+  KUtils::style_dialog_box(fil_box);
+  lv_obj_set_size(fil_box, LV_PCT(80), LV_PCT(62));
+  lv_obj_align(fil_box, LV_ALIGN_CENTER, 0, 0);
+
+  // header (text swapped per spool state in show_load_filament_dialog)
+  fil_title_label = lv_label_create(fil_box);
+  lv_label_set_text(fil_title_label, "Use this filament?");
+  KUtils::style_dialog_title(fil_title_label);
+
+  lv_obj_remove_style_all(fil_content_cont);
+  lv_obj_set_width(fil_content_cont, LV_PCT(100));
+  lv_obj_set_height(fil_content_cont, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(fil_content_cont, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(fil_content_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_row(fil_content_cont, 7, 0);
+  lv_obj_clear_flag(fil_content_cont, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_align(fil_content_cont, LV_ALIGN_CENTER, 0, 2);
+
+  lv_obj_remove_style_all(fil_row_cont);
+  lv_obj_set_width(fil_row_cont, LV_SIZE_CONTENT);
+  lv_obj_set_height(fil_row_cont, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(fil_row_cont, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(fil_row_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_column(fil_row_cont, 8, 0);
+  lv_obj_clear_flag(fil_row_cont, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_set_size(fil_swatch, 20, 20);
+  lv_obj_set_style_border_width(fil_swatch, 1, 0);
+  lv_obj_set_style_border_color(fil_swatch, lv_color_white(), 0);
+  lv_obj_set_style_radius(fil_swatch, 4, 0);
+  lv_obj_clear_flag(fil_swatch, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_label_set_long_mode(fil_name_label, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_max_width(fil_name_label, 280, 0);
+  lv_obj_set_style_text_font(fil_name_label, &lv_font_montserrat_14, 0);
+  lv_label_set_text(fil_name_label, "");
+
+  lv_obj_set_style_text_align(fil_detail_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(fil_detail_label, "");
+
+  lv_obj_set_size(fil_yes_btn, 96, LV_SIZE_CONTENT);
+  lv_obj_add_event_cb(fil_yes_btn, &ExtruderPanel::_handle_filament_btns, LV_EVENT_CLICKED, this);
+  lv_obj_align(fil_yes_btn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+  lv_obj_t *yl = lv_label_create(fil_yes_btn);
+  lv_label_set_text(yl, "Yes");
+  lv_obj_center(yl);
+
+  lv_obj_set_size(fil_no_btn, 96, LV_SIZE_CONTENT);
+  lv_obj_add_event_cb(fil_no_btn, &ExtruderPanel::_handle_filament_btns, LV_EVENT_CLICKED, this);
+  lv_obj_align(fil_no_btn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
+  lv_obj_t *nl = lv_label_create(fil_no_btn);
+  lv_label_set_text(nl, "No");
+  lv_obj_center(nl);
+}
+
+void ExtruderPanel::show_load_filament_dialog() {
+  json spool = spoolman_panel.get_active_spool();
+  if (spool.is_null()) {
+    lv_label_set_text(fil_title_label, "No spool selected - load anyway?");
+    lv_obj_add_flag(fil_swatch, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(fil_name_label, "");
+    lv_label_set_text(fil_detail_label, "");
+  } else {
+    lv_label_set_text(fil_title_label, "Use this filament?");
+    auto vendor_json = spool["/filament/vendor/name"_json_pointer];
+    auto vendor = !vendor_json.is_null() ? vendor_json.template get<std::string>() : "";
+    auto name_json = spool["/filament/name"_json_pointer];
+    auto name = !name_json.is_null() ? name_json.template get<std::string>() : "";
+    lv_label_set_text(fil_name_label, fmt::format("{} - {}", vendor, name).c_str());
+
+    auto color_json = spool["/filament/color_hex"_json_pointer];
+    if (!color_json.is_null()) {
+      uint32_t rgb = static_cast<uint32_t>(strtol(color_json.template get<std::string>().c_str(), NULL, 16));
+      lv_obj_set_style_bg_color(fil_swatch, lv_color_hex(rgb), 0);
+      lv_obj_clear_flag(fil_swatch, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_add_flag(fil_swatch, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    auto material_json = spool["/filament/material"_json_pointer];
+    auto material = !material_json.is_null() ? material_json.template get<std::string>() : "?";
+    auto remaining_json = spool["/remaining_weight"_json_pointer];
+    if (!remaining_json.is_null()) {
+      lv_label_set_text(fil_detail_label,
+        fmt::format("{}, {:.0f} g left", material, remaining_json.template get<double>()).c_str());
+    } else {
+      lv_label_set_text(fil_detail_label, material.c_str());
+    }
+  }
+  lv_obj_clear_flag(fil_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(fil_cont);
+}
+
+void ExtruderPanel::handle_filament_btns(lv_event_t *event) {
+  if (lv_event_get_code(event) != LV_EVENT_CLICKED) {
+    return;
+  }
+  lv_obj_t *btn = lv_event_get_current_target(event);
+
+  // dismiss the dialog regardless of choice
+  lv_obj_move_background(fil_cont);
+  lv_obj_add_flag(fil_cont, LV_OBJ_FLAG_HIDDEN);
+
+  if (btn == fil_yes_btn) {
+    run_when_hot(PA_LOAD, "Load", "");
+  } else if (btn == fil_no_btn) {
+    // open Spoolman to pick/fix the active spool; re-show this confirm once a
+    // spool is chosen so the user re-confirms before the load starts.
+    spoolman_panel.request_select_for_print([this]() { this->show_load_filament_dialog(); });
+    spoolman_panel.foreground();
+  }
 }
 
 void ExtruderPanel::consume(json &j) {
@@ -566,12 +700,16 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
     }
 
     if (btn == load_btn.get_container()) {
-      // Heat to the selected temp, then feed in bounded chunks we can stop
-      // (run_when_hot -> begin_load) rather than firing the configured load
-      // macro. The stock LOAD_MATERIAL is a single G1 E150 F180 move that can't
-      // be interrupted once queued — the source of the "never stops" report —
-      // so the macro is intentionally bypassed here for a stoppable load.
-      run_when_hot(PA_LOAD, "Load", "");
+      // Loading deducts from the active Spoolman spool (Moonraker tracks raw
+      // E-axis movement, not just prints), so confirm the spool first when
+      // Spoolman is configured. Yes -> load, No -> open the Spoolman panel.
+      // The load itself heats then feeds in bounded, stoppable chunks
+      // (run_when_hot -> begin_load), bypassing the uninterruptible stock macro.
+      if (spoolman_enabled) {
+        show_load_filament_dialog();
+      } else {
+        run_when_hot(PA_LOAD, "Load", "");
+      }
       return;
     }
   }

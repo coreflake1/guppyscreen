@@ -31,6 +31,12 @@ class ExtruderPanel : public NotifyConsumer {
     panel->handle_callback(event);
   };
 
+  void handle_filament_btns(lv_event_t *event);
+  static void _handle_filament_btns(lv_event_t *event) {
+    ExtruderPanel *panel = (ExtruderPanel*)event->user_data;
+    panel->handle_filament_btns(event);
+  };
+
  private:
   KWebSocketClient &ws;
   lv_obj_t *panel_cont;
@@ -51,6 +57,24 @@ class ExtruderPanel : public NotifyConsumer {
   std::string load_filament_macro;
   std::string unload_filament_macro;
   std::string cooldown_macro;
+
+  // Spoolman "Use this filament?" confirm before a Load (mirrors the print
+  // dialog). Only shown when Spoolman is configured; if a spool is selected it
+  // shows the swatch/name, otherwise it warns there's none. Yes -> load,
+  // No -> open the Spoolman panel to pick/fix the spool.
+  bool spoolman_enabled = false;
+  lv_obj_t *fil_cont = NULL;
+  lv_obj_t *fil_box = NULL;
+  lv_obj_t *fil_content_cont = NULL;
+  lv_obj_t *fil_row_cont = NULL;
+  lv_obj_t *fil_title_label = NULL;
+  lv_obj_t *fil_swatch = NULL;
+  lv_obj_t *fil_name_label = NULL;
+  lv_obj_t *fil_detail_label = NULL;
+  lv_obj_t *fil_yes_btn = NULL;
+  lv_obj_t *fil_no_btn = NULL;
+  void build_filament_dialog();
+  void show_load_filament_dialog();
 
   // Live extruder telemetry, updated from consume().
   int current_temp = 0;
