@@ -1,20 +1,8 @@
-# OpenKE — Perfect prints on the Ender-3 V3 KE
+# OpenKE — perfect prints on the Ender-3 V3 KE
 
-**OpenKE** is an open-source toolkit for getting *perfect prints* out of the **Creality Ender-3 V3 KE**.
-It pulls three things most people otherwise hunt down separately into one place:
-
-- 🖥️ **A fast touch UI** that replaces the stock screen — full print control, an interactive 3D bed
-  mesh, and an on-screen calibration suite. It runs directly on the printer's display (no X11, Wayland,
-  or display server) on top of [Klipper](https://www.klipper3d.org/) and
-  [Moonraker](https://github.com/Arksine/moonraker). This UI is a KE-focused fork of
-  [GuppyScreen](https://github.com/ballaswag/guppyscreen).
-- 🔧 **The Klipper mods that actually improve prints** — adaptive bed mesh + purge (KAMP), Axis Twist
-  Compensation, TMC Autotune, skew correction — gathered and documented for the KE in one project
-  instead of scattered across a dozen other repos.
-- 📚 **Plain-English guides** that explain *how to dial the printer in*, not just which button does what.
-
-> **Naming:** the project is being rebranded **GuppyKE → OpenKE**. The current published release is
-> **`v0.5.5-GuppyKE`**; the OpenKE name lands with the next release.
+**OpenKE turns a stock Creality Ender-3 V3 KE into a properly dialed-in Klipper printer** — a fast
+touchscreen UI, the print-quality mods that actually matter, and plain-English guides, all set up by one
+installer.
 
 <p align="center">
   <a href="https://github.com/coreflake1/guppyscreen/releases"><img alt="Release" src="https://img.shields.io/github/v/release/coreflake1/guppyscreen?style=flat-square&include_prereleases"></a>
@@ -22,74 +10,64 @@ It pulls three things most people otherwise hunt down separately into one place:
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/github/license/coreflake1/guppyscreen?style=flat-square"></a>
 </p>
 
----
+It bundles three things people usually hunt down separately:
+
+- 🖥️ **A fast touch UI** — replaces the stock screen with full print control, an interactive 3D bed
+  mesh, and an on-screen calibration suite. Runs right on the printer's display (no X11, Wayland, or
+  display server) on top of [Klipper](https://www.klipper3d.org/) and
+  [Moonraker](https://github.com/Arksine/moonraker). The UI is a KE-focused fork of
+  [GuppyScreen](https://github.com/ballaswag/guppyscreen).
+- 🔧 **The Klipper mods that actually improve prints** — adaptive meshing + purge (KAMP), Axis Twist
+  Compensation, TMC Autotune, skew correction, and more — vendored in and set up by the installer, not
+  scattered across a dozen repos.
+- 📚 **Plain-English guides** — how to *dial the printer in*, not just which button does what.
 
 ## Features
 
-- 🖨️ **Print control & status** — temperatures, fans, LED, movement, homing
-- 🟦 **Interactive 3D bed mesh** — colour height map you can rotate, zoom, and pan (plus a table view)
-- 🎯 **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset baby-stepping
-- 📈 **Input shaper & belt calibration** with PSD graphs
-- 🎚️ **Fine tune mid-print** — speed, flow, Z-offset, pressure advance
-- 📂 File browser (with USB thumb-drive support), macro/console shell, Spoolman, TMC metrics
-- 🔒 **Print-state safety locks** — panels that could ruin a running job are blocked or confirmed mid-print
-- 📐 Tuned **480×272 layout** with the screen mounted the right way up
+- 🖨️ **Print control & status** — temps, fans, LED, movement/homing, file browser (incl. USB sticks), Spoolman
+- 🟦 **Interactive 3D bed mesh** — rotate / zoom / pan colour height map (plus a table view)
+- 🎯 **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset baby-stepping, input-shaper & belt graphs
+- 🎚️ **Fine-tune mid-print** — speed, flow, Z-offset, pressure advance, firmware retraction
+- 📷 **Camera** — persistent image tuning, plus an optional low-bandwidth hardware **H.264** stream
+- 🔌 **Power-loss recovery**, **WiFi low-latency** toggle, on-screen notifications
+- 🔒 **Print-state safety locks** — anything that could ruin a running job is blocked or asks first
+- 📐 Tuned **480×272** layout, with the screen mounted the right way up
 
-## What OpenKE adds (on top of upstream GuppyScreen)
+> Full screen tour: **[Using OpenKE](wiki/Using-GuppyKE.md)** · complete change history: **[CHANGELOG](CHANGELOG.md)**
 
-The touch UI is built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
-[probielodan/guppyscreen](https://github.com/probielodan/guppyscreen), with the 3D bed mesh from
-[prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). On top of those, OpenKE adds:
+## Install
 
-**New panels & tools**
-- **Skew Correction** *(new in v0.5)* — square up functional parts from the screen. Print a flat calibration square
-  (sliced with your own profile), measure three lengths with calipers, type them into **Tune → Skew**, and it
-  applies `SET_SKEW` + saves. See the
-  [Skew Correction guide](wiki/Skew-Correction.md).
-- **TMC Autotune** *(new in v0.5)* — on-screen stepper-driver autotuning (quieter, cooler, smoother). Pick each
-  motor and a tuning goal in **Tune → TMC Autotune**; it computes optimal driver registers from the motor's
-  specs on every boot. Recommended on the KE: **X/Y = performance, Z = silent** (or `auto`, which picks the
-  same). The button is greyed out until a small Klipper add-on is installed — see the
-  [TMC Autotune guide](wiki/TMC-Autotune.md).
-- **TMC Metrics fixed for TMC2208** *(new in v0.5)* — the live driver dashboard previously crashed Klipper on the
-  KE's 2208 drivers; it's now guarded (and the CoolStep adjusters that don't exist on a 2208 are hidden).
-- **Axis Twist Compensation wizard** *(new in v0.4)* — a guided, on-screen calibration (Tune tab) that fixes
-  the classic "first layer fine in the middle, squished on one side, lifting on the other" left-to-right
-  error that bed mesh alone can't. Walks you through the 5-point paper test and saves the result.
-- **Live Z-Offset baby-stepping** — dedicated panel (Tune tab, or tap the Z-offset metric mid-print) with
-  **0.001** / 0.005 / 0.01 / 0.025 / 0.05 mm steps, Raise/Lower, Reset. Adjustments save automatically (see
-  setup below), and are blocked with a "Home first" prompt when the printer isn't homed.
-- **Firmware Retraction** live-tuning panel — edit retract length/speed and extra unretract on the fly, with
-  clear toasts when `[firmware_retraction]` isn't configured.
-- **Tap-to-exclude object map** — cancel a single failed object by tapping it on a live bed map during a print.
-- **Console** redesigned as a drill-down command browser (history, favourites, quick-filter groups).
-- **Macros** redesigned — favourites, collapsible rows, button navigation; jumps to the console when a macro runs.
-- **Power Settings** (renamed from Power Devices) with **Power Loss Recovery** — after a mid-print power
-  outage, resume the interrupted print from where it stopped (uses the printer's saved breakpoint).
+> ⚠️ **Back up your printer config first.** The installer changes init scripts, `printer.cfg`, and some
+> Klipper extras. It keeps backups in `/usr/data/guppyify-backup/`, but keep your own too.
 
-**Improved UX**
-- **WiFi Low Latency toggle** *(expanded in v0.5.5; was the v0.4 "power-saving" toggle)* — one tap in the
-  WiFi panel for noticeably lower, steadier latency (snappier Mainsail/Fluidd and screen response). It drives
-  a whole bundle on the KE's Broadcom combo chip: WiFi power-save off (`PM 0`), radio kept awake (`mpc 0`),
-  background roam-scans off (`roam_off 1`), **and Bluetooth stopped** — because WiFi and BT share one 2.4 GHz
-  radio/antenna, so an idle BT stack still injects latency spikes into WiFi. The choice persists and
-  re-applies across reboots and reconnects; turning it off restores stock behaviour (and restarts Bluetooth).
-- **On-screen notifications** — Klipper events surface as toasts, with separate modals and a dedicated
-  print-done screen.
-- **Fans** — friendly names, read-only fans (heater_fan / output-pin fans) shown, correct editable/read-only split.
-- **Print status / home** — bigger preview-led print overlay, a compact mini-overlay on the home screen, and a
-  "Paused" chip; ETA now matches Mainsail by averaging the file/filament/slicer estimates.
-- **Mid-print safety** — view the bed mesh during a print (mutating actions blocked); Homing/Extrude allowed
-  while paused with the overlay hidden.
-- **Adaptive bed mesh rendering** — the table and 3D views now render correctly for KAMP adaptive meshes and
-  denser grids (true bed position/aspect, bed outline, fill-to-canvas), not just the stock 5×5.
-- **Extruder** — filament actions heat to the selected temperature first, with clearer labels and feedback.
-- **Spoolman** — confirm the active filament at print start.
+SSH into your printer and run:
 
-**Under the hood**
-- Smoother scrolling on the KE's resistive **ns2009** touch panel (EMA-smoothed input).
-- Thread-safe `State` access, tightened LVGL cadence, and an evdev tracking-id fix.
-- A self-hosted MIPS cross-build toolchain and CI that publishes KE release tarballs.
+```sh
+sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/main/scripts/installer.sh)"
+```
+
+> Use `installer.sh` — **not** `installer-deb.sh` (that one is for aarch64/Debian and refuses to run on the KE).
+
+**It also offers the print-quality extras** (install all / skip all / choose each): KAMP, Axis Twist
+Compensation, TMC Autotune, Skew Correction, the Creality Nebula camera (image tuning + H.264 stream), the
+Pause/Resume layer-shift fix, and the Creality macros (M600, Save Z-Offset, useful macros, Exclude Object).
+Already set some up by hand or via the **Creality Helper Script**? It detects and **skips** those — safe to
+run on an existing setup, and it **never rewrites your saved calibrations**.
+
+**Updating:** from the screen, **Settings → Update Guppy**. Coming from an older version (or "GuppyKE")?
+See **[Upgrading](wiki/Upgrading.md)**.
+
+**Uninstall:** re-run the command above with `uninstall` appended. Details: **[Installation](wiki/Installation.md)**.
+
+## Compatibility
+
+| | |
+|---|---|
+| **Printer** | Creality Ender-3 V3 KE |
+| **SoC / arch** | Ingenic XBurst2 X2000 — **MIPS (mipsel)**, *not* aarch64 |
+| **Display** | 480×272 |
+
+Built and verified for the **Ender-3 V3 KE**. Other boards/screens can be built from source but aren't the focus.
 
 ## Screenshots
 
@@ -103,118 +81,31 @@ The touch UI is built on [ballaswag/guppyscreen](https://github.com/ballaswag/gu
 | ![Firmware Retraction](docs/screenshots/firmware-retraction.png) | ![Tune menu](docs/screenshots/tune-menu.png) |
 | **Fans** | **Extruder** |
 | ![Fans](docs/screenshots/fans.png) | ![Extruder heating](docs/screenshots/extruder.png) |
-| **Print complete** | **Notifications & homing prompt** |
-| ![Print complete](docs/screenshots/print-complete.png) | ![Notifications and homing prompt](docs/screenshots/notifications.png) |
-
-## Compatibility
-
-| | |
-|---|---|
-| **Printer** | Creality Ender-3 V3 KE |
-| **SoC / arch** | Ingenic XBurst2 X2000 — **MIPS (mipsel)**, *not* aarch64 |
-| **Display** | 480×272 |
-
-> This fork is built and verified for the **Ender-3 V3 KE**. Other boards/screens can be built from
-> source but are not the focus here.
-
-## Install
-
-> ⚠️ **Back up your printer config first.** The installer changes init scripts, `printer.cfg`, and some
-> Klipper extras (it keeps backups in `/usr/data/guppyify-backup/`, but keep your own too).
-
-SSH into your printer and run:
-
-```sh
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/main/scripts/installer.sh)"
-```
-
-> Use `installer.sh` — **not** `installer-deb.sh` (that one is for aarch64/Debian and will refuse to
-> run on the KE).
-
-### Updating
-
-From **v0.3.0 onward**, update in place from the screen: **Settings → Update Guppy** (it pulls the
-latest release and restarts).
-
-> **Upgrading from v0.2.0 (one-time):** the v0.2.0 in-app updater points at the wrong repository and
-> can't fetch GuppyKE releases, so the **Update Guppy** button won't work on 0.2.0. Just re-run the
-> install command above once — it pulls the latest release, replaces the updater with the fixed one,
-> and **keeps your printer config**. After that, the on-screen Update button works for every future
-> release.
-
-### Uninstall
-
-```sh
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/main/scripts/installer.sh)" uninstall
-```
-
-Full details (exactly what changes, what is/isn't restored): **[Installation](wiki/Installation.md)**.
-
-## Required printer setup (Klipper & Creality Helper Script)
-
-OpenKE drives features that depend on Klipper/Moonraker config. Most KE setups install these through the
-**[Creality Helper Script](https://github.com/Guilouz/Creality-Helper-Script)** — see its
-**[Wiki](https://guilouz.github.io/Creality-Helper-Script-Wiki/)**. The screen still runs without them; the
-related panels just show an empty/disabled state.
-
-> 🚧 **Changing soon:** OpenKE is vendoring the key Klipper mods (KAMP, Axis Twist Compensation, TMC
-> Autotune) into this repo and teaching the installer to set them up, so most of this manual setup goes
-> away from the next release. See the [changelog](CHANGELOG.md).
-
-**Mandatory for the matching feature**
-
-| Feature in OpenKE | What it needs | Where |
-|---|---|---|
-| **Z-Offset saved between reboots** | Helper Script → **Save Z-Offset Macros** (overrides `SET_GCODE_OFFSET` to mirror every change into `variables.cfg`). Without it the panel still adjusts live, but the value is **not** persisted. | [Save Z-Offset Macros](https://guilouz.github.io/Creality-Helper-Script-Wiki/helper-script/save-z-offset-macros/) |
-| **Firmware Retraction panel** | A `[firmware_retraction]` section in `printer.cfg` (added manually — it is not a Helper Script toggle). | [Klipper docs](https://www.klipper3d.org/Config_Reference.html#firmware_retraction) |
-| **Tap-to-exclude object map** | `[exclude_object]` in Klipper **and** `enable_object_processing: True` in `moonraker.conf` (both come with the Helper Script's updated Moonraker). | [Moonraker (updated)](https://guilouz.github.io/Creality-Helper-Script-Wiki/helper-script/moonraker-ender3/) |
-
-**Recommended for the full experience**
-
-| Adds | Helper Script option |
-|---|---|
-| Filament-change / `M600` support (used by the console + filament actions) | [M600 Support](https://guilouz.github.io/Creality-Helper-Script-Wiki/helper-script/m600-support/) |
-| A library of macros for the Macros panel | [Useful Macros](https://guilouz.github.io/Creality-Helper-Script-Wiki/helper-script/useful-macros/) |
-| Better input-shaper calibration graphs | [Improved Shapers Calibrations](https://guilouz.github.io/Creality-Helper-Script-Wiki/helper-script/improved-shapers-calibrations/) |
-| Manual bed-tramming helper | [Screws Tilt Adjust Support](https://guilouz.github.io/Creality-Helper-Script-Wiki/helper-script/screws-tilt-adjust-support/) |
 
 ## Documentation
 
-Everything beyond installing lives in the **[`wiki/`](wiki/Home.md)** docs folder (browsable right here in
-the repo):
+Start at the **[wiki](wiki/Home.md)**. Highlights:
 
-- [Using GuppyKE](wiki/Using-GuppyKE.md) — a plain-English tour of the screen and every tool
-- [Installation](wiki/Installation.md) — install/uninstall and what it changes
-- [Configuration](wiki/Configuration.md) — `guppyconfig.json` and build options
-- [KAMP & Axis Twist Compensation](wiki/KAMP-and-Axis-Twist-Compensation.md) — first-layer mods for the KE (reinstall guide; survives firmware flashes)
-- [Skew Correction](wiki/Skew-Correction.md) — square up functional parts from the screen
-- [TMC Autotune](wiki/TMC-Autotune.md) — quieter, cooler steppers; enabling the greyed-out button (reinstall guide)
-- [Layer shift after pause/resume](wiki/Pause-Park-Layer-Shift-Fix.md) — the one-line `y_park` fix for the stock KE pause crash
-- [Camera image tuning](wiki/Camera-Image-Tuning.md) — improve the Nebula image and persist the settings across reboots
-- [Hardware H.264 camera stream](wiki/Camera-H264-Stream.md) — low-bandwidth WebRTC/RTSP feed alongside the stock MJPEG
-- [Building from Source](wiki/Building-from-Source.md) — submodules, simulator, MIPS cross-build
-- [Development & Simulator](wiki/Development-and-Simulator.md) — local dev workflow
-- [Architecture](wiki/Architecture.md) — how it's put together
-- [Troubleshooting](wiki/Troubleshooting.md) · [Known Issues](wiki/Known-Issues.md) · [Contributing](wiki/Contributing.md)
+- [Perfect prints — start here](wiki/Perfect-Prints.md) and the [calibration walkthrough](wiki/Calibration-Explained.md)
+- [Installation](wiki/Installation.md) · [Upgrading from an older version](wiki/Upgrading.md)
+- [Perfect first layer (KAMP + Axis Twist)](wiki/KAMP-and-Axis-Twist-Compensation.md) · [Skew Correction](wiki/Skew-Correction.md) · [TMC Autotune](wiki/TMC-Autotune.md)
+- [Camera tuning](wiki/Camera-Image-Tuning.md) · [H.264 stream](wiki/Camera-H264-Stream.md) · [Layer-shift fix](wiki/Pause-Park-Layer-Shift-Fix.md)
+- [Troubleshooting](wiki/Troubleshooting.md) · developer docs: [Building from Source](wiki/Building-from-Source.md), [Architecture](wiki/Architecture.md)
 
-## Build it yourself (quick start)
+## Build from source
 
 ```bash
 git clone --recurse-submodules https://github.com/coreflake1/guppyscreen.git
-cd guppyscreen
 ```
 
-- **Desktop simulator** (try the UI without a printer) and **MIPS build for the KE** are both covered in
-  [Building from Source](wiki/Building-from-Source.md).
-- The MIPS cross-build runs in a toolchain container. This repo ships its own
-  [`docker/Dockerfile`](docker/Dockerfile), published as `ghcr.io/coreflake1/guppydev` — see
-  [Building from Source](wiki/Building-from-Source.md).
+The desktop simulator (try the UI with no printer) and the MIPS cross-build for the KE are both covered in
+**[Building from Source](wiki/Building-from-Source.md)**. The cross-build runs in this repo's toolchain
+container (`docker/Dockerfile`, published as `ghcr.io/coreflake1/guppydev`).
 
 ## License & credits
 
-Licensed under **GPL-3.0** — see [LICENSE](./LICENSE).
-
-Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
+**GPL-3.0** — see [LICENSE](./LICENSE). The touch UI builds on
+[ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 [probielodan/guppyscreen](https://github.com/probielodan/guppyscreen), with the 3D bed mesh from
-[prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). Full credits in
-[Contributing](wiki/Contributing.md).
+[prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). Vendored Klipper mods keep their
+own upstream licenses and credits — see [Contributing](wiki/Contributing.md). *(Formerly "GuppyKE".)*

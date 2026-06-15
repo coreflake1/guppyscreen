@@ -93,10 +93,11 @@ What's on offer:
 **Coexists with the Creality Helper Script.** If you already set any of these up — by hand or via the
 Helper Script — the installer **detects it and leaves your version alone**: it skips adding a config
 section you already have (no duplicate-section crash), and it backs up any Klipper-extras module it
-overwrites (e.g. an existing TMC Autotune) to `/usr/data/guppyify-backup/` first. Macros OpenKE *relies
-on* but doesn't ship — `M600`/filament, Save-Z-Offset, useful macros, `[exclude_object]` — are left
-entirely to the Helper Script; OpenKE just uses them if present and shows an empty/disabled panel if not.
-So it's safe to run on top of an existing Helper-Script setup.
+overwrites (e.g. an existing TMC Autotune) to `/usr/data/guppyify-backup/` first. The everyday macros —
+`M600`/filament, Save Z-Offset, useful macros, `[exclude_object]` — are now **shipped by OpenKE** (the
+**Creality macros** option), so a fresh printer gets them; on a printer that already has them (e.g. an
+existing Helper-Script setup) those are skipped instead. Either way it's safe to run on top of an
+existing setup.
 
 ## What the installer changes
 
