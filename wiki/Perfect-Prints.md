@@ -43,7 +43,7 @@ and clean**. The KE has an onboard accelerometer, so you can measure and apply i
 the screen's input-shaper tool. Your config may already hold shaper values (from a previous calibration —
 check **Tune → Input Shaper**, or look for `[input_shaper]` in your config), but running the calibration
 yourself dials it in for *your* machine. Redo it whenever you change an axis's moving hardware — see
-[Calibration, explained](Calibration-Explained).
+[After a hardware change](Calibration-Explained#after-a-hardware-change).
 
 ### 5. Pressure advance + flow + temps — the slicer side
 Corner bulges, gaps, over/under-extrusion — these are dialed in your slicer and with pressure advance.
@@ -69,10 +69,10 @@ quieter, cooler, sometimes smoother. Doesn't change dimensions, just niceness.
 | Parts not square / parallelogram | [Skew Correction](Skew-Correction) |
 | Loud or hot steppers | [TMC Autotune](TMC-Autotune) |
 | Layer shift right after a pause/resume | [Pause/resume fix](Pause-Park-Layer-Shift-Fix) |
-| "I changed hardware — what do I redo?" | [Calibration, explained](Calibration-Explained) |
+| "I changed hardware — what do I redo?" | [After a hardware change](Calibration-Explained#after-a-hardware-change) |
 
 ## Changed some hardware?
 
-Don't blindly re-run everything. **[Calibration, explained](Calibration-Explained)** tells you exactly
-which calibrations a given change invalidates, which are safe to leave, and whether you need to "reset"
+Don't blindly re-run everything. **[After a hardware change](Calibration-Explained#after-a-hardware-change)**
+tells you exactly which calibrations a given change invalidates, which are safe to leave, and whether you need to "reset"
 anything (spoiler: almost never).

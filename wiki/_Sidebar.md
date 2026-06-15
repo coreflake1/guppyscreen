@@ -7,7 +7,7 @@
 - [Perfect prints — start here](Perfect-Prints)
 
 **Get perfect prints**
-- [Calibration, explained](Calibration-Explained)
+- [Calibrate step by step (A→Z)](Calibration-Explained)
 - [Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation)
 - [Square parts (Skew Correction)](Skew-Correction)
 - [Quieter steppers (TMC Autotune)](TMC-Autotune)

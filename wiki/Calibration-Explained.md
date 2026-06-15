@@ -1,89 +1,135 @@
-# Calibration, explained
+# Calibrate your KE — start to finish
 
-Most calibration confusion comes down to two questions: **"do I need to redo this?"** and **"do I have
-to reset it first?"** This page answers both, plus gives you a cheat-sheet for "I changed X — what now?"
+This is the full run, in order, from a fresh printer to clean prints. Do it **top to bottom** and stop
+when your prints look the way you want — you don't always need every step. Each one says *what it fixes*,
+*how to run it* (mostly from the screen's **Tune** tab), and *how to know it worked*.
 
-## The one rule that saves you
+> **Golden rule: change one thing, then print a test.** If you tweak five things and the next print is
+> worse, you won't know which one did it.
 
-**Redoing a calibration *overwrites* the old value. You almost never need to "reset" anything first.**
+> **You won't "reset" anything.** Re-running a calibration just overwrites the old value — there's no
+> separate reset step. (More on that in [After a hardware change](#after-a-hardware-change) at the end.)
 
-Klipper stores one value per thing (your Z-offset, your shaper frequencies, your mesh…). When you run
-the calibration again and save, it replaces the old value in place. So "reset then recalibrate" is just
-"recalibrate."
+---
 
-**Reset only matters in one situation:** you changed hardware you **can't currently re-measure**, and
-the now-stale value is actively *harmful*. Then you reset it to a safe baseline instead of trusting a
-stale number. That's the whole reason "reset" ever comes up.
+## 0. Mechanics first (no software)
 
-## Two kinds of stale calibration
+Software can't fix loose hardware — it can only paper over it.
 
-How much a stale (out-of-date) value hurts depends on which bucket it's in:
+- Belts firm (a plucked belt should "thunk," not flap), no slack in the gantry, bed not rocking.
+- Nozzle clean (no plastic blob), bed clean (IPA), V-wheels/rails snug but not binding.
 
-**🟡 Quality-only — stale is suboptimal, never dangerous**
-- **Input shaper.** A shaper tuned to an outdated frequency just under-corrects; worst case some
-  ringing comes back. It can't crash anything or ruin a print. Lowest-stakes to leave alone.
+**Done when:** nothing wobbles when you nudge it. Five minutes here saves hours later.
 
-**🔴 First-layer / safety — stale can wreck a print or crash the nozzle**
-- **Z-offset** (probe offset / saved baby-step)
-- **Bed mesh**
-- **Axis Twist Compensation**
-- **Skew correction**
-- **PID** (heater stability)
+## 1. Stable temperatures (PID)
 
-If something in the 🔴 group is stale and you *can* re-measure it, just redo it. If you *can't*
-re-measure it right now, reset it to a safe default rather than print on a stale value.
+Wobbling hotend/bed temperature = inconsistent extrusion. If your temp graph swings more than ~±1 °C at
+target, PID-tune. In the **Klipper console**:
 
-## What each calibration does & when to redo it
+```
+PID_CALIBRATE HEATER=extruder TARGET=230
+PID_CALIBRATE HEATER=heater_bed TARGET=60
+SAVE_CONFIG
+```
 
-| Calibration | What it does | Redo it when you change… | Bucket |
-|---|---|---|---|
-| **Z-offset** | Sets nozzle-to-bed distance for layer 1 | Nozzle, probe, hotend, bed surface, bed height | 🔴 |
-| **Bed mesh** | Maps bed flatness so Z compensates across the plate | Bed, springs, surface, anything affecting flatness | 🔴 |
-| **Axis Twist Comp** | Corrects a tilted X gantry that fools the probe left↔right | X gantry / anything tilting the X axis | 🔴 |
-| **Skew correction** | Squares up parts (fixes parallelogram error) | Frame squareness, axis perpendicularity | 🔴 |
-| **PID** | Stable hotend/bed temperature | Hotend, heater, or bed heater swap | 🔴 |
-| **Input shaper** | Cancels vibration → faster, ringing-free prints | The *moving* hardware on an axis (mass/stiffness) | 🟡 |
+(If you installed the Creality macros, `PID_HOTEND` / `PID_BED` do the same.) **Done when:** the temp
+holds flat at target on the screen's graph.
 
-> **How to reset (only if you must):** Z-offset/mesh/PID — just recalibrate (overwrites). Skew —
-> `SET_SKEW CLEAR=1`. Bed mesh (clear active) — `BED_MESH_CLEAR`. Input shaper (disable one axis) —
-> set `shaper_freq_x: 0` (or `_y`). You rarely need any of these.
+## 2. Bed mesh (even first layer across the whole plate)
 
-## The accelerometer gotcha (input shaper)
+The bed is never perfectly flat. A mesh maps its hills and valleys so Z follows them. From the console:
 
-On a bed-slinger like the KE, the input-shaper test needs the accelerometer **on whatever moves**:
+```
+BED_MESH_CALIBRATE
+SAVE_CONFIG
+```
 
-- **X axis** → the **toolhead** moves, so the accelerometer goes on the **toolhead**.
-- **Y axis** → the **bed** moves, so the accelerometer goes on the **bed**.
+(Your `G29` macro does this too. If you installed **KAMP**, it meshes just the print area automatically at
+the start of each print — see [Perfect first layer](KAMP-and-Axis-Twist-Compensation).) **Done when:** the
+mesh on the screen (3D or table view) looks like a smooth surface with no wild spikes — typically within a
+few tenths of a millimetre corner to corner.
 
-You don't need a fancy permanent bracket for a one-time test — people routinely **tape or zip-tie** the
-accelerometer to the bed, run `TEST_RESONANCES AXIS=Y`, and move it back. It just has to survive ~1
-minute of shaking.
+## 3. Z-offset / first layer (the big one)
 
-And because X and Y are measured independently, **recalibrating one axis doesn't touch the other.**
-Changed only the bed? You only need to redo **Y**; X stays valid.
+This is most of what makes a print "look good." Set the nozzle-to-bed gap with the screen's **live
+Z-offset baby-stepping** (Tune tab, or tap the Z-offset readout while a first-layer test prints):
 
-## Worked example: "I installed linear rails on the bed"
+1. Start a first-layer test print (a single-layer square or patch).
+2. Nudge Z down/up in **0.01–0.05 mm** steps while watching the line go down.
+3. Aim for lines that are **squished together and fused** — not gappy/round (too high), not translucent
+   or smeared (too low).
 
-This is a real one. Bed rails = a **Y-axis** change (the bed is what moves in Y). Here's the call:
+It saves automatically (with Save Z-Offset installed). **Done when:** the first layer is uniform and the
+lines have no gaps between them.
 
-1. **Z-offset → redo first.** Rails almost certainly changed the bed height → first-layer crash/gouge
-   risk. No accelerometer needed. Do this carefully, before anything else. 🔴
-2. **Bed mesh → redo.** New rails change flatness/tilt. No accelerometer needed. 🔴
-3. **Y input shaper → recalibrate** (tape the accel to the bed). Rails changed the moving mass *and*
-   stiffness, so Y resonance shifted. Quality-only, so not urgent — but worth it. 🟡
-4. **X input shaper → leave it.** The toolhead didn't change; X is still valid.
-5. **Skew / ATC → optional.** Only if you notice parts aren't square or the first layer is uneven
-   left-to-right. Both are accelerometer-free and quick.
-6. **PID → leave it** (unless you also swapped the bed heater).
+## 4. Axis Twist Compensation (only if the first layer is uneven left↔right)
 
-And to be explicit: **no resets needed.** Everything affected is something you can re-measure and
-overwrite. If you genuinely can't measure the Y shaper right now, leaving the old value is *safe* (it's
-🟡) — just watch for ghosting on Y-facing walls and redo it when you can.
+Classic symptom: first layer is perfect in the **middle** but squished on one side and lifting on the
+other, and bed mesh didn't fix it. That's a slightly twisted X gantry tilting the probe. Run the on-screen
+wizard: **Tune → Axis Twist** (a guided 5-point paper test). Full walkthrough:
+[Perfect first layer](KAMP-and-Axis-Twist-Compensation). **Done when:** the first layer is even edge to
+edge, not just in the centre.
 
-## TL;DR
+## 5. Input shaper (kill ringing / ghosting)
 
-- Recalibrating **overwrites** — no "reset" step needed.
-- Only **reset** when you changed something you can't re-measure *and* a stale value would be harmful.
-- 🔴 first-layer/safety calibrations matter most after a hardware change; 🟡 input shaper is low-stakes.
-- Changed one axis? You usually only redo that axis.
-- Not sure where to even start? → [Perfect prints — start here](Perfect-Prints).
+Those faint echoes after sharp corners are vibration. Input shaping cancels it so you can print **fast and
+clean**. The KE has an onboard accelerometer, so you measure and apply it from the screen's **Input
+Shaper** tool — it runs the resonance test, shows the graph, and recommends a shaper for each axis.
+
+> **Accelerometer placement (bed-slinger):** the sensor must be on **whatever moves** for that axis — the
+> **toolhead** for the **X** test, the **bed** for the **Y** test. You don't need a permanent bracket;
+> taping or zip-tying it on for the ~1-minute test is fine. X and Y are measured independently.
+
+**Done when:** a fast ringing-test print shows no echoes trailing the corners.
+
+## 6. Pressure advance, flow & temperature (slicer side)
+
+The last 10%: corner bulges, blobs, gaps, over/under-extrusion. These are tuned in your **slicer** (flow,
+temperature) and with **pressure advance**. Don't start here — it only pays off once the first layer and
+motion are solid.
+
+## 7. Skew correction (only if parts aren't square)
+
+If functional parts come out as slight parallelograms, square them up: **Tune → Skew** — print a
+calibration square, measure three lengths with calipers, type them in. Full guide:
+[Skew Correction](Skew-Correction). **Done when:** a measured test square is square on both diagonals.
+
+## 8. Quieter motors (optional)
+
+**Tune → TMC Autotune** computes better stepper-driver settings from your motor type — quieter, cooler,
+sometimes smoother. It doesn't change dimensions, so it's pure quality-of-life. See
+[TMC Autotune](TMC-Autotune).
+
+---
+
+## After a hardware change
+
+You don't have to redo everything when you change a part — just the calibrations that part affects.
+
+**The rule:** redoing a calibration **overwrites** the old value, so there's no "reset first" step. The
+only time *reset* matters is if you changed something you **can't re-measure right now** and the stale
+value would be harmful — then set it back to a safe default instead of trusting it.
+
+**How stale values hurt — two buckets:**
+
+- 🔴 **First-layer / safety** (Z-offset, bed mesh, Axis Twist, skew, PID): a stale value can wreck a print
+  or crash the nozzle. Redo these promptly after a relevant change.
+- 🟡 **Input shaper:** a stale shaper just under-corrects — worst case some ringing returns. It can't
+  damage anything, so it's the lowest-stakes one to leave for later.
+
+**What to redo when you change…**
+
+| You changed… | Redo |
+|---|---|
+| Nozzle / hotend | Z-offset (+ PID if you swapped the heater) |
+| Bed surface, springs, or anything affecting bed height/flatness | Z-offset, bed mesh |
+| X gantry / anything that could tilt the X axis | Axis Twist, then re-check the first layer |
+| The *moving* hardware on an axis (belts, carriage, bed rails — changes mass/stiffness) | Input shaper for **that axis only** (the other axis stays valid) |
+| Frame squareness | Skew |
+| A heater | PID |
+
+**Reset commands (rarely needed):** skew → `SET_SKEW CLEAR=1`; active mesh → `BED_MESH_CLEAR`; disable a
+shaper axis → `shaper_freq_x: 0` (or `_y`). For everything else, just recalibrate — it overwrites.
+
+Not sure where your problem comes from? → [Perfect prints — start here](Perfect-Prints) has a
+symptom-to-fix table.

@@ -36,8 +36,7 @@ your problem:
   [Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation)
 - **Parts come out as parallelograms / not square?** → [Skew Correction](Skew-Correction)
 - **Motors loud or hot?** → [TMC Autotune](TMC-Autotune)
-- **Not sure what to (re)calibrate after changing something?** →
-  [Calibration, explained](Calibration-Explained)
+- **Want the full calibration walkthrough (A→Z)?** → [Calibrate step by step](Calibration-Explained)
 - **Layer shift right after a pause/resume?** → [Fix layer shift after pause](Pause-Park-Layer-Shift-Fix)
 
 ## What's actually in it
