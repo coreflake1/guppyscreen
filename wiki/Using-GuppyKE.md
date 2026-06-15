@@ -110,7 +110,23 @@ of these day-to-day, but when you do, they're right on the screen (no PC require
 - **System info** — temperatures, load, versions.
 - **Macros / Console** — run any gcode macro, or type commands directly (a drill-down command browser with
   history).
-- **Spoolman** — filament spool tracking, if you run a Spoolman server.
+
+## Spoolman (filament tracking)
+
+If you run a [Spoolman](https://github.com/Donkie/Spoolman) server — a filament inventory that knows your
+spools and how much is left on each — OpenKE talks to it **right from the printer screen**, so you don't
+need a browser to manage filament:
+
+- **See your spools** in a table — name, **material**, colour, and **remaining weight & length**. At a
+  glance you know if a spool has enough left for the next print.
+- **Set the active spool** with one tap (and **archive** empties, or show archived, to keep the list tidy).
+- **Usage tracks itself** — once a spool is active, the filament a print uses is subtracted automatically,
+  so each spool's remaining amount stays accurate without you weighing anything.
+- **Wrong-filament safety net** — OpenKE shows a **"Use this filament?"** confirmation of the active spool
+  **before a print starts and before a manual load**, so you catch "oops, that's the PETG, not the PLA"
+  before it ruins a print instead of after.
+
+The whole thing is optional: no Spoolman server, no Spoolman panel — nothing else changes.
 
 ---
 
