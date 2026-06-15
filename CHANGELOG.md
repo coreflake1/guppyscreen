@@ -46,7 +46,11 @@ The "self-contained project + real docs" release: vendored mods, a smarter insta
 - A fresh **timestamped `printer.cfg` backup on every installer run**; `probe.py` backed up before the
   Axis-Twist patch. Re-running the installer does **not** rewrite saved calibration values.
 - **Duplicate-section guards**: the installer detects an existing `[axis_twist_compensation]`,
-  `[skew_correction]`, or KAMP setup and leaves it alone instead of adding a conflicting copy.
+  `[skew_correction]`, KAMP, M600, Save-Z-Offset, or Exclude-Object setup and leaves it alone instead of
+  adding a conflicting copy. The check looks only at **actively-loaded** config files (`printer.cfg` + its
+  `[include]` globs, nested) and only at **uncommented** section headers — so it correctly ignores the
+  KE's commented-out stock sections (e.g. `#[filament_switch_sensor ...]`) and the `*.bak`/`printer-*.cfg`
+  backups in the config dir. Verified against a live KE under its BusyBox.
 
 ## [0.5.5-GuppyKE] — 2025
 

@@ -320,11 +320,44 @@ GUPPY_CFG_DIR=$K1_CONFIG_DIR/GuppyScreen
 # so a reinstall does not un-calibrate you. This backup is just belt-and-suspenders.
 cp "$K1_CONFIG_DIR/printer.cfg" "$BACKUP_DIR/printer.cfg.$(date +%Y%m%d-%H%M%S).bak" 2>/dev/null || true
 
-# True if a config section is already defined OUTSIDE our managed GuppyScreen/ dir.
-# Used to avoid adding a section the user set up by hand (which would be a duplicate
-# section and crash Klipper). Autosave values under GuppyScreen/ are fine to overlay.
-section_defined_elsewhere() {   # $1 = literal header text, e.g. "[axis_twist_compensation]"
-    grep -rsF "$1" "$K1_CONFIG_DIR" 2>/dev/null | grep -vq "/GuppyScreen/"
+# Echo the cfg files Klipper actually loads: printer.cfg + its [include] globs,
+# two levels deep (nested includes resolve relative to the including file's dir).
+# This deliberately ignores *.bak / printer-*.cfg backups sitting in the config dir.
+active_cfgs() {
+    _cfg="$K1_CONFIG_DIR/printer.cfg"
+    [ -f "$_cfg" ] || return 0
+    echo "$_cfg"
+    _inc1=$(grep -E "^[[:space:]]*\[include " "$_cfg" 2>/dev/null \
+            | sed -e 's/^[[:space:]]*\[include[[:space:]][[:space:]]*//' -e 's/[[:space:]]*\][[:space:]]*$//')
+    for _p1 in $_inc1; do
+        for _f1 in "$K1_CONFIG_DIR"/$_p1; do
+            [ -f "$_f1" ] || continue
+            echo "$_f1"
+            _d1=$(dirname "$_f1")
+            _inc2=$(grep -E "^[[:space:]]*\[include " "$_f1" 2>/dev/null \
+                    | sed -e 's/^[[:space:]]*\[include[[:space:]][[:space:]]*//' -e 's/[[:space:]]*\][[:space:]]*$//')
+            for _p2 in $_inc2; do
+                for _f2 in "$_d1"/$_p2; do [ -f "$_f2" ] && echo "$_f2"; done
+            done
+        done
+    done
+}
+
+# True if a config section is ACTIVELY defined in a loaded file OUTSIDE our managed
+# GuppyScreen/ dir. Anchored match so commented-out headers (e.g. the KE's stock
+# "#[filament_switch_sensor ...]") do NOT count, and only loaded files are checked
+# (not the *.bak / printer-*.cfg backups). Prevents adding a duplicate section.
+section_defined_elsewhere() {   # $1 = literal header, e.g. "[axis_twist_compensation]"
+    _pat=$(printf '%s' "$1" | sed 's/[][]/\\&/g')   # escape [ and ] for ERE
+    _lst="/tmp/.ke_active.$$"
+    active_cfgs | sort -u | grep -v "/GuppyScreen/" > "$_lst"
+    _ret=1
+    while IFS= read -r _f; do
+        [ -f "$_f" ] || continue
+        if grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null; then _ret=0; break; fi
+    done < "$_lst"
+    rm -f "$_lst"
+    return $_ret
 }
 
 # Back up an existing klippy/extras file once before we overwrite it — e.g. a TMC
