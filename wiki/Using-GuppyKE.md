@@ -10,6 +10,31 @@ works great for remote control).
 
 ---
 
+## Getting around — the five tabs
+
+You navigate with a small row of **icon buttons** (the tab bar). There are five screens; tapping the
+already-active one resets it (Macros jumps back to Favorites, Console back to the terminal):
+
+- **🏠 Home** — temperatures, a live temperature graph, and quick buttons (move/home, extrude, fans,
+  light, and **Files** to start a print). This is your day-to-day screen.
+- **Macros** — your gcode macros, with favourites and collapsible parameter rows.
+- **Console** — type gcode directly; a drill-down command browser with history.
+- **Tune** — the calibration & quality toolbox (bed mesh, Z-offset, Axis Twist, input shaper, skew, TMC, limits…).
+- **Settings** — WiFi, system info, Spoolman, and the in-app updater.
+
+## Your home screen
+
+Where you land. At a glance:
+
+- **Temperatures** — nozzle, bed, and chamber/MCU, each **tappable** to set a target (or use presets).
+- **Live graph** — those temperatures plotted over time.
+- **Quick actions** — buttons to home/move the toolhead, extrude/retract filament, control fans and the
+  case light, and open the **Files** browser to print.
+- **While a print runs** — a compact overlay shows progress, layer, and time left; tap it for the full
+  print-status screen (with pause/resume/cancel).
+
+---
+
 ## The basics: printing something
 
 1. **Load a file.** Slice in your slicer (OrcaSlicer, Cura, …) and copy the `.gcode` to the printer — over
@@ -39,8 +64,8 @@ works great for remote control).
 
 ## The Tune tab: calibration & quality tools
 
-This is where OpenKE shines. These are the tools that take a printer from "works" to "dialed in." You don't
-need most of them often — but when you want them, they're right on the screen.
+One of the five tabs — the toolbox for taking a printer from "works" to "dialed in." You won't need most
+of these day-to-day, but when you do, they're right on the screen (no PC required).
 
 ### First-layer & dimensional accuracy
 
