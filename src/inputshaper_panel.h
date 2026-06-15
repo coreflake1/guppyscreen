@@ -42,7 +42,17 @@ class InputShaperPanel {
 			 lv_obj_t *slider,
 			 lv_obj_t *slider_label,
 			 lv_obj_t *dd);
-  
+
+  // mark one axis finished; re-enables controls + stops the watchdog once both done
+  void axis_finished(bool is_x);
+  // re-enable Calibrate/Save, hide spinners, clear the watchdog timer
+  void end_calibration_ui();
+  static void _watchdog_cb(lv_timer_t *t) {
+    InputShaperPanel *panel = (InputShaperPanel*)t->user_data;
+    panel->handle_watchdog();
+  };
+  void handle_watchdog();
+
  private:
   KWebSocketClient &ws;
   std::mutex &lv_lock;
@@ -89,6 +99,11 @@ class InputShaperPanel {
   bool ximage_fullsized;
   bool yimage_fullsized;
   json calibrate_output;
+
+  // calibration progress tracking (for feedback + button locking)
+  bool x_pending;
+  bool y_pending;
+  lv_timer_t *cal_watchdog;
 
   static std::vector<std::string> shapers;
   

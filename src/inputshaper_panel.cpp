@@ -76,6 +76,9 @@ InputShaperPanel::InputShaperPanel(KWebSocketClient &c, std::mutex &l)
   , back_btn(cont, &back, "Back", &InputShaperPanel::_handle_callback, this)
   , ximage_fullsized(false)
   , yimage_fullsized(false)
+  , x_pending(false)
+  , y_pending(false)
+  , cal_watchdog(NULL)
 {
   lv_obj_move_background(cont);
 
@@ -120,11 +123,11 @@ InputShaperPanel::InputShaperPanel(KWebSocketClient &c, std::mutex &l)
   // text output
   lv_obj_set_size(xoutput, LV_PCT(38), LV_PCT(45));
   lv_label_set_text(xoutput, "");
-  lv_obj_set_style_text_font(xoutput, &dejavusans_mono_14, LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(xoutput, &lv_font_montserrat_10, LV_STATE_DEFAULT);
 
   lv_obj_set_size(youtput, LV_PCT(38), LV_PCT(45));
   lv_label_set_text(youtput, "");
-  lv_obj_set_style_text_font(youtput, &dejavusans_mono_14, LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(youtput, &lv_font_montserrat_10, LV_STATE_DEFAULT);
 
   // spinners
   lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
@@ -298,7 +301,34 @@ void InputShaperPanel::handle_callback(lv_event_t *event) {
     bool x_requested = lv_obj_has_state(x_switch, LV_STATE_CHECKED);
     bool y_requested = lv_obj_has_state(y_switch, LV_STATE_CHECKED);
 
-    if ((x_requested || y_requested) && !KUtils::is_homed()) {
+    if (!x_requested && !y_requested) {
+      KUtils::notify_toast("Pick X and/or Y first, then Calibrate.", 2500);
+      return;
+    }
+
+    bool graph = lv_obj_has_state(graph_switch, LV_STATE_CHECKED);
+    bool homing = !KUtils::is_homed();
+    KUtils::notify_toast(
+      fmt::format("Calibrating {}{}{}{} — the toolhead will move & shake for ~1 min{}. Leave it be.{}",
+        homing ? "(homing first) " : "",
+        x_requested ? "X" : "", (x_requested && y_requested) ? "+" : "", y_requested ? "Y" : "",
+        (x_requested && y_requested) ? " each" : "",
+        graph ? " Graph is on, so it's slower." : ""),
+      5000);
+
+    // lock the controls + start a watchdog so a stuck run can't spin forever
+    x_pending = x_requested;
+    y_pending = y_requested;
+    calibrate_btn.disable();
+    save_btn.disable();
+    if (cal_watchdog != NULL) {
+      lv_timer_del(cal_watchdog);
+      cal_watchdog = NULL;
+    }
+    cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb, 240000, this);
+    lv_timer_set_repeat_count(cal_watchdog, 1);
+
+    if (homing) {
       ws.gcode_script("G28");
     }
 
@@ -348,6 +378,11 @@ void InputShaperPanel::handle_callback(lv_event_t *event) {
     ws.gcode_script(fmt::format("SAVE_INPUT_SHAPER SHAPER_FREQ_X={} SHAPER_TYPE_X={} SHAPER_FREQ_Y={} SHAPER_TYPE_Y={}\nSAVE_CONFIG",
       xhz, xbuf, yhz, ybuf));
 
+    KUtils::notify_toast(
+      fmt::format("Saved — X: {} @ {:.1f} Hz, Y: {} @ {:.1f} Hz. Klipper is restarting to apply it "
+        "(if it shows 'shutdown', just restart it again).", xbuf, xhz, ybuf, yhz),
+      6000);
+
   } else if (btn == back_btn.get_container()) {
     lv_obj_move_background(cont);
   } else if (btn == emergency_btn.get_container()) {
@@ -394,6 +429,15 @@ void InputShaperPanel::handle_macro_response(json &j) {
 
           lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
           lv_obj_move_background(xspinner);
+          {
+            auto &b = res["/best"_json_pointer];
+            if (!b.is_null()) {
+              auto bn = b.template get<std::string>();
+              double bf = res["/shapers"][bn]["freq"].template get<double>();
+              KUtils::notify_toast(fmt::format("X done — recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
+            }
+          }
+          axis_finished(true);
 
         } else if (Y_DATA == fn) {
           if (graph_requested && !axis_png.is_null()) {
@@ -420,10 +464,20 @@ void InputShaperPanel::handle_macro_response(json &j) {
 
           lv_obj_add_flag(yspinner, LV_OBJ_FLAG_HIDDEN);
           lv_obj_move_background(yspinner);
+          {
+            auto &b = res["/best"_json_pointer];
+            if (!b.is_null()) {
+              auto bn = b.template get<std::string>();
+              double bf = res["/shapers"][bn]["freq"].template get<double>();
+              KUtils::notify_toast(fmt::format("Y done — recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
+            }
+          }
+          axis_finished(false);
         }
       }
 
     } else if ("// Resonances data written to " Y_DATA " file" == resp) {
+      KUtils::notify_toast(graph_requested ? "Analysing Y + rendering graph (slower)…" : "Analysing Y…", 3000);
       auto config_root = KUtils::get_root_path("config");
       auto screen_width = (double)lv_disp_get_physical_hor_res(NULL) / 100.0;
       auto screen_height = (double)lv_disp_get_physical_ver_res(NULL) / 100.0;
@@ -435,6 +489,7 @@ void InputShaperPanel::handle_macro_response(json &j) {
       ws.gcode_script(fmt::format("RUN_SHELL_COMMAND CMD=guppy_input_shaper PARAMS={:?}", arg));
 
     } else if ("// Resonances data written to " X_DATA " file" == resp) {
+      KUtils::notify_toast(graph_requested ? "Analysing X + rendering graph (slower)…" : "Analysing X…", 3000);
       auto config_root = KUtils::get_root_path("config");
       auto screen_width = (double)lv_disp_get_physical_hor_res(NULL) / 100.0;
       auto screen_height = (double)lv_disp_get_physical_ver_res(NULL) / 100.0;
@@ -546,7 +601,7 @@ void InputShaperPanel::set_shaper_detail(json &res,
       auto bs_name = best_shaper.template get<std::string>();
       double f = shapers_resp[bs_name]["freq"]
         .template get<double>();
-      shaper_details.push_back(fmt::format("Best shaper is {} @ {:.2f} Hz\n", bs_name, f));
+      shaper_details.push_back(fmt::format("Best: {} @ {:.1f} Hz\n", bs_name, f));
 
       uint32_t idx = find_shaper_index(shapers, bs_name);
       lv_dropdown_set_selected(dd, idx);
@@ -556,19 +611,55 @@ void InputShaperPanel::set_shaper_detail(json &res,
     }
 
     if (label != NULL) {
-      shaper_details.push_back(fmt::format("{:^8}\t{:^4}\t{:^5}\t{:^5}\t{:^5}",
-        "Shaper", "Hz", "Vibr", "Smt", "MaxAcl"));
+      // compact, proportional-font-friendly list (the full table is on the graph)
       for (auto &el : shapers_resp.items()) {
         shaper_details.push_back(
-          fmt::format("{:<8}\t{:.1f}\t{:.1f}%\t{:.3f}\t{:>}",
+          fmt::format("{}  {:.1f} Hz  {:.1f}% vib",
             el.key(),
             el.value()["freq"].template get<double>(),
-            el.value()["vib"].template get<double>(),
-            el.value()["smooth"].template get<double>(),
-            el.value()["max_acel"].template get<double>()));
+            el.value()["vib"].template get<double>()));
       }
 
       lv_label_set_text(label, fmt::format("{}", fmt::join(shaper_details, "\n")).c_str());
     }
+  }
+}
+
+void InputShaperPanel::axis_finished(bool is_x) {
+  if (is_x) {
+    x_pending = false;
+  } else {
+    y_pending = false;
+  }
+  if (!x_pending && !y_pending) {
+    end_calibration_ui();
+  }
+}
+
+void InputShaperPanel::end_calibration_ui() {
+  calibrate_btn.enable();
+  save_btn.enable();
+  lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(yspinner, LV_OBJ_FLAG_HIDDEN);
+  if (cal_watchdog != NULL) {
+    lv_timer_del(cal_watchdog);
+    cal_watchdog = NULL;
+  }
+}
+
+void InputShaperPanel::handle_watchdog() {
+  // Runs on the LVGL timer thread (lv_timer_handler already holds lv_lock), and
+  // repeat_count is 1 so LVGL frees the timer after this returns — drop our handle
+  // and DON'T lv_timer_del it here.
+  cal_watchdog = NULL;
+  if (x_pending || y_pending) {
+    x_pending = false;
+    y_pending = false;
+    calibrate_btn.enable();
+    save_btn.enable();
+    lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(yspinner, LV_OBJ_FLAG_HIDDEN);
+    KUtils::notify_toast(
+      "Calibration timed out — nothing was changed. Check the printer and try again.", 6000);
   }
 }
