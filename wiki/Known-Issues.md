@@ -1,26 +1,25 @@
 # Known Issues & Limitations
 
-## Stale references in the install/update scripts
+## Release-pin upkeep
 
-As of this writing, the install/update scripts predate the merge to `main` / `v0.1.1-ke-gui-fixes` and
-still reference older locations. These should be updated:
+The install/update scripts are current (they point at `coreflake1/guppyscreen`), but the pinned release
+tag must be bumped at each release:
 
-- **`scripts/installer.sh`** pins `PINNED_RELEASE="v0.1.0-ke-bedmesh"` and the asset URL points at
-  `coreflake1/guppyscreen` releases. The installer *script itself* is fetched fresh from `main` (so
-  the install command on the [Installation](Installation) page is correct), but the **tarball it
-  downloads** is the older pinned tag until `PINNED_RELEASE` is bumped.
-- **`scripts/installer-deb.sh`** likewise pins `v0.1.0-ke-bedmesh` and references the
-  `ke-advanced-3d-bedmesh` branch in its banner. (This installer is for aarch64/Debian, not the KE.)
-- **`scripts/update.sh`** checks `probielodan/guppyscreen` for the latest release, **not** this fork —
-  it will not pick up this fork's releases until updated.
+- **`scripts/installer.sh`** / **`scripts/installer-deb.sh`** pin `PINNED_RELEASE` (currently
+  `v0.5.5-GuppyKE`) — the tarball they download. Bump this when cutting a new release. The installer
+  *script itself* is fetched fresh from `main`, so the install command on the
+  [Installation](Installation) page always runs the latest installer.
+- **`scripts/update.sh`** queries `coreflake1/guppyscreen` releases and filters out the rolling `nightly`
+  prerelease.
 
 ## Functional limitations
 
-- The `View Job` / `Queue Job` buttons in the "print already in progress" dialog are unimplemented stubs.
+- The `View Job` / `Queue Job` buttons in the "print already in progress" dialog are unimplemented stubs
+  (Moonraker job-queue — deliberately low-priority on a single-printer KE).
 - **No automated unit-test suite.** LVGL's own tests are disabled (`LV_BUILD_TEST=0`); verification is
-  via the CI build matrix, the simulator, and on-device testing. See [Development and Simulator](Development-and-Simulator).
-- The KE install path is hardware-specific. aarch64 and standard-screen MIPS targets are built by CI
-  but are less exercised in this fork.
+  via the CI build, the simulator, and on-device testing. See [Development and Simulator](Development-and-Simulator).
+- CI builds **only the Ender-3 V3 KE smallscreen target** (`guppyscreen-smallscreen`, MIPS). aarch64 and
+  standard-screen MIPS can still be built from source, but are not produced by CI in this fork.
 
 ## Minor small-screen layout items (lower priority)
 

@@ -173,7 +173,7 @@ if [ "$ARCH" = "aarch64" ]; then
         exit 0
     fi
 
-    printf "${green}Installing Guppy Screen (coreflake1 fork - ke-advanced-3d-bedmesh) ${white}\n"
+    printf "${green}Installing Guppy Screen (OpenKE - coreflake1 fork) ${white}\n"
 
     ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_RELEASE}/guppyscreen-arm.tar.gz"
     if [ "$1" = "nightly" ]; then
