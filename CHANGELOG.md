@@ -7,11 +7,22 @@ follow [Semantic Versioning](https://semver.org/). Release tags use the `vMAJOR.
 scheme (older tags use `-GuppyKE`). Each released entry corresponds to a GitHub release with a
 `guppyscreen-smallscreen.tar.gz` asset.
 
-## [Unreleased] — v0.6.0-OpenKE (planned)
+## [Unreleased]
 
-The "self-contained project + real docs" release: vendored mods, a smarter installer, and a rebrand.
+_Nothing yet._
+
+## [0.6.0-OpenKE] — 2026-06-16
+
+The OpenKE rebrand plus a self-contained, one-shot installer — and a batch of on-screen features and real
+documentation.
 
 ### Added
+- **On-screen:** stoppable filament **Load** (stops cleanly instead of running forever); an **Invert Y**
+  homing-jog toggle (bed-slinger feel); **auto-cooldown** of the hotend after a manual
+  extrude/retract/load/unload; a **Spoolman "Use this filament?"** confirmation before a manual load; and
+  a regrouped **Tune** tab + rebalanced **Settings** panel.
+- **Hardware H.264 camera stream** (go2rtc) — a low-bandwidth WebRTC/RTSP feed for the Creality Nebula,
+  alongside the stock MJPEG.
 - **Vendored Klipper mods** under `k1/k1_mods/klipper_mods/` (ship in the release tarball): **KAMP**
   (adaptive mesh + purge, pre-edited for the KE), **Axis Twist Compensation** (Klipper v0.12.0 module +
   idempotent `probe.py` patcher), and **TMC Autotune** (evgarthub K1 fork). Each carries its upstream
@@ -41,6 +52,10 @@ The "self-contained project + real docs" release: vendored mods, a smarter insta
   a manual edit.
 - Mod/install wiki pages rewritten: the installer does the setup; manual steps kept as an *advanced*
   section on each page.
+
+### Fixed
+- **Filament-runout Cancel dialog** — now shows "Cancelling print…", disables its buttons, and stays up
+  with feedback until the print actually stops (the runout sensor could otherwise re-fire and re-pop it).
 
 ### Safety
 - A fresh **timestamped `printer.cfg` backup on every installer run**; `probe.py` backed up before the
@@ -80,7 +95,8 @@ Z-offset baby-stepping aid.
 Initial KE fork line: 480×272 small-screen layout, interactive 3D bed mesh, print-state safety locks,
 hardened installer. See the `RELEASE_NOTES_*.md` files for details.
 
-[Unreleased]: https://github.com/coreflake1/guppyscreen/compare/v0.5.5-GuppyKE...HEAD
+[Unreleased]: https://github.com/coreflake1/guppyscreen/compare/v0.6.0-OpenKE...HEAD
+[0.6.0-OpenKE]: https://github.com/coreflake1/guppyscreen/releases/tag/v0.6.0-OpenKE
 [0.5.5-GuppyKE]: https://github.com/coreflake1/guppyscreen/releases/tag/v0.5.5-GuppyKE
 [0.5.0-GuppyKE]: https://github.com/coreflake1/guppyscreen/releases/tag/v0.5.0-GuppyKE
 [0.4.0-GuppyKE]: https://github.com/coreflake1/guppyscreen/releases/tag/v0.4.0-GuppyKE
