@@ -24,6 +24,11 @@ The "self-contained project + real docs" release: vendored mods, a smarter insta
   up first and guarded (skipped if not applicable).
 - **Self-contained Nebula camera persist macros** (`nebula_camera.cfg`) — re-applies image settings on
   every boot so they survive reboots, with or without the Helper Script's `CAM_*` macros.
+- **Vendored Creality macros** (GPL-3.0, from the Creality Helper Script) as their own installer option:
+  M600 filament change, **Save Z-Offset** (native z-offset persistence — no longer delegated to the
+  Helper Script), useful macros (backup/restore, PID, bed-level, warmup), and Exclude Object
+  (+ `enable_object_processing` in moonraker.conf). Each `.cfg` installs only if its sections don't
+  already exist (section-conflict guard), so it never causes a duplicate-section crash.
 - **Real, split wiki** — User vs Developer sections, plain "reddit-style" guides, including new
   **Perfect prints — start here** and **Calibration, explained** (recalibrate-vs-reset, hardware-change
   matrix) pages. Publishing mechanism documented in **Publishing this wiki**.

@@ -338,10 +338,32 @@ backup_extra_once() {   # $1 = filename in KLIPPY_EXTRA_DIR
     return 0
 }
 
+# Copy a vendored .cfg into GuppyScreen/ ONLY if none of the [sections] it defines
+# already exist elsewhere in the config. Prevents a duplicate-section crash when a
+# stock or Helper-Script config already owns one of those sections.
+install_cfg_guarded() {   # $1 = src path, $2 = dest filename, $3 = label
+    _src="$1"; _dest="$2"; _label="$3"
+    [ -f "$_src" ] || return 0
+    _secfile="/tmp/.ke_secs.$$"
+    grep -oE '^\[[^]]+\]' "$_src" 2>/dev/null | sort -u > "$_secfile"
+    _conflict=""
+    while IFS= read -r _sec; do
+        [ -z "$_sec" ] && continue
+        if section_defined_elsewhere "$_sec"; then _conflict="$_sec"; break; fi
+    done < "$_secfile"
+    rm -f "$_secfile"
+    if [ -n "$_conflict" ]; then
+        printf "${yellow}  Skipping %s — your config already defines %s.${white}\n" "$_label" "$_conflict"
+    else
+        cp "$_src" "$GUPPY_CFG_DIR/$_dest"
+        printf "${green}  Installed %s${white}\n" "$_label"
+    fi
+}
+
 printf "${white}=== OpenKE optional features ===\n"
 printf "${green}  Print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew Correction),\n"
-printf "${green}  the Creality Nebula camera (persistent image tuning + H.264 stream), and the\n"
-printf "${green}  Pause/Resume layer-shift fix.${white}\n\n"
+printf "${green}  the Creality Nebula camera (persistent image tuning + H.264 stream), Creality macros\n"
+printf "${green}  (M600, Save Z-Offset, useful macros, Exclude Object), and the layer-shift fix.${white}\n\n"
 printf "${white}  [Y] install all     [n] skip all     [o] choose each one${white}\n"
 printf "Choice (Y/n/o): "
 read feat_mode
@@ -438,6 +460,28 @@ else
             printf "${green}  Applied layer-shift fix (PAUSE y_park 222 -> 220)${white}\n"
         else
             printf "${yellow}  Layer-shift fix: y_park=222 not found in gcode_macro.cfg (already fixed or different config); skipped.${white}\n"
+        fi
+    fi
+
+    # --- Creality / extra macros: M600, Save Z-Offset, useful macros, Exclude Object ---
+    if [ -d "$MODS_DIR/creality_macros" ] && want "Creality macros (M600, Save Z-Offset, useful macros, Exclude Object)"; then
+        CM="$MODS_DIR/creality_macros"
+        install_cfg_guarded "$CM/useful-macros.cfg"  "useful-macros.cfg"  "useful macros (backup/restore, PID, bed-level, warmup)"
+        install_cfg_guarded "$CM/save-zoffset.cfg"   "save-zoffset.cfg"   "Save Z-Offset (persists z-offset across reboots)"
+        install_cfg_guarded "$CM/M600-support.cfg"   "M600-support.cfg"   "M600 filament-change support"
+        install_cfg_guarded "$CM/exclude_object.cfg" "exclude_object.cfg" "Exclude Object"
+        # moonraker: object processing (needed by Exclude Object + KAMP). Add only if safe.
+        MK_CONF="$K1_CONFIG_DIR/moonraker.conf"
+        if [ -f "$MK_CONF" ]; then
+            if grep -q "enable_object_processing" "$MK_CONF"; then
+                : # already set
+            elif grep -q "^\[file_manager\]" "$MK_CONF"; then
+                printf "${yellow}  moonraker.conf has [file_manager] but no enable_object_processing — add 'enable_object_processing: True' under it for Exclude Object/KAMP.${white}\n"
+            else
+                cp "$MK_CONF" "$BACKUP_DIR/moonraker.conf.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+                printf '\n[file_manager]\nenable_object_processing: True\n' >> "$MK_CONF"
+                printf "${green}  Enabled object processing in moonraker.conf${white}\n"
+            fi
         fi
     fi
 

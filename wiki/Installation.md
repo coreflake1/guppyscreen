@@ -25,6 +25,24 @@ The installer:
 6. Starts GuppyScreen via `/etc/init.d/S99guppyscreen`.
 7. **Offers the optional features** (see below).
 
+## Disabling Creality services (a prompt during install)
+
+Partway through, the installer asks:
+
+```
+=== Do you want to disable all Creality services (revertible) with GuppyScreen installation? ===
+Disable all Creality Services? (y/n):
+```
+
+- **`y` (recommended)** — frees up CPU/RAM for the things that matter (Klipper, Moonraker, the screen) by
+  not starting Creality's cloud/app stack. This is what most KE users want.
+- **`n`** — keeps Creality's services, but the installer still moves `Monitor` and `display-server` aside
+  (renamed to `.disable`) so OpenKE can own the screen. The trade-off with `y` is that the Creality
+  Cloud / Creality Print app integration stops working.
+
+It's reversible either way — backups go to `/usr/data/guppyify-backup/`, and the uninstaller (plus the
+notes it prints) restore the originals.
+
 ## Optional features (pick what you want)
 
 Near the end the installer asks:
@@ -49,6 +67,7 @@ What's on offer:
 | **TMC Autotune** | quieter, cooler steppers | [guide](TMC-Autotune) |
 | **Skew Correction** | square parts | [guide](Skew-Correction) |
 | **Creality Nebula camera** | image tuning that **sticks across reboots** + a hardware **H.264** stream | [image](Camera-Image-Tuning) · [H.264](Camera-H264-Stream) |
+| **Creality macros** | M600 filament change, **Save Z-Offset** (persists z-offset), useful macros (backup/PID/bed-level), Exclude Object | — |
 | **Pause/Resume layer-shift fix** | stops the bed crashing into the rail on resume (`y_park` 222→220) | [guide](Pause-Park-Layer-Shift-Fix) |
 
 > Some of these still need a **one-time calibration / slicer setup** afterward (the installer can't do the
@@ -56,6 +75,14 @@ What's on offer:
 > file (`probe.py`); the installer backs it up first and the edit is reversible. The layer-shift fix
 > edits `gcode_macro.cfg` (backed up first, and skipped automatically if your config doesn't have the
 > stock `y_park = 222`).
+
+> **About the Creality macros:** these used to come from the Creality Helper Script. **Save Z-Offset** and
+> **M600** redefine sections a stock or Helper-Script config may already own (`[save_variables]`,
+> `[filament_switch_sensor filament_sensor]`, `SET_GCODE_OFFSET`, `[idle_timeout]`). To avoid a
+> duplicate-section crash, the installer adds each macro file **only if your config doesn't already define
+> those sections** — otherwise it skips that file and leaves your working setup alone. So on a fresh
+> printer you get the lot; on top of an existing Helper-Script setup, the conflicting ones are skipped (you
+> already have them). Exclude Object also flips `enable_object_processing` on in `moonraker.conf` when safe.
 
 **Coexists with the Creality Helper Script.** If you already set any of these up — by hand or via the
 Helper Script — the installer **detects it and leaves your version alone**: it skips adding a config
