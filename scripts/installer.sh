@@ -302,10 +302,14 @@ ln -sf $K1_GUPPY_DIR/k1_mods/respawn/librc.so.1 /lib/librc.so.1
 
 
 ## ============================================================================
-## OpenKE print-quality mods — KAMP, Axis Twist Compensation, TMC Autotune, Skew
-## Vendored under k1_mods/klipper_mods. KAMP/Skew/ATC config install via the
-## existing [include GuppyScreen/*.cfg] glob (no printer.cfg section edits); only
-## Axis Twist touches Klipper core (probe.py), via an idempotent, backed-up patch.
+## OpenKE optional features — install all / skip all / choose each:
+##   print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew),
+##   Creality Nebula camera (persistent image tuning + H.264 stream),
+##   Pause/Resume layer-shift fix (PAUSE y_park 222 -> 220).
+## KAMP/Skew/ATC/camera config install via the existing [include GuppyScreen/*.cfg]
+## glob (no printer.cfg section edits); only Axis Twist touches Klipper core
+## (probe.py), via an idempotent, backed-up patch. The layer-shift fix sed-edits
+## gcode_macro.cfg (backed up first, guarded on the 222 line existing).
 ## ============================================================================
 MODS_DIR=$K1_GUPPY_DIR/k1_mods/klipper_mods
 GUPPY_CFG_DIR=$K1_CONFIG_DIR/GuppyScreen
@@ -334,77 +338,114 @@ backup_extra_once() {   # $1 = filename in KLIPPY_EXTRA_DIR
     return 0
 }
 
-printf "${white}=== Install OpenKE print-quality mods? ===\n"
-printf "${green}  KAMP (adaptive mesh + purge), Axis Twist Compensation, TMC Autotune, Skew Correction.\n"
-printf "${white}  Adds the Klipper-side support for the on-screen calibration tools. Axis Twist applies\n"
-printf "${white}  a small, reversible edit to Klipper's probe.py (backed up first).${white}\n\n"
-printf "Install print-quality mods? (Y/n): "
-read confirm_mods
+printf "${white}=== OpenKE optional features ===\n"
+printf "${green}  Print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew Correction),\n"
+printf "${green}  the Creality Nebula camera (persistent image tuning + H.264 stream), and the\n"
+printf "${green}  Pause/Resume layer-shift fix.${white}\n\n"
+printf "${white}  [Y] install all     [n] skip all     [o] choose each one${white}\n"
+printf "Choice (Y/n/o): "
+read feat_mode
 echo
+case "$feat_mode" in
+    n|N)  FEAT=none ;;
+    o|O)  FEAT=choose ;;
+    *)    FEAT=all ;;
+esac
 
-if [ "$confirm_mods" != "n" ] && [ "$confirm_mods" != "N" ]; then
-    if [ ! -d "$MODS_DIR" ]; then
-        printf "${yellow}Mods dir $MODS_DIR not in this release; skipping mods.${white}\n"
-    else
-        # --- KAMP: drop KAMP/ + KAMP_Settings.cfg into the GuppyScreen include dir ---
-        if [ -d "$MODS_DIR/kamp" ]; then
-            if section_defined_elsewhere "[gcode_macro _KAMP_Settings]"; then
-                printf "${yellow}KAMP already set up by hand elsewhere — leaving your KAMP config untouched.${white}\n"
-            else
-                printf "${green}Installing KAMP (adaptive meshing + purge) ${white}\n"
-                cp -r "$MODS_DIR/kamp/KAMP" "$GUPPY_CFG_DIR/"
-                cp "$MODS_DIR/kamp/KAMP_Settings.cfg" "$GUPPY_CFG_DIR/KAMP_Settings.cfg"
-            fi
-        fi
+# want <label> -> 0 (install) / 1 (skip), per the chosen mode.
+want() {
+    case "$FEAT" in
+        all)    return 0 ;;
+        none)   return 1 ;;
+        choose) printf "  Install %s? (y/N): " "$1"; read _a; { [ "$_a" = y ] || [ "$_a" = Y ]; } ;;
+    esac
+}
 
-        # --- TMC Autotune: modules into klippy/extras (sections written on-screen) ---
-        if [ -d "$MODS_DIR/tmc_autotune" ]; then
-            printf "${green}Installing TMC Autotune modules ${white}\n"
-            backup_extra_once autotune_tmc.py
-            backup_extra_once motor_constants.py
-            backup_extra_once motor_database.cfg
-            cp "$MODS_DIR/tmc_autotune/autotune_tmc.py"    "$KLIPPY_EXTRA_DIR/"
-            cp "$MODS_DIR/tmc_autotune/motor_constants.py" "$KLIPPY_EXTRA_DIR/"
-            cp "$MODS_DIR/tmc_autotune/motor_database.cfg" "$KLIPPY_EXTRA_DIR/"
-        fi
-
-        # --- Skew Correction: bare [skew_correction] via the include dir ---
-        if section_defined_elsewhere "[skew_correction]"; then
-            printf "${yellow}[skew_correction] already in your config — not adding a duplicate.${white}\n"
+if [ "$FEAT" = "none" ]; then
+    printf "${yellow}Skipping all optional features.${white}\n"
+elif [ ! -d "$MODS_DIR" ]; then
+    printf "${yellow}Mods dir $MODS_DIR not in this release; skipping optional features.${white}\n"
+else
+    # --- KAMP ---
+    if [ -d "$MODS_DIR/kamp" ] && want "KAMP (adaptive mesh + purge)"; then
+        if section_defined_elsewhere "[gcode_macro _KAMP_Settings]"; then
+            printf "${yellow}  KAMP already set up elsewhere — leaving it untouched.${white}\n"
         else
-            printf "${green}Enabling Skew Correction ${white}\n"
+            printf "${green}  Installing KAMP${white}\n"
+            cp -r "$MODS_DIR/kamp/KAMP" "$GUPPY_CFG_DIR/"
+            cp "$MODS_DIR/kamp/KAMP_Settings.cfg" "$GUPPY_CFG_DIR/KAMP_Settings.cfg"
+        fi
+    fi
+
+    # --- Axis Twist Compensation: module + cfg + idempotent probe.py patch ---
+    if [ -d "$MODS_DIR/axis_twist_compensation" ] && want "Axis Twist Compensation (left/right first-layer fix)"; then
+        printf "${green}  Installing Axis Twist Compensation${white}\n"
+        backup_extra_once axis_twist_compensation.py
+        cp "$MODS_DIR/axis_twist_compensation/axis_twist_compensation.py" "$KLIPPY_EXTRA_DIR/"
+        if section_defined_elsewhere "[axis_twist_compensation]"; then
+            printf "${yellow}  [axis_twist_compensation] already in your config — keeping yours.${white}\n"
+        else
+            cp "$MODS_DIR/axis_twist_compensation/axis_twist_compensation.cfg" "$GUPPY_CFG_DIR/axis_twist_compensation.cfg"
+        fi
+        [ -f "$KLIPPY_EXTRA_DIR/probe.py" ] && [ ! -f "$BACKUP_DIR/probe.py.bak" ] && cp "$KLIPPY_EXTRA_DIR/probe.py" "$BACKUP_DIR/probe.py.bak"
+        python3 "$MODS_DIR/axis_twist_compensation/patch_probe.py" "$KLIPPY_EXTRA_DIR/probe.py" || \
+            printf "${yellow}  Axis Twist: probe.py not auto-patched (see above); patch by hand if your firmware differs (wiki).${white}\n"
+    fi
+
+    # --- TMC Autotune: modules into klippy/extras (sections written on-screen) ---
+    if [ -d "$MODS_DIR/tmc_autotune" ] && want "TMC Autotune (quieter, cooler steppers)"; then
+        printf "${green}  Installing TMC Autotune modules${white}\n"
+        backup_extra_once autotune_tmc.py
+        backup_extra_once motor_constants.py
+        backup_extra_once motor_database.cfg
+        cp "$MODS_DIR/tmc_autotune/autotune_tmc.py"    "$KLIPPY_EXTRA_DIR/"
+        cp "$MODS_DIR/tmc_autotune/motor_constants.py" "$KLIPPY_EXTRA_DIR/"
+        cp "$MODS_DIR/tmc_autotune/motor_database.cfg" "$KLIPPY_EXTRA_DIR/"
+    fi
+
+    # --- Skew Correction: bare [skew_correction] via the include dir ---
+    if want "Skew Correction (square up parts)"; then
+        if section_defined_elsewhere "[skew_correction]"; then
+            printf "${yellow}  [skew_correction] already in your config — not adding a duplicate.${white}\n"
+        else
+            printf "${green}  Enabling Skew Correction${white}\n"
             printf '[skew_correction]\n' > "$GUPPY_CFG_DIR/skew_correction.cfg"
         fi
+    fi
 
-        # --- Axis Twist Compensation: module + cfg + idempotent probe.py patch ---
-        if [ -d "$MODS_DIR/axis_twist_compensation" ]; then
-            printf "${green}Installing Axis Twist Compensation ${white}\n"
-            backup_extra_once axis_twist_compensation.py
-            cp "$MODS_DIR/axis_twist_compensation/axis_twist_compensation.py" "$KLIPPY_EXTRA_DIR/"
-            if section_defined_elsewhere "[axis_twist_compensation]"; then
-                printf "${yellow}[axis_twist_compensation] already in your config — keeping yours, not adding ours.${white}\n"
+    # --- Creality Nebula camera: persistent image tuning + H.264 stream ---
+    if want "Creality Nebula camera (persistent image tuning + H.264 stream)"; then
+        if [ -f "$MODS_DIR/nebula_camera/nebula_camera.cfg" ]; then
+            if section_defined_elsewhere "[gcode_macro APPLY_CAM_SETTINGS]"; then
+                printf "${yellow}  Camera persist macros already present — leaving yours.${white}\n"
             else
-                cp "$MODS_DIR/axis_twist_compensation/axis_twist_compensation.cfg" "$GUPPY_CFG_DIR/axis_twist_compensation.cfg"
-            fi
-            if [ -f "$KLIPPY_EXTRA_DIR/probe.py" ] && [ ! -f "$BACKUP_DIR/probe.py.bak" ]; then
-                cp "$KLIPPY_EXTRA_DIR/probe.py" "$BACKUP_DIR/probe.py.bak"
-            fi
-            if python3 "$MODS_DIR/axis_twist_compensation/patch_probe.py" "$KLIPPY_EXTRA_DIR/probe.py"; then
-                :
-            else
-                printf "${yellow}  Axis Twist: probe.py was NOT auto-patched (message above). The module is\n"
-                printf "${yellow}  installed; if your firmware's probe.py differs, patch it by hand (wiki).${white}\n"
+                printf "${green}  Installing Nebula camera persist macros${white}\n"
+                cp "$MODS_DIR/nebula_camera/nebula_camera.cfg" "$GUPPY_CFG_DIR/nebula_camera.cfg"
             fi
         fi
-
-        printf "${green}Print-quality mods installed.${white}\n"
-        printf "${yellow}  Still need a one-time setup (see the OpenKE wiki):\n"
-        printf "${yellow}    Axis Twist:  BED_MESH_CLEAR; AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5; SAVE_CONFIG\n"
-        printf "${yellow}    KAMP:        add ADAPTIVE_BED_MESH_CALIBRATE / SMART_PARK / LINE_PURGE to slicer start g-code\n"
-        printf "${yellow}    TMC Autotune & Skew: configure on-screen (Tune tab).${white}\n"
+        if [ -f "$K1_GUPPY_DIR/k1_mods/h264cam/install.sh" ]; then
+            printf "${green}  Installing H.264 camera stream (go2rtc)${white}\n"
+            sh "$K1_GUPPY_DIR/k1_mods/h264cam/install.sh"
+        fi
     fi
-else
-    printf "${yellow}Skipping print-quality mods.${white}\n"
+
+    # --- Pause/Resume layer-shift fix (PAUSE y_park 222 -> 220) ---
+    if want "Pause/Resume layer-shift fix (y_park 222->220)"; then
+        GM="$K1_CONFIG_DIR/gcode_macro.cfg"
+        if [ -f "$GM" ] && grep -q "{% set y_park = 222 %}" "$GM"; then
+            [ ! -f "$BACKUP_DIR/gcode_macro.cfg.bak-ypark" ] && cp "$GM" "$BACKUP_DIR/gcode_macro.cfg.bak-ypark"
+            sed -i 's/{% set y_park = 222 %}/{% set y_park = 220 %}/' "$GM"
+            printf "${green}  Applied layer-shift fix (PAUSE y_park 222 -> 220)${white}\n"
+        else
+            printf "${yellow}  Layer-shift fix: y_park=222 not found in gcode_macro.cfg (already fixed or different config); skipped.${white}\n"
+        fi
+    fi
+
+    printf "${green}Optional features done.${white}\n"
+    printf "${yellow}  One-time setup still needed where applicable (see the OpenKE wiki):\n"
+    printf "${yellow}    Axis Twist: BED_MESH_CLEAR; AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5; SAVE_CONFIG\n"
+    printf "${yellow}    KAMP:       add ADAPTIVE_BED_MESH_CALIBRATE / SMART_PARK / LINE_PURGE to slicer start g-code\n"
+    printf "${yellow}    TMC Autotune & Skew: configure on-screen (Tune tab).${white}\n"
 fi
 
 sync

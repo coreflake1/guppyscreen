@@ -16,9 +16,14 @@ The "self-contained project + real docs" release: vendored mods, a smarter insta
   (adaptive mesh + purge, pre-edited for the KE), **Axis Twist Compensation** (Klipper v0.12.0 module +
   idempotent `probe.py` patcher), and **TMC Autotune** (evgarthub K1 fork). Each carries its upstream
   `LICENSE`/`NOTICE`; see [`docs/VENDORING.md`](docs/VENDORING.md). No more cloning other repos by hand.
-- **Installer print-quality-mods prompt** — one opt-in step sets up KAMP, Axis Twist, TMC Autotune, and
-  Skew Correction (sections added via the `GuppyScreen/*.cfg` include mechanism; only the Axis-Twist
-  `probe.py` patch touches Klipper core, and it's backed up first).
+- **Installer "optional features" prompt** with **install-all / skip-all / choose-each** — set up any
+  combination of: KAMP, Axis Twist, TMC Autotune, Skew Correction, the **Creality Nebula camera**
+  (persistent image tuning + H.264 stream, as one option), and the **Pause/Resume layer-shift fix**
+  (`y_park` 222→220). Config installs via the `GuppyScreen/*.cfg` include mechanism; only the Axis-Twist
+  `probe.py` patch and the layer-shift `gcode_macro.cfg` edit touch existing files, and both are backed
+  up first and guarded (skipped if not applicable).
+- **Self-contained Nebula camera persist macros** (`nebula_camera.cfg`) — re-applies image settings on
+  every boot so they survive reboots, with or without the Helper Script's `CAM_*` macros.
 - **Real, split wiki** — User vs Developer sections, plain "reddit-style" guides, including new
   **Perfect prints — start here** and **Calibration, explained** (recalibrate-vs-reset, hardware-change
   matrix) pages. Publishing mechanism documented in **Publishing this wiki**.

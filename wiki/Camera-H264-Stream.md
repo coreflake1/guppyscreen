@@ -4,6 +4,10 @@ The Creality **Nebula** camera streams to Mainsail as **MJPEG** by default — w
 
 **Why you'd want it:** ~14× less bandwidth, lower latency, smoother motion — much easier on the KE's WiFi and far better for remote/mobile viewing. (It is *not* sharper per-frame — see [Honest limitations](#honest-limitations).)
 
+> 💡 **Shortcut:** the OpenKE [installer](Installation) installs this for you — pick the **Creality Nebula
+> camera** option (it sets up this H.264 stream *and* the persistent [image tuning](Camera-Image-Tuning)).
+> The manual one-liner below still works if you'd rather run it on its own.
+
 ---
 
 ## How it works (short version)

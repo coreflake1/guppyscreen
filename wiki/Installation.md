@@ -23,21 +23,39 @@ The installer:
 4. Substitutes the `<GUPPY_DIR>` / `<PRINTER_DATA_DIR>` placeholders in `guppyconfig.json`.
 5. Smoke-tests the binary, wires up Klipper extras, and installs the init script.
 6. Starts GuppyScreen via `/etc/init.d/S99guppyscreen`.
-7. **Offers the print-quality mods** (see below) under a `Y/n` prompt.
+7. **Offers the optional features** (see below).
 
-## Print-quality mods (optional prompt)
+## Optional features (pick what you want)
 
-Near the end the installer asks: **"Install OpenKE print-quality mods? (Y/n)"** (default yes). Say yes and
-it sets up the Klipper side of the on-screen calibration tools — no cloning repos, no editing config:
+Near the end the installer asks:
 
-- **KAMP** — adaptive bed mesh + purge ([guide](KAMP-and-Axis-Twist-Compensation))
-- **Axis Twist Compensation** — left/right first-layer fix ([guide](KAMP-and-Axis-Twist-Compensation))
-- **TMC Autotune** — quieter, cooler steppers ([guide](TMC-Autotune))
-- **Skew Correction** — square parts ([guide](Skew-Correction))
+```
+=== OpenKE optional features ===
+  [Y] install all     [n] skip all     [o] choose each one
+Choice (Y/n/o):
+```
 
-> These still need a **one-time calibration / slicer setup** afterward (the installer can't do the
-> physical part) — each guide above walks you through it. Axis Twist is the only one that edits a Klipper
-> core file (`probe.py`); the installer backs it up first and the edit is reversible.
+- **`Y`** installs everything below.
+- **`n`** skips it all (you can re-run the installer later to add them — it's safe to run again).
+- **`o`** walks you through each one with its own `y/N` prompt, so you can take Axis Twist but skip KAMP,
+  add the camera but not TMC, etc.
+
+What's on offer:
+
+| Feature | What it does | Guide |
+|---|---|---|
+| **KAMP** | adaptive bed mesh + purge | [guide](KAMP-and-Axis-Twist-Compensation) |
+| **Axis Twist Compensation** | left/right first-layer fix | [guide](KAMP-and-Axis-Twist-Compensation) |
+| **TMC Autotune** | quieter, cooler steppers | [guide](TMC-Autotune) |
+| **Skew Correction** | square parts | [guide](Skew-Correction) |
+| **Creality Nebula camera** | image tuning that **sticks across reboots** + a hardware **H.264** stream | [image](Camera-Image-Tuning) · [H.264](Camera-H264-Stream) |
+| **Pause/Resume layer-shift fix** | stops the bed crashing into the rail on resume (`y_park` 222→220) | [guide](Pause-Park-Layer-Shift-Fix) |
+
+> Some of these still need a **one-time calibration / slicer setup** afterward (the installer can't do the
+> physical part) — each guide walks you through it. Axis Twist is the only one that edits a Klipper core
+> file (`probe.py`); the installer backs it up first and the edit is reversible. The layer-shift fix
+> edits `gcode_macro.cfg` (backed up first, and skipped automatically if your config doesn't have the
+> stock `y_park = 222`).
 
 **Coexists with the Creality Helper Script.** If you already set any of these up — by hand or via the
 Helper Script — the installer **detects it and leaves your version alone**: it skips adding a config

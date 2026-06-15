@@ -8,6 +8,10 @@ you set them once and never think about it again.
 
 You don't need to be a programmer — if you can paste a command into a terminal, you can do this.
 
+> 💡 **Shortcut:** the OpenKE [installer](Installation) can set this up — pick the **Creality Nebula
+> camera** option, which installs persist-on-boot macros *and* the [H.264 stream](Camera-H264-Stream)
+> together. The steps below are the manual route, and explain what those macros do.
+
 ---
 
 ## Why camera settings don't stick on their own

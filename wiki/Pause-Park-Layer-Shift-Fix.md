@@ -8,6 +8,10 @@ V3 KE configuration, it has a simple one-line fix, and it's **not** your printer
 You don't need to be a programmer. If you can paste a couple of commands into a terminal, you can do this
 in about five minutes.
 
+> 💡 **Shortcut:** the OpenKE [installer](Installation) can apply this for you — choose the
+> **Pause/Resume layer-shift fix** option. It backs up `gcode_macro.cfg` first and only changes the stock
+> `y_park = 222`. The manual steps below are the same edit, by hand.
+
 ---
 
 ## What you'll see
