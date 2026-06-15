@@ -67,6 +67,16 @@ uninstall_guppy() {
     rm -f "$KLIPPY_EXTRA_DIR_U/tmcstatus.py"
     printf "${green}Removed Klipper symlinks${white}\n"
 
+    # Print-quality mods: KAMP/Skew/ATC cfgs lived in GuppyScreen/ (removed above).
+    # Leave the Klipper modules in place — removing them would break a printer.cfg
+    # that still has saved [autotune_tmc ...] / [axis_twist_compensation] sections.
+    if [ -f "$BACKUP_DIR/probe.py.bak" ]; then
+        printf "${yellow}NOTE: Axis Twist edited probe.py. To fully revert:${white}\n"
+        printf "${yellow}      cp $BACKUP_DIR/probe.py.bak $KLIPPY_EXTRA_DIR_U/probe.py${white}\n"
+        printf "${yellow}      and remove autotune_tmc.py / axis_twist_compensation.py from $KLIPPY_EXTRA_DIR_U${white}\n"
+        printf "${yellow}      plus any [autotune_tmc]/[axis_twist_compensation] sections from printer.cfg.${white}\n"
+    fi
+
     # Optionally remove /usr/data/guppyscreen
     printf "${yellow}Remove $K1_GUPPY_DIR (binary + themes + configs)? (y/n): ${white}"
     read confirm_rm
@@ -290,6 +300,112 @@ fi
 ln -sf $K1_GUPPY_DIR/k1_mods/respawn/libeinfo.so.1 /lib/libeinfo.so.1
 ln -sf $K1_GUPPY_DIR/k1_mods/respawn/librc.so.1 /lib/librc.so.1
 
+
+## ============================================================================
+## OpenKE print-quality mods — KAMP, Axis Twist Compensation, TMC Autotune, Skew
+## Vendored under k1_mods/klipper_mods. KAMP/Skew/ATC config install via the
+## existing [include GuppyScreen/*.cfg] glob (no printer.cfg section edits); only
+## Axis Twist touches Klipper core (probe.py), via an idempotent, backed-up patch.
+## ============================================================================
+MODS_DIR=$K1_GUPPY_DIR/k1_mods/klipper_mods
+GUPPY_CFG_DIR=$K1_CONFIG_DIR/GuppyScreen
+
+# Safety net: a fresh timestamped printer.cfg backup on EVERY run. Your calibration
+# values (z-offset, mesh, input shaper, skew, axis-twist, TMC autotune) live in
+# printer.cfg's SAVE_CONFIG block / variables.cfg, which this installer never rewrites —
+# so a reinstall does not un-calibrate you. This backup is just belt-and-suspenders.
+cp "$K1_CONFIG_DIR/printer.cfg" "$BACKUP_DIR/printer.cfg.$(date +%Y%m%d-%H%M%S).bak" 2>/dev/null || true
+
+# True if a config section is already defined OUTSIDE our managed GuppyScreen/ dir.
+# Used to avoid adding a section the user set up by hand (which would be a duplicate
+# section and crash Klipper). Autosave values under GuppyScreen/ are fine to overlay.
+section_defined_elsewhere() {   # $1 = literal header text, e.g. "[axis_twist_compensation]"
+    grep -rsF "$1" "$K1_CONFIG_DIR" 2>/dev/null | grep -vq "/GuppyScreen/"
+}
+
+# Back up an existing klippy/extras file once before we overwrite it — e.g. a TMC
+# Autotune or axis_twist module a user already installed via the Creality Helper
+# Script or by hand — so their original is recoverable from the backup dir.
+backup_extra_once() {   # $1 = filename in KLIPPY_EXTRA_DIR
+    if [ -f "$KLIPPY_EXTRA_DIR/$1" ] && [ ! -f "$BACKUP_DIR/$1.bak" ]; then
+        cp "$KLIPPY_EXTRA_DIR/$1" "$BACKUP_DIR/$1.bak"
+        printf "${yellow}  Backed up existing $1 -> $BACKUP_DIR/$1.bak${white}\n"
+    fi
+    return 0
+}
+
+printf "${white}=== Install OpenKE print-quality mods? ===\n"
+printf "${green}  KAMP (adaptive mesh + purge), Axis Twist Compensation, TMC Autotune, Skew Correction.\n"
+printf "${white}  Adds the Klipper-side support for the on-screen calibration tools. Axis Twist applies\n"
+printf "${white}  a small, reversible edit to Klipper's probe.py (backed up first).${white}\n\n"
+printf "Install print-quality mods? (Y/n): "
+read confirm_mods
+echo
+
+if [ "$confirm_mods" != "n" ] && [ "$confirm_mods" != "N" ]; then
+    if [ ! -d "$MODS_DIR" ]; then
+        printf "${yellow}Mods dir $MODS_DIR not in this release; skipping mods.${white}\n"
+    else
+        # --- KAMP: drop KAMP/ + KAMP_Settings.cfg into the GuppyScreen include dir ---
+        if [ -d "$MODS_DIR/kamp" ]; then
+            if section_defined_elsewhere "[gcode_macro _KAMP_Settings]"; then
+                printf "${yellow}KAMP already set up by hand elsewhere — leaving your KAMP config untouched.${white}\n"
+            else
+                printf "${green}Installing KAMP (adaptive meshing + purge) ${white}\n"
+                cp -r "$MODS_DIR/kamp/KAMP" "$GUPPY_CFG_DIR/"
+                cp "$MODS_DIR/kamp/KAMP_Settings.cfg" "$GUPPY_CFG_DIR/KAMP_Settings.cfg"
+            fi
+        fi
+
+        # --- TMC Autotune: modules into klippy/extras (sections written on-screen) ---
+        if [ -d "$MODS_DIR/tmc_autotune" ]; then
+            printf "${green}Installing TMC Autotune modules ${white}\n"
+            backup_extra_once autotune_tmc.py
+            backup_extra_once motor_constants.py
+            backup_extra_once motor_database.cfg
+            cp "$MODS_DIR/tmc_autotune/autotune_tmc.py"    "$KLIPPY_EXTRA_DIR/"
+            cp "$MODS_DIR/tmc_autotune/motor_constants.py" "$KLIPPY_EXTRA_DIR/"
+            cp "$MODS_DIR/tmc_autotune/motor_database.cfg" "$KLIPPY_EXTRA_DIR/"
+        fi
+
+        # --- Skew Correction: bare [skew_correction] via the include dir ---
+        if section_defined_elsewhere "[skew_correction]"; then
+            printf "${yellow}[skew_correction] already in your config — not adding a duplicate.${white}\n"
+        else
+            printf "${green}Enabling Skew Correction ${white}\n"
+            printf '[skew_correction]\n' > "$GUPPY_CFG_DIR/skew_correction.cfg"
+        fi
+
+        # --- Axis Twist Compensation: module + cfg + idempotent probe.py patch ---
+        if [ -d "$MODS_DIR/axis_twist_compensation" ]; then
+            printf "${green}Installing Axis Twist Compensation ${white}\n"
+            backup_extra_once axis_twist_compensation.py
+            cp "$MODS_DIR/axis_twist_compensation/axis_twist_compensation.py" "$KLIPPY_EXTRA_DIR/"
+            if section_defined_elsewhere "[axis_twist_compensation]"; then
+                printf "${yellow}[axis_twist_compensation] already in your config — keeping yours, not adding ours.${white}\n"
+            else
+                cp "$MODS_DIR/axis_twist_compensation/axis_twist_compensation.cfg" "$GUPPY_CFG_DIR/axis_twist_compensation.cfg"
+            fi
+            if [ -f "$KLIPPY_EXTRA_DIR/probe.py" ] && [ ! -f "$BACKUP_DIR/probe.py.bak" ]; then
+                cp "$KLIPPY_EXTRA_DIR/probe.py" "$BACKUP_DIR/probe.py.bak"
+            fi
+            if python3 "$MODS_DIR/axis_twist_compensation/patch_probe.py" "$KLIPPY_EXTRA_DIR/probe.py"; then
+                :
+            else
+                printf "${yellow}  Axis Twist: probe.py was NOT auto-patched (message above). The module is\n"
+                printf "${yellow}  installed; if your firmware's probe.py differs, patch it by hand (wiki).${white}\n"
+            fi
+        fi
+
+        printf "${green}Print-quality mods installed.${white}\n"
+        printf "${yellow}  Still need a one-time setup (see the OpenKE wiki):\n"
+        printf "${yellow}    Axis Twist:  BED_MESH_CLEAR; AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5; SAVE_CONFIG\n"
+        printf "${yellow}    KAMP:        add ADAPTIVE_BED_MESH_CALIBRATE / SMART_PARK / LINE_PURGE to slicer start g-code\n"
+        printf "${yellow}    TMC Autotune & Skew: configure on-screen (Tune tab).${white}\n"
+    fi
+else
+    printf "${yellow}Skipping print-quality mods.${white}\n"
+fi
 
 sync
 

@@ -61,7 +61,7 @@ make -j"$(nproc)" \
 
 To build the small-screen layout in the simulator, add `GUPPY_SMALL_SCREEN=1` to the `make` invocation.
 
-Output: `build/bin/guppyscreen`. See **[Development and Simulator](Development-and-Simulator.md)** to run it.
+Output: `build/bin/guppyscreen`. See **[Development and Simulator](Development-and-Simulator)** to run it.
 
 ## 4b. Cross-compile for the Ender-3 V3 KE (MIPS)
 
@@ -112,4 +112,4 @@ from-source replacement for the upstream `ballaswag/guppydev` image, which it re
   `CROSS_COMPILE` switches to a static cross build (`-static`).
 - The `GUPPY_SMALL_SCREEN` define selects the `material_46` asset set and the small-screen layout paths.
 
-See **[Releases and Deployment](Releases-and-Deployment.md)** for packaging the result into a release tarball.
+See **[Releases and Deployment](Releases-and-Deployment)** for packaging the result into a release tarball.

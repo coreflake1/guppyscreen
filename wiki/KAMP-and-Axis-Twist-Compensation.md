@@ -39,14 +39,14 @@ left/right problem; KAMP is a quality-of-life bonus.
 
 - ⏱️ **Time:** about 30–45 minutes, most of it the guided calibration.
 - 🧰 **You need:** the printer on your network, a computer, and a sheet of paper. No tools, no disassembly.
-- 💻 **Skill:** comfortable opening a terminal and pasting commands. That's it.
+- 💻 **Skill:** if you can paste a few commands into the Klipper console, you can do this.
 - ↩️ **Safe to try:** every change here is reversible (see [Undoing it](#undoing-it)), and none of it touches
   your prints until you run the calibration.
 
 > ### ⚠️ One important warning — read this
 > These changes live in the printer's system files. **A Creality firmware update will erase them.** That's
-> not a disaster — this whole page is written so you can redo it in a few minutes — but it's why you should
-> bookmark it. After any firmware update, just run through the [Quick reinstall](#quick-reinstall-after-a-firmware-update) at the bottom.
+> not a disaster — just re-run the OpenKE installer afterwards and the mods come back — but it's why you
+> should bookmark this. After any firmware update, see [After a firmware update](#after-a-firmware-update) at the bottom.
 
 ### What this guide was tested on
 
@@ -59,106 +59,36 @@ left/right problem; KAMP is a quality-of-life bonus.
 
 ---
 
-## Connecting to your printer
+## The installer already set this up
 
-Everything below is typed into your printer over **SSH** (a remote terminal). From your computer:
+Good news: **you don't install KAMP or Axis Twist by hand anymore.** The OpenKE installer does it for you.
 
-```sh
-ssh root@<your-printer-ip>
-```
+When you ran the installer it asked **"Install OpenKE print-quality mods? (Y/n)"** — if you said yes (the
+default), it already:
 
-Replace `<your-printer-ip>` with your printer's address (e.g. `192.168.0.231` — you can find it on the
-printer's WiFi screen). When it asks for a password, use your printer's root password. Windows users: download
-[PuTTY](https://www.putty.org/) and connect the same way.
+- dropped in the **KAMP** config (pre-edited for the KE) and auto-included it,
+- copied the **Axis Twist Compensation** module into Klipper and patched `probe.py` for you (safely, with a
+  backup), and added the `[axis_twist_compensation]` section with the correct KE bed bounds.
 
-**Make a safety backup first** (so you can always undo):
+**Didn't see that prompt, or said no?** Just re-run the [installer](Installation) and answer **Y** at the
+mods prompt. It's idempotent — safe to run again. Then come back here.
 
-```sh
-cd /usr/data/printer_data/config
-cp -a printer.cfg printer.cfg.bak-$(date +%Y%m%d)
-cp -a /usr/share/klipper/klippy/extras/probe.py /usr/share/klipper/klippy/extras/probe.py.bak-$(date +%Y%m%d)
-```
+The only thing left for *you* to do is the one-time calibration below (Axis Twist) and the slicer setup
+(KAMP). Everything that needs a terminal is already done.
 
-You'll also run a few commands in the **Klipper console** — that's the input box in Mainsail/Fluidd (the web
-page you open in a browser to control the printer). We'll say "in the console" when that's the case.
+> You'll run a few commands in the **Klipper console** — that's the input box in Mainsail/Fluidd (the web
+> page you open in a browser to control the printer). We'll say "in the console" when that's the case.
 
 ---
 
 # Part B — Axis Twist Compensation (the left/right first-layer fix)
 
-> Doing just this part? Great — it's the one that fixes the uneven first layer. KAMP (Part A) is optional and
-> can be added later.
+> The module is already installed (see above). This part is the **calibration** — the bit only you can do,
+> since it measures *your* gantry.
 
-### Step 1 — Add the compensation tool to Klipper
+### Calibrate it (the 5-point paper test)
 
-Paste this into your SSH terminal. It downloads one small file that teaches Klipper how to do the correction:
-
-```sh
-wget --no-check-certificate \
-  "https://raw.githubusercontent.com/Klipper3d/klipper/v0.12.0/klippy/extras/axis_twist_compensation.py" \
-  -O /usr/share/klipper/klippy/extras/axis_twist_compensation.py
-```
-
-### Step 2 — Connect the tool to the probe
-
-By itself, the file from Step 1 does nothing — Klipper needs a small edit to actually *use* it during probing.
-Just paste this whole block into SSH; it makes the edit for you, safely. (It refuses to run twice and won't
-break anything if your printer is too different.)
-
-```sh
-python3 - <<'PY'
-import py_compile, sys
-p = '/usr/share/klipper/klippy/extras/probe.py'
-s = open(p).read()
-ANCHOR = '        msg = "probe at %.3f,%.3f is z=%.6f" % (epos[0], epos[1], epos[2] - self.z_offset)'
-if 'axis_twist_compensation' in s:
-    sys.exit('Already done — nothing to change.')
-if s.count(ANCHOR) != 1:
-    sys.exit('STOP: your firmware differs from what this expects. See "If Step 2 says STOP" below.')
-graft = (
-    "        # --- axis_twist_compensation (added by hand) ---\n"
-    "        axis_twist_compensation = self.printer.lookup_object(\n"
-    "            'axis_twist_compensation', None)\n"
-    "        if axis_twist_compensation is not None:\n"
-    "            epos[2] += axis_twist_compensation.get_z_compensation_value(pos)\n"
-)
-open(p, 'w').write(s.replace(ANCHOR, graft + ANCHOR, 1))
-py_compile.compile(p, doraise=True)
-print('Success: the probe is now connected to axis twist compensation.')
-PY
-```
-
-You want to see **"Success:"**. If you see "STOP", jump to [If Step 2 says STOP](#if-step-2-says-stop) — it's
-rare and fixable.
-
-> **Why not the popular Reddit patch?** The widely-shared `.patch` file only works on one exact firmware
-> version (V1.1.0.14) and silently fails on others — that's why so many people report "I followed the guide
-> and nothing changed." The block above does the same edit but adapts to your file, so it keeps working across
-> firmware versions.
-
-### Step 3 — Tell Klipper to use it
-
-Open `printer.cfg` (easiest in Mainsail: **Machine** tab → `printer.cfg`). Add these lines **anywhere above**
-the line that says `#*# <---------------------- SAVE_CONFIG ---------------------->`:
-
-```ini
-[axis_twist_compensation]
-calibrate_start_x: 20
-calibrate_end_x: 200
-calibrate_y: 110
-```
-
-Save the file. These numbers are already correct for the KE — you don't need to change them.
-
-### Step 4 — Restart and calibrate
-
-In the **Klipper console**, restart:
-
-```
-FIRMWARE_RESTART
-```
-
-When it comes back, start the guided calibration. **No heating needed** — just make sure the nozzle tip is
+In the **Klipper console**, start the guided calibration. **No heating needed** — just make sure the nozzle tip is
 clean (no plastic blob):
 
 ```
@@ -191,70 +121,25 @@ left/right unevenness should be gone. 🎉
 *(If the overall height feels slightly off now, just nudge your Z-offset a touch as usual — the twist is
 fixed, this is only fine-tuning.)*
 
-> **Using GuppyKE?** There's now a built-in wizard for this — **Tune → Axis Twist** — that walks you through
-> the same 5-point calibration on the printer's screen, no console needed. (It still needs Steps 1–3 done
-> first, since those add the tool to Klipper.)
+> **On the OpenKE screen:** there's a built-in wizard — **Tune → Axis Twist** — that walks you through this
+> same 5-point calibration on the printer itself, no console needed.
 
 ---
 
 # Part A — KAMP (optional: smarter meshing + auto purge line)
 
-KAMP makes the printer mesh only the footprint of your print (instead of the whole bed every time) and draw a
+KAMP makes the printer mesh only the footprint of your print (instead of the whole bed every time) and draws a
 clean purge line right beside it. It's optional but nice. It needs the **Exclude Object** feature, which the
 KE already has on by default.
 
-### Step 1 — Download KAMP
+### The installer already set up KAMP
 
-```sh
-cd /tmp
-git clone https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging.git kamp-src
-cd /usr/data/printer_data/config
-cp -r /tmp/kamp-src/Configuration ./KAMP
-cp /tmp/kamp-src/Configuration/KAMP_Settings.cfg ./KAMP_Settings.cfg
-```
+The KAMP config (pre-edited for the KE — separate `ADAPTIVE_BED_MESH_CALIBRATE` command, so it doesn't fight
+the KE's built-in meshing) is dropped in and auto-included by the installer. You don't clone anything or edit
+config files. There's just **one optional tweak** and **one required slicer step**:
 
-### Step 2 — One required edit for the KE
-
-KAMP normally *replaces* the printer's built-in meshing command, which doesn't play nicely with the KE's older
-Klipper. We'll make it a **separate** command instead. Open `KAMP/Adaptive_Meshing.cfg` and make three small
-changes:
-
-1. Change the first line of the macro from
-   `[gcode_macro BED_MESH_CALIBRATE]` to `[gcode_macro ADAPTIVE_BED_MESH_CALIBRATE]`
-2. **Delete** the line that starts with `rename_existing:`
-3. Near the bottom, find the line that begins with `_BED_MESH_CALIBRATE` and remove the leading underscore so
-   it reads `BED_MESH_CALIBRATE mesh_min=...` (just delete the `_`).
-
-### Step 3 — KAMP settings
-
-Open `KAMP_Settings.cfg` and make it look like this (these values are tuned for the KE):
-
-```ini
-[include ./KAMP/Adaptive_Meshing.cfg]
-[include ./KAMP/Line_Purge.cfg]
-[include ./KAMP/Smart_Park.cfg]
-
-[gcode_macro _KAMP_Settings]
-variable_verbose_enable: True
-variable_mesh_margin: 0
-variable_fuzz_amount: 0
-variable_purge_height: 0.8
-variable_tip_distance: 0
-variable_purge_margin: 10
-variable_purge_amount: 30
-variable_flow_rate: 12
-variable_smart_park_height: 10
-```
-
-### Step 4 — Turn it on in `printer.cfg`
-
-Add this line near the top of `printer.cfg`, with the other `[include ...]` lines:
-
-```ini
-[include KAMP_Settings.cfg]
-```
-
-And make your `[bed_mesh]` section look like this. **Two settings the KE is fussy about** are flagged:
+**Optional — richer mesh.** KAMP works with the stock 5×5 mesh, but a denser mesh is nicer. If you want it,
+make your `[bed_mesh]` section in `printer.cfg` look like this (the two KE-fussy settings are flagged):
 
 ```ini
 [bed_mesh]
@@ -269,11 +154,9 @@ fade_end: 10
 ```
 
 > Don't add `zero_reference_position` or `relative_reference_index` here — they either aren't supported on the
-> KE or conflict with KAMP. If you copied a config that has them, remove them.
+> KE or conflict with KAMP. If a config you copied has them, remove them.
 
-Restart (`FIRMWARE_RESTART`). KAMP is installed.
-
-### Step 5 — Tell your slicer to use it (OrcaSlicer)
+### Required — tell your slicer to use it (OrcaSlicer)
 
 KAMP runs from your slicer's **Machine start G-code**. In Orca, turn on **Label Objects**, then set your
 machine start G-code to run things in this order:
@@ -294,29 +177,76 @@ purge.
 
 ---
 
-## Undoing it
+## Set it up manually (advanced)
 
-Everything reverts cleanly.
+The installer does all of this for you. If you'd rather do it by hand — or want to know exactly what the
+installer changed — here are the steps.
 
-**Axis Twist Compensation:**
-```sh
-cp -a /usr/share/klipper/klippy/extras/probe.py.bak-<date> /usr/share/klipper/klippy/extras/probe.py
-rm /usr/share/klipper/klippy/extras/axis_twist_compensation.py
-```
-…then delete the `[axis_twist_compensation]` block from `printer.cfg` and `FIRMWARE_RESTART`.
+### Axis Twist (manual)
+1. Drop the module into Klipper:
+   ```sh
+   wget --no-check-certificate \
+     "https://raw.githubusercontent.com/Klipper3d/klipper/v0.12.0/klippy/extras/axis_twist_compensation.py" \
+     -O /usr/share/klipper/klippy/extras/axis_twist_compensation.py
+   ```
+2. Connect it to the probe — make the one edit to `probe.py` shown in
+   [If the installer skipped the probe patch](#if-the-installer-skipped-the-probe-patch-stop) above.
+3. Add the config section to `printer.cfg` (anywhere above the `#*# SAVE_CONFIG` marker):
+   ```ini
+   [axis_twist_compensation]
+   calibrate_start_x: 20
+   calibrate_end_x: 200
+   calibrate_y: 110
+   ```
+4. `FIRMWARE_RESTART`, then run the [calibration](#calibrate-it-the-5-point-paper-test) above.
 
-**KAMP:**
-```sh
-rm -rf /usr/data/printer_data/config/KAMP /usr/data/printer_data/config/KAMP_Settings.cfg
-```
-…then remove `[include KAMP_Settings.cfg]` from `printer.cfg` and `FIRMWARE_RESTART`.
+### KAMP (manual)
+1. Download and copy the config:
+   ```sh
+   cd /tmp
+   git clone https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging.git kamp-src
+   cd /usr/data/printer_data/config
+   cp -r /tmp/kamp-src/Configuration ./KAMP
+   cp /tmp/kamp-src/Configuration/KAMP_Settings.cfg ./KAMP_Settings.cfg
+   ```
+2. Edit `KAMP/Adaptive_Meshing.cfg` so it doesn't override the KE's built-in meshing (this is the part
+   the vendored copy already has done):
+   - rename `[gcode_macro BED_MESH_CALIBRATE]` → `[gcode_macro ADAPTIVE_BED_MESH_CALIBRATE]`
+   - delete the `rename_existing:` line
+   - in the call near the bottom, drop the leading underscore: `_BED_MESH_CALIBRATE …` → `BED_MESH_CALIBRATE …`
+3. In `KAMP_Settings.cfg`, uncomment the includes for `Adaptive_Meshing.cfg`, `Line_Purge.cfg`, and
+   `Smart_Park.cfg`.
+4. Add `[include KAMP_Settings.cfg]` near the top of `printer.cfg`, then `FIRMWARE_RESTART`.
 
 ---
 
-## If Step 2 says STOP
+## Undoing it
 
-This only happens if your firmware's `probe.py` is structured differently than expected (e.g. a much newer or
-older firmware). You can still do the edit by hand:
+Everything reverts cleanly. The easiest path is the installer's uninstall (see [Installation](Installation)),
+which removes the KAMP/Axis-Twist config and tells you how to restore `probe.py`. By hand:
+
+**Axis Twist Compensation:**
+```sh
+cp -a /usr/data/guppyify-backup/probe.py.bak /usr/share/klipper/klippy/extras/probe.py
+rm /usr/share/klipper/klippy/extras/axis_twist_compensation.py
+rm /usr/data/printer_data/config/GuppyScreen/axis_twist_compensation.cfg
+```
+…then delete the saved `[axis_twist_compensation]` block (if any) from `printer.cfg` and `FIRMWARE_RESTART`.
+
+**KAMP:**
+```sh
+rm -rf /usr/data/printer_data/config/GuppyScreen/KAMP \
+       /usr/data/printer_data/config/GuppyScreen/KAMP_Settings.cfg
+```
+…then `FIRMWARE_RESTART`.
+
+---
+
+## If the installer skipped the probe patch ("STOP")
+
+The installer patches `probe.py` automatically, but it deliberately **skips** (printing `STOP`) if your
+firmware's `probe.py` is structured differently than expected — better to skip than half-apply. If that
+happened, do the one edit by hand:
 
 1. Open `/usr/share/klipper/klippy/extras/probe.py`.
 2. Find the function `def _probe` and, just before its `return epos[:3]` line, paste:
@@ -326,17 +256,20 @@ older firmware). You can still do the edit by hand:
         if axis_twist_compensation is not None:
             epos[2] += axis_twist_compensation.get_z_compensation_value(pos)
    ```
-3. Save, then `FIRMWARE_RESTART`. If Klipper comes back happy, continue from Step 3.
+3. Save, then `FIRMWARE_RESTART`. If Klipper comes back happy, carry on to the calibration above.
 
 ---
 
-## Quick reinstall (after a firmware update)
+## After a firmware update
 
-A firmware update wipes these. To put them back in a few minutes:
+A Creality firmware update wipes the Klipper-side changes (this is true of *any* Klipper mod). Putting them
+back takes a couple of minutes:
 
-1. SSH in; back up `printer.cfg` and `probe.py` (the two `cp` commands at the top).
-2. **Axis Twist:** redo Steps 1–3, restart, recalibrate (Step 4), `SAVE_CONFIG`.
-3. **KAMP (if you use it):** redo Steps 1–4. Your slicer start G-code lives on your computer, so it survives
-   the update — but double-check it after any OrcaSlicer update.
+1. **Re-run the OpenKE [installer](Installation)** and answer **Y** at the print-quality-mods prompt. That
+   re-installs KAMP and re-patches `probe.py` for you.
+2. **Re-calibrate Axis Twist** (the 5-point test above) and `SAVE_CONFIG` — the saved correction is cleared by
+   the update.
+3. Your slicer start G-code lives on your computer, so KAMP's slicer side survives — just double-check it after
+   any OrcaSlicer update.
 
-> Bookmark this page. Re-run it after **every** Creality firmware update.
+> Bookmark this page and revisit it after **every** Creality firmware update.

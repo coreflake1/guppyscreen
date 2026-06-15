@@ -24,7 +24,7 @@ This is a KE-focused fork, so CI builds **only the Ender-3 V3 KE asset**:
 
 ## Packaging locally
 
-After a successful build (see [Building from Source](Building-from-Source.md)), package a tarball with:
+After a successful build (see [Building from Source](Building-from-Source)), package a tarball with:
 
 ```bash
 GUPPYSCREEN_VERSION=0.1.1-ke-gui-fixes GUPPY_THEME=blue \
@@ -46,5 +46,5 @@ The on-printer installer downloads the matching `*.tar.gz` from the GitHub relea
 The current release baseline is the `v0.1.1-ke-gui-fixes` tag on `main`. Earlier tags
 (`v0.1.0-ke-bedmesh`, `v0.1.0`, the `0.0.x-beta` series) also exist in the repository history.
 
-See **[Known Issues](Known-Issues.md)** for caveats about which release the installer/updater scripts
+See **[Known Issues](Known-Issues)** for caveats about which release the installer/updater scripts
 currently point at.

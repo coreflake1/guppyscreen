@@ -61,7 +61,7 @@ Ports `1984` / `8554` / `8555` must be reachable. Either port-forward/VPN, or �
 
 - **Quality ceiling ≈ 1 Mbps / 1080p15.** The camera's H.264 bitrate/QP is fixed inside `cam_app` and **cannot be raised** — there's no CLI flag, the live V4L2 controls are per-file-handle (an external `v4l2-ctl` can't reach cam_app's session), and the defaults live in a shared library linked by ~380 system binaries (including boot/display), so patching it is unsafe. This is *the same stream the Creality app shows.*
 - **Not sharper than MJPEG per-frame** — the stock MJPEG actually uses a higher bitrate. H.264's win is **bandwidth + latency + smoothness**, not still-image detail.
-- The image controls still apply: the `CAM_*` macros (see [Camera Image Tuning](Camera-Image-Tuning.md)) act on the capture *upstream* of both encoders, so brightness/contrast/saturation affect this stream too.
+- The image controls still apply: the `CAM_*` macros (see [Camera Image Tuning](Camera-Image-Tuning)) act on the capture *upstream* of both encoders, so brightness/contrast/saturation affect this stream too.
 
 ---
 

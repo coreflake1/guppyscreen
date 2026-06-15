@@ -1,10 +1,10 @@
-# Using GuppyKE — Your Screen, Explained
+# Using OpenKE — Your Screen, Explained
 
 This page is a plain-English tour of what's on your printer's screen and what each tool actually does. No
-jargon, no assumptions. If you've just installed GuppyKE and you're looking at the screen wondering "okay,
+jargon, no assumptions. If you've just installed OpenKE and you're looking at the screen wondering "okay,
 what does all this do?" — start here.
 
-GuppyKE replaces the stock Creality interface with a faster, fuller one. Everything runs **on the printer
+OpenKE replaces the stock Creality interface with a faster, fuller one. Everything runs **on the printer
 itself** — you don't need a phone or computer for day-to-day printing (though Mainsail in a browser still
 works great for remote control).
 
@@ -39,7 +39,7 @@ works great for remote control).
 
 ## The Tune tab: calibration & quality tools
 
-This is where GuppyKE shines. These are the tools that take a printer from "works" to "dialed in." You don't
+This is where OpenKE shines. These are the tools that take a printer from "works" to "dialed in." You don't
 need most of them often — but when you want them, they're right on the screen.
 
 ### First-layer & dimensional accuracy
@@ -48,8 +48,8 @@ need most of them often — but when you want them, they're right on the screen.
 |---|---|---|
 | **Bed Mesh** | Shows the bed's height map as an interactive 3D surface (rotate/zoom) or a table. | To *see* how flat your bed is, or after re-meshing. |
 | **Z Offset** | Live first-layer baby-stepping — Raise/Lower in steps from **0.001** up to 0.05 mm. Saves automatically. | First layer too squished or not sticking. Nudge it mid-print and watch. |
-| **Axis Twist** | A guided 5-point wizard that fixes a first layer that's good in the middle but uneven **left-to-right**. | The classic "one side squished, other side lifting" problem bed mesh can't fix. → [full guide](KAMP-and-Axis-Twist-Compensation.md) |
-| **Skew** | Corrects parts that come out as a slight **parallelogram** instead of square. Print a frame, measure, type in 3 numbers. | Functional parts that need to be truly square. → [full guide](Skew-Correction.md) |
+| **Axis Twist** | A guided 5-point wizard that fixes a first layer that's good in the middle but uneven **left-to-right**. | The classic "one side squished, other side lifting" problem bed mesh can't fix. → [full guide](KAMP-and-Axis-Twist-Compensation) |
+| **Skew** | Corrects parts that come out as a slight **parallelogram** instead of square. Print a frame, measure, type in 3 numbers. | Functional parts that need to be truly square. → [full guide](Skew-Correction) |
 
 ### Print quality & motion
 
@@ -65,7 +65,7 @@ need most of them often — but when you want them, they're right on the screen.
 
 | Tool | What it does | When to use it |
 |---|---|---|
-| **TMC Autotune** | Automatically optimizes your stepper drivers (quieter, cooler, smoother) from the motor type. Pick the motor + a goal and it tunes every boot. | Set once and forget — but the button is greyed out until a small add-on is installed. See the [TMC Autotune guide](TMC-Autotune.md). |
+| **TMC Autotune** | Automatically optimizes your stepper drivers (quieter, cooler, smoother) from the motor type. Pick the motor + a goal and it tunes every boot. | Set once and forget — but the button is greyed out until a small add-on is installed. See the [TMC Autotune guide](TMC-Autotune). |
 | **TMC Metrics** | A live read-out of the stepper drivers — current, temperature, and internal settings. A diagnostic dashboard. | Chasing skipped steps or a hot driver. Otherwise ignorable. |
 | **Power Settings** | Power-device toggles and Power-Loss-Recovery (resume a print after a power cut). | Recovering an interrupted print. |
 
@@ -93,10 +93,10 @@ need most of them often — but when you want them, they're right on the screen.
 
 Most people only need to do these once. They're written step-by-step for non-programmers:
 
-1. **[Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation.md)** — fixes left-to-right
+1. **[Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation)** — fixes left-to-right
    first-layer unevenness. The single highest-impact tweak for the KE.
-2. **[Skew correction](Skew-Correction.md)** — makes functional parts come out truly square.
-3. **[TMC Autotune](TMC-Autotune.md)** — quieter, cooler motors (and how to enable the greyed-out button).
+2. **[Skew correction](Skew-Correction)** — makes functional parts come out truly square.
+3. **[TMC Autotune](TMC-Autotune)** — quieter, cooler motors (and how to enable the greyed-out button).
 
 ---
 

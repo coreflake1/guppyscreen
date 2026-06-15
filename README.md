@@ -1,12 +1,20 @@
-# GuppyScreen — Ender-3 V3 KE Edition
+# OpenKE — Perfect prints on the Ender-3 V3 KE
 
-A fast, standalone touch UI for your **Creality Ender-3 V3 KE**, powered by [Klipper](https://www.klipper3d.org/)
-and [Moonraker](https://github.com/Arksine/moonraker). It runs directly on the printer's screen — no
-X11, Wayland, or display server required — and replaces the stock interface with full print control,
-calibration tools, and an interactive 3D bed mesh.
+**OpenKE** is an open-source toolkit for getting *perfect prints* out of the **Creality Ender-3 V3 KE**.
+It pulls three things most people otherwise hunt down separately into one place:
 
-This is a KE-focused fork of [GuppyScreen](https://github.com/ballaswag/guppyscreen). Current release:
-**GuppyKE (`v0.5.5-GuppyKE`)**.
+- 🖥️ **A fast touch UI** that replaces the stock screen — full print control, an interactive 3D bed
+  mesh, and an on-screen calibration suite. It runs directly on the printer's display (no X11, Wayland,
+  or display server) on top of [Klipper](https://www.klipper3d.org/) and
+  [Moonraker](https://github.com/Arksine/moonraker). This UI is a KE-focused fork of
+  [GuppyScreen](https://github.com/ballaswag/guppyscreen).
+- 🔧 **The Klipper mods that actually improve prints** — adaptive bed mesh + purge (KAMP), Axis Twist
+  Compensation, TMC Autotune, skew correction — gathered and documented for the KE in one project
+  instead of scattered across a dozen other repos.
+- 📚 **Plain-English guides** that explain *how to dial the printer in*, not just which button does what.
+
+> **Naming:** the project is being rebranded **GuppyKE → OpenKE**. The current published release is
+> **`v0.5.5-GuppyKE`**; the OpenKE name lands with the next release.
 
 <p align="center">
   <a href="https://github.com/coreflake1/guppyscreen/releases"><img alt="Release" src="https://img.shields.io/github/v/release/coreflake1/guppyscreen?style=flat-square&include_prereleases"></a>
@@ -27,11 +35,11 @@ This is a KE-focused fork of [GuppyScreen](https://github.com/ballaswag/guppyscr
 - 🔒 **Print-state safety locks** — panels that could ruin a running job are blocked or confirmed mid-print
 - 📐 Tuned **480×272 layout** with the screen mounted the right way up
 
-## What's new in the GuppyKE edition
+## What OpenKE adds (on top of upstream GuppyScreen)
 
-Built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
+The touch UI is built on [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 [probielodan/guppyscreen](https://github.com/probielodan/guppyscreen), with the 3D bed mesh from
-[prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). On top of those, this edition adds:
+[prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). On top of those, OpenKE adds:
 
 **New panels & tools**
 - **Skew Correction** *(new in v0.5)* — square up functional parts from the screen. Print a flat calibration square
@@ -144,14 +152,18 @@ Full details (exactly what changes, what is/isn't restored): **[Installation](wi
 
 ## Required printer setup (Klipper & Creality Helper Script)
 
-GuppyKE drives features that depend on Klipper/Moonraker config. Most KE setups install these through the
+OpenKE drives features that depend on Klipper/Moonraker config. Most KE setups install these through the
 **[Creality Helper Script](https://github.com/Guilouz/Creality-Helper-Script)** — see its
 **[Wiki](https://guilouz.github.io/Creality-Helper-Script-Wiki/)**. The screen still runs without them; the
 related panels just show an empty/disabled state.
 
+> 🚧 **Changing soon:** OpenKE is vendoring the key Klipper mods (KAMP, Axis Twist Compensation, TMC
+> Autotune) into this repo and teaching the installer to set them up, so most of this manual setup goes
+> away from the next release. See the [changelog](CHANGELOG.md).
+
 **Mandatory for the matching feature**
 
-| Feature in GuppyKE | What it needs | Where |
+| Feature in OpenKE | What it needs | Where |
 |---|---|---|
 | **Z-Offset saved between reboots** | Helper Script → **Save Z-Offset Macros** (overrides `SET_GCODE_OFFSET` to mirror every change into `variables.cfg`). Without it the panel still adjusts live, but the value is **not** persisted. | [Save Z-Offset Macros](https://guilouz.github.io/Creality-Helper-Script-Wiki/helper-script/save-z-offset-macros/) |
 | **Firmware Retraction panel** | A `[firmware_retraction]` section in `printer.cfg` (added manually — it is not a Helper Script toggle). | [Klipper docs](https://www.klipper3d.org/Config_Reference.html#firmware_retraction) |

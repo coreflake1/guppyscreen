@@ -7,7 +7,7 @@ still reference older locations. These should be updated:
 
 - **`scripts/installer.sh`** pins `PINNED_RELEASE="v0.1.0-ke-bedmesh"` and the asset URL points at
   `coreflake1/guppyscreen` releases. The installer *script itself* is fetched fresh from `main` (so
-  the install command on the [Installation](Installation.md) page is correct), but the **tarball it
+  the install command on the [Installation](Installation) page is correct), but the **tarball it
   downloads** is the older pinned tag until `PINNED_RELEASE` is bumped.
 - **`scripts/installer-deb.sh`** likewise pins `v0.1.0-ke-bedmesh` and references the
   `ke-advanced-3d-bedmesh` branch in its banner. (This installer is for aarch64/Debian, not the KE.)
@@ -18,7 +18,7 @@ still reference older locations. These should be updated:
 
 - The `View Job` / `Queue Job` buttons in the "print already in progress" dialog are unimplemented stubs.
 - **No automated unit-test suite.** LVGL's own tests are disabled (`LV_BUILD_TEST=0`); verification is
-  via the CI build matrix, the simulator, and on-device testing. See [Development and Simulator](Development-and-Simulator.md).
+  via the CI build matrix, the simulator, and on-device testing. See [Development and Simulator](Development-and-Simulator).
 - The KE install path is hardware-specific. aarch64 and standard-screen MIPS targets are built by CI
   but are less exercised in this fork.
 

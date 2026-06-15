@@ -1,22 +1,30 @@
-### GuppyScreen (KE)
+### 🖨️ OpenKE
 
-**For users**
-- [Home](Home.md)
-- [Installation](Installation.md)
-- [Using GuppyKE (screen tour)](Using-GuppyKE.md)
-- [Perfect First Layer — Axis Twist & KAMP](KAMP-and-Axis-Twist-Compensation.md)
-- [Skew Correction](Skew-Correction.md)
-- [TMC Autotune (quieter steppers)](TMC-Autotune.md)
-- [Layer shift after pause/resume](Pause-Park-Layer-Shift-Fix.md)
-- [Camera image tuning (save settings)](Camera-Image-Tuning.md)
-- [Hardware H.264 camera stream](Camera-H264-Stream.md)
-- [Troubleshooting](Troubleshooting.md)
+**Start here**
+- [Home](Home)
+- [Install OpenKE](Installation)
+- [Perfect prints — start here](Perfect-Prints)
 
-**For developers**
-- [Configuration](Configuration.md)
-- [Building from Source](Building-from-Source.md)
-- [Development & Simulator](Development-and-Simulator.md)
-- [Architecture](Architecture.md)
-- [Releases & Deployment](Releases-and-Deployment.md)
-- [Known Issues](Known-Issues.md)
-- [Contributing](Contributing.md)
+**Get perfect prints**
+- [Calibration, explained](Calibration-Explained)
+- [Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation)
+- [Square parts (Skew Correction)](Skew-Correction)
+- [Quieter steppers (TMC Autotune)](TMC-Autotune)
+
+**Using the screen**
+- [Screen tour](Using-GuppyKE)
+- [Fix layer shift after pause](Pause-Park-Layer-Shift-Fix)
+- [Camera: better image](Camera-Image-Tuning)
+- [Camera: H.264 stream](Camera-H264-Stream)
+- [Troubleshooting](Troubleshooting)
+
+---
+### 🛠️ Developers
+- [Build from source](Building-from-Source)
+- [Dev & simulator](Development-and-Simulator)
+- [Architecture](Architecture)
+- [Configuration](Configuration)
+- [Releases & deployment](Releases-and-Deployment)
+- [Publishing this wiki](Wiki-Publishing)
+- [Known issues](Known-Issues)
+- [Contributing](Contributing)

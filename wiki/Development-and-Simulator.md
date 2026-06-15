@@ -5,7 +5,7 @@ This is the recommended way to develop.
 
 ## Run the simulator
 
-1. Build the simulator (see **[Building from Source](Building-from-Source.md)** → step 4a). Add
+1. Build the simulator (see **[Building from Source](Building-from-Source)** → step 4a). Add
    `GUPPY_SMALL_SCREEN=1` to the build if you want the 480×272 layout.
 2. Create / point a local `guppyconfig.json` at a reachable Moonraker instance, and set `log_path`
    and `thumbnail_path` to **existing** local directories.

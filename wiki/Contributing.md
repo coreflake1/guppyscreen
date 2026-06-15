@@ -4,7 +4,7 @@ Issues and pull requests are welcome.
 
 ## Workflow
 
-1. Develop and test against the **[simulator](Development-and-Simulator.md)** first, then verify on-device
+1. Develop and test against the **[simulator](Development-and-Simulator)** first, then verify on-device
    where relevant.
 2. Keep changes consistent with the existing panel structure and LVGL v8 idioms in `src/` (each screen
    is a `*_panel.cpp`; shared helpers live in `src/utils.cpp`).

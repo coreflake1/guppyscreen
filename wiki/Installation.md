@@ -23,6 +23,29 @@ The installer:
 4. Substitutes the `<GUPPY_DIR>` / `<PRINTER_DATA_DIR>` placeholders in `guppyconfig.json`.
 5. Smoke-tests the binary, wires up Klipper extras, and installs the init script.
 6. Starts GuppyScreen via `/etc/init.d/S99guppyscreen`.
+7. **Offers the print-quality mods** (see below) under a `Y/n` prompt.
+
+## Print-quality mods (optional prompt)
+
+Near the end the installer asks: **"Install OpenKE print-quality mods? (Y/n)"** (default yes). Say yes and
+it sets up the Klipper side of the on-screen calibration tools — no cloning repos, no editing config:
+
+- **KAMP** — adaptive bed mesh + purge ([guide](KAMP-and-Axis-Twist-Compensation))
+- **Axis Twist Compensation** — left/right first-layer fix ([guide](KAMP-and-Axis-Twist-Compensation))
+- **TMC Autotune** — quieter, cooler steppers ([guide](TMC-Autotune))
+- **Skew Correction** — square parts ([guide](Skew-Correction))
+
+> These still need a **one-time calibration / slicer setup** afterward (the installer can't do the
+> physical part) — each guide above walks you through it. Axis Twist is the only one that edits a Klipper
+> core file (`probe.py`); the installer backs it up first and the edit is reversible.
+
+**Coexists with the Creality Helper Script.** If you already set any of these up — by hand or via the
+Helper Script — the installer **detects it and leaves your version alone**: it skips adding a config
+section you already have (no duplicate-section crash), and it backs up any Klipper-extras module it
+overwrites (e.g. an existing TMC Autotune) to `/usr/data/guppyify-backup/` first. Macros OpenKE *relies
+on* but doesn't ship — `M600`/filament, Save-Z-Offset, useful macros, `[exclude_object]` — are left
+entirely to the Helper Script; OpenKE just uses them if present and shows an empty/disabled panel if not.
+So it's safe to run on top of an existing Helper-Script setup.
 
 ## What the installer changes
 
@@ -43,8 +66,20 @@ The installer:
 ¹ The KE's stock `S50dropbear` has its `start` call commented out, so SSH does not auto-start on a
 clean reboot. The replacement fixes this — SSH will auto-start after install.
 
-Backups are written to `/usr/data/guppyify-backup/` **before** any destructive change, including a copy
-of `printer.cfg` taken before the `[include]` line is added.
+Backups are written to `/usr/data/guppyify-backup/` **before** any destructive change. A fresh,
+timestamped copy of `printer.cfg` (`printer.cfg.YYYYMMDD-HHMMSS.bak`) is taken on **every** run.
+
+### Will reinstalling lose my calibrations?
+
+**No.** Your calibration *values* — Z-offset, bed mesh, input shaper, skew, axis-twist, TMC Autotune —
+live in `printer.cfg`'s `SAVE_CONFIG` block (and Z-offset in `variables.cfg`). The installer only *adds*
+includes and copies files; it never rewrites those saved values, so re-running it does **not**
+un-calibrate your printer. The probe-patch backup (`probe.py.bak`) and the timestamped `printer.cfg`
+backups give you a restore point regardless.
+
+> The one thing that *does* wipe calibrations is a **Creality firmware update** (it can reset
+> `printer.cfg` and erase Klipper-side files) — that's true of any Klipper mod, not OpenKE specifically.
+> After a firmware update, re-run the installer and re-run the affected calibrations.
 
 ## Uninstall
 
@@ -64,6 +99,12 @@ the GuppyScreen config directory, and removes the Klipper symlinks.
 - `Monitor` / `display-server` if they were renamed to `.disable` — restore with
   `mv /usr/bin/Monitor.disable /usr/bin/Monitor` (and likewise for `display-server`)
 - `libeinfo.so.1` / `librc.so.1` symlinks in `/lib/`
+- The print-quality mod modules in Klipper extras (`autotune_tmc.py`, `motor_constants.py`,
+  `axis_twist_compensation.py`) and the `probe.py` Axis-Twist edit. These are left in place on purpose —
+  removing them would break a `printer.cfg` that still has saved `[autotune_tmc]` /
+  `[axis_twist_compensation]` sections. To fully revert, restore
+  `cp /usr/data/guppyify-backup/probe.py.bak /usr/share/klipper/klippy/extras/probe.py`, delete those
+  modules, and remove the matching sections from `printer.cfg`. The uninstaller prints these exact steps.
 
 A reboot is required after uninstall to restore display services.
 
@@ -78,4 +119,4 @@ A reboot is required after uninstall to restore display services.
 > ⚠️ **Caveat:** because the service is supervised, simply `kill`-ing the process will cause it to
 > respawn. Use `/etc/init.d/S99guppyscreen stop` to stop it cleanly.
 
-See **[Known Issues](Known-Issues.md)** for the current installer version caveats.
+See **[Known Issues](Known-Issues)** for the current installer version caveats.
