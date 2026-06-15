@@ -84,6 +84,12 @@ What's on offer:
 > printer you get the lot; on top of an existing Helper-Script setup, the conflicting ones are skipped (you
 > already have them). Exclude Object also flips `enable_object_processing` on in `moonraker.conf` when safe.
 
+> **Restarting after changes:** the installer restarts Klipper for you. On the KE, the *first* restart
+> after a config change occasionally shuts down with a `serialqueue … NoneType` error — this is a harmless
+> host-MCU reconnect race, **not** a config problem. Just **Restart Klipper** again (Mainsail → *Restart*,
+> which is more reliable than a bare `FIRMWARE_RESTART`); a cold boot always clears it. It can take more
+> than one restart. See [Troubleshooting](Troubleshooting).
+
 **Coexists with the Creality Helper Script.** If you already set any of these up — by hand or via the
 Helper Script — the installer **detects it and leaves your version alone**: it skips adding a config
 section you already have (no duplicate-section crash), and it backs up any Klipper-extras module it

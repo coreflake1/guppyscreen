@@ -117,7 +117,8 @@ That zeroes the correction. Re-running Steps 1–3 overwrites it with fresh meas
 
 The OpenKE installer enables this for you (it ships a `[skew_correction]` section). If **Tune → Skew**
 shows *"Skew correction isn't enabled"*, the quickest fix is to **re-run the [installer](Installation)**
-and answer **Y** at the print-quality-mods prompt, then `FIRMWARE_RESTART`.
+and answer **Y** at the print-quality-mods prompt, then **Restart Klipper** (if it shuts down with a
+`serialqueue` error, restart once more — see [Troubleshooting](Troubleshooting)).
 
 Prefer to do it by hand? It's one bare section (no settings):
 

@@ -2,6 +2,7 @@
 
 | Symptom | Cause / fix |
 |---|---|
+| Klipper shuts down after a restart with `serialqueue … NoneType` / "Unhandled exception during run" | Known KE host-MCU reconnect race — **not** a config problem. Just restart Klipper again; a full **Restart Klipper** (Mainsail → *Restart* → host, or the installer's service restart) is more reliable than a bare `FIRMWARE_RESTART`, and a cold boot always clears it. It can need **more than one** restart. |
 | Screen upside-down or 90° wrong | Set `display_rotate: 2` in `guppyconfig.json` (KE default). `0` = upside-down, `1` = wrong axis. See [Configuration](Configuration). |
 | White screen after wake from sleep | Fixed on `main`; if a stuck framebuffer state remains, a full reboot clears it. |
 | Simulator crashes on startup with `spdlog_ex: Failed opening file` | The directory in `log_path` doesn't exist — create it. |

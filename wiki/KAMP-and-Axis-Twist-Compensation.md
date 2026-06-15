@@ -198,7 +198,8 @@ installer changed — here are the steps.
    calibrate_end_x: 200
    calibrate_y: 110
    ```
-4. `FIRMWARE_RESTART`, then run the [calibration](#calibrate-it-the-5-point-paper-test) above.
+4. **Restart Klipper** (if it shuts down with a `serialqueue` error, restart once more —
+   [Troubleshooting](Troubleshooting)), then run the [calibration](#calibrate-it-the-5-point-paper-test) above.
 
 ### KAMP (manual)
 1. Download and copy the config:
@@ -216,7 +217,8 @@ installer changed — here are the steps.
    - in the call near the bottom, drop the leading underscore: `_BED_MESH_CALIBRATE …` → `BED_MESH_CALIBRATE …`
 3. In `KAMP_Settings.cfg`, uncomment the includes for `Adaptive_Meshing.cfg`, `Line_Purge.cfg`, and
    `Smart_Park.cfg`.
-4. Add `[include KAMP_Settings.cfg]` near the top of `printer.cfg`, then `FIRMWARE_RESTART`.
+4. Add `[include KAMP_Settings.cfg]` near the top of `printer.cfg`, then **Restart Klipper** (if it shuts
+   down with a `serialqueue` error, restart once more — [Troubleshooting](Troubleshooting)).
 
 ---
 

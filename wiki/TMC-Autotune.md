@@ -19,7 +19,9 @@ button when it's present.** The installer puts it there for you, so normally it'
 
 If it's still greyed out, you either declined the print-quality mods at install time, or a firmware
 update wiped them. The fix is one step: **re-run the OpenKE [installer](Installation)**, answer **Y** at
-the mods prompt (it's safe to run again), then `FIRMWARE_RESTART`. Done.
+the mods prompt (it's safe to run again), then **Restart Klipper**. Done. *(If it shuts down with a
+`serialqueue … NoneType` error, that's a harmless KE restart race — just restart once more, see
+[Troubleshooting](Troubleshooting).)*
 
 A couple of things this is *not*:
 
@@ -173,7 +175,9 @@ All three are required; `motor_database.cfg` is read automatically (no `[include
 `/usr/data/printer_data/config/GuppyScreen/guppy_cmd.cfg` (OpenKE now ships this by default, so you may
 already have it). Without it, the on-screen Save fails with "Unknown command".
 
-**3. Restart** — `FIRMWARE_RESTART` in the Klipper console. The button lights up.
+**3. Restart** — **Restart Klipper** (Mainsail → *Restart*, or `FIRMWARE_RESTART`). The button lights up.
+If Klipper shuts down with a `serialqueue` error on the first try, restart once more — it's a harmless KE
+host-MCU race ([Troubleshooting](Troubleshooting)).
 
 ---
 

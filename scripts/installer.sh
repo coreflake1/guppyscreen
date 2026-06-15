@@ -546,6 +546,9 @@ echo
 if [ "$confirm" = "y" -o "$confirm" = "Y" ]; then
     echo "Restarting Klipper"
     /etc/init.d/S55klipper_service restart
+    printf "${yellow}Note: on the KE the first restart after a config change can shut down with a\n"
+    printf "${yellow}'serialqueue ... NoneType' error (a host-MCU reconnect race, harmless). If Klipper\n"
+    printf "${yellow}shows 'shutdown', just restart it again (Mainsail -> Restart) or cold-boot.${white}\n"
 else
     printf "${red}Some GuppyScreen functionality won't work until Klipper is restarted. ${white}\n"
 fi
