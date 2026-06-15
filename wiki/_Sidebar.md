@@ -3,6 +3,7 @@
 **Start here**
 - [Home](Home)
 - [Install OpenKE](Installation)
+- [Upgrading from an older version](Upgrading)
 - [Perfect prints — start here](Perfect-Prints)
 
 **Get perfect prints**

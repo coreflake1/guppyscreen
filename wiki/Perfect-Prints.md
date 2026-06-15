@@ -39,8 +39,11 @@ twisted, which tilts the probe. The on-screen **Axis Twist wizard** measures and
 
 ### 4. Input shaper — kill ringing/ghosting
 Those faint echoes after sharp corners are vibration. Input shaping cancels it so you can print **fast
-and clean**. The KE ships already shaped; you only need to redo it if you change the moving hardware
-(see below). Run it from the screen's input-shaper tool.
+and clean**. The KE has an onboard accelerometer, so you can measure and apply input shaping right from
+the screen's input-shaper tool. Your config may already hold shaper values (from a previous calibration —
+check **Tune → Input Shaper**, or look for `[input_shaper]` in your config), but running the calibration
+yourself dials it in for *your* machine. Redo it whenever you change an axis's moving hardware — see
+[Calibration, explained](Calibration-Explained).
 
 ### 5. Pressure advance + flow + temps — the slicer side
 Corner bulges, gaps, over/under-extrusion — these are dialed in your slicer and with pressure advance.

@@ -17,7 +17,8 @@ OpenKE is three things in one project:
 
 > **Heads-up on the name:** this project used to be called **GuppyKE** and is being renamed to
 > **OpenKE**. You'll still see `GuppyKE` in the current release tag (`v0.5.5-GuppyKE`) and a few file
-> names — that's the same project.
+> names — that's the same project. **Already running an older version?** See
+> [Upgrading from an older version](Upgrading).
 
 ## New here? Do this
 
