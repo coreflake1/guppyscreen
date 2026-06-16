@@ -380,10 +380,13 @@ void InputShaperPanel::handle_macro_response(json &j) {
           lv_obj_move_background(xspinner);
           {
             auto &b = res["/best"_json_pointer];
-            if (!b.is_null()) {
+            if (b.is_string()) {
               auto bn = b.template get<std::string>();
-              double bf = res["/shapers"][bn]["freq"].template get<double>();
-              KUtils::notify_toast(fmt::format("X done - recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
+              auto &fq = res["shapers"][bn]["freq"];
+              if (fq.is_number()) {
+                KUtils::notify_toast(fmt::format("X done - recommended {} @ {:.1f} Hz. Tap Save to apply.",
+                  bn, fq.template get<double>()), 4000);
+              }
             }
           }
           x_pending = false;   // X is finished regardless of what's next
@@ -425,10 +428,13 @@ void InputShaperPanel::handle_macro_response(json &j) {
           lv_obj_move_background(yspinner);
           {
             auto &b = res["/best"_json_pointer];
-            if (!b.is_null()) {
+            if (b.is_string()) {
               auto bn = b.template get<std::string>();
-              double bf = res["/shapers"][bn]["freq"].template get<double>();
-              KUtils::notify_toast(fmt::format("Y done - recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
+              auto &fq = res["shapers"][bn]["freq"];
+              if (fq.is_number()) {
+                KUtils::notify_toast(fmt::format("Y done - recommended {} @ {:.1f} Hz. Tap Save to apply.",
+                  bn, fq.template get<double>()), 4000);
+              }
             }
           }
           y_pending = false;   // Y is the last axis when both are run
