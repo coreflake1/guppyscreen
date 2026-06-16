@@ -79,6 +79,7 @@ InputShaperPanel::InputShaperPanel(KWebSocketClient &c, std::mutex &l)
   , x_pending(false)
   , y_pending(false)
   , x_after_move(false)
+  , next_axis_is_x(false)
   , cal_watchdog(NULL)
 {
   lv_obj_move_background(cont);
@@ -307,41 +308,11 @@ void InputShaperPanel::handle_callback(lv_event_t *event) {
       return;
     }
 
-    bool graph = lv_obj_has_state(graph_switch, LV_STATE_CHECKED);
-    bool homing = !KUtils::is_homed();
-    std::string graph_note = graph ? " Graph is on, so it's slower." : "";
-    std::string home_note = homing ? " (homing first)" : "";
-    std::string msg;
-    if (x_requested && y_requested) {
-      msg = fmt::format("Calibrating both axes. Mount the accelerometer for Y (on the bed) first — "
-        "you'll be prompted to move it to the toolhead for X. ~1 min each.{}{}", graph_note, home_note);
-    } else if (y_requested) {
-      msg = fmt::format("Calibrating Y — accelerometer on the bed. ~1 min.{}{}", graph_note, home_note);
-    } else {
-      msg = fmt::format("Calibrating X — accelerometer on the toolhead. ~1 min.{}{}", graph_note, home_note);
-    }
-    KUtils::notify_toast(msg, 5000);
-
     // Axes run ONE AT A TIME so the accelerometer can be moved between them.
-    // Both selected -> run Y now, prompt to relocate the sensor, then run X.
-    calibrate_btn.disable();
-    save_btn.disable();
+    // Confirm placement before each axis; both -> Y first, then prompt for X.
     x_after_move = (x_requested && y_requested);
-    y_pending = y_requested;
-    x_pending = x_requested && !y_requested;   // X runs first only when it's X-only
-    if (cal_watchdog != NULL) {
-      lv_timer_del(cal_watchdog);
-      cal_watchdog = NULL;
-    }
-    cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb, 240000, this);
-    lv_timer_set_repeat_count(cal_watchdog, 1);
-
-    if (homing) {
-      ws.gcode_script("G28");
-    }
-
-    // run Y first whenever it's requested (sensor on the bed); otherwise X
-    start_axis(!y_requested);
+    // Y first whenever it's requested (sensor on the bed); otherwise X.
+    show_placement_prompt(/*is_x=*/!y_requested, /*moving=*/false);
 
   } else if (btn == save_btn.get_container()) {
     double xhz = (double)lv_slider_get_value(xslider) / 10.0;
@@ -450,6 +421,7 @@ void InputShaperPanel::handle_macro_response(json &j) {
               KUtils::notify_toast(fmt::format("Y done — recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
             }
           }
+          y_pending = false;   // Y is finished regardless of what's next
           if (x_after_move) {
             // both axes: stop the watchdog (the user may take a while to move the
             // sensor) and prompt; X runs when they confirm.
@@ -457,9 +429,9 @@ void InputShaperPanel::handle_macro_response(json &j) {
               lv_timer_del(cal_watchdog);
               cal_watchdog = NULL;
             }
-            show_move_sensor_prompt();
-          } else {
-            axis_finished(false);
+            show_placement_prompt(/*is_x=*/true, /*moving=*/true);
+          } else if (!x_pending && !y_pending) {
+            end_calibration_ui();
           }
         }
       }
@@ -672,35 +644,67 @@ void InputShaperPanel::start_axis(bool is_x) {
   lv_obj_move_foreground(spinner);
 }
 
-void InputShaperPanel::show_move_sensor_prompt() {
-  static const char *btns[] = {"Continue", "Cancel", ""};
-  lv_obj_t *mbox = lv_msgbox_create(NULL, "Move the accelerometer",
-    "Y axis done.\n\nMount the accelerometer on the TOOLHEAD (for X), then tap Continue.",
-    btns, false);
-  KUtils::style_lock_mbox(mbox, 90);
-  lv_obj_add_event_cb(mbox, &InputShaperPanel::_move_prompt_cb, LV_EVENT_VALUE_CHANGED, this);
+void InputShaperPanel::begin_axis(bool is_x) {
+  calibrate_btn.disable();
+  save_btn.disable();
+
+  bool homing = !KUtils::is_homed();
+  bool graph = lv_obj_has_state(graph_switch, LV_STATE_CHECKED);
+  KUtils::notify_toast(
+    fmt::format("Calibrating {} — it'll move & shake for ~1 min. Leave it be.{}{}",
+      is_x ? "X" : "Y",
+      homing ? " (homing first)" : "",
+      graph ? " Graph is on, so it's slower." : ""),
+    5000);
+
+  if (is_x) {
+    x_pending = true;
+  } else {
+    y_pending = true;
+  }
+
+  if (cal_watchdog != NULL) {
+    lv_timer_del(cal_watchdog);
+    cal_watchdog = NULL;
+  }
+  cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb, 240000, this);
+  lv_timer_set_repeat_count(cal_watchdog, 1);
+
+  if (homing) {
+    ws.gcode_script("G28");
+  }
+  start_axis(is_x);
 }
 
-void InputShaperPanel::_move_prompt_cb(lv_event_t *e) {
+void InputShaperPanel::show_placement_prompt(bool is_x, bool moving) {
+  next_axis_is_x = is_x;
+  static const char *btns[] = {"Continue", "Cancel", ""};
+  const char *title = moving ? "Move the accelerometer" : "Position the accelerometer";
+  std::string body =
+    moving
+      ? std::string("Y axis done.\n\nMount the accelerometer on the TOOLHEAD (for X), then tap Continue.")
+      : (is_x
+          ? std::string("Mount the accelerometer on the TOOLHEAD (for X), then tap Continue.")
+          : std::string("Mount the accelerometer on the BED (for Y), then tap Continue."));
+  lv_obj_t *mbox = lv_msgbox_create(NULL, title, body.c_str(), btns, false);
+  KUtils::style_lock_mbox(mbox, 90);
+  lv_obj_add_event_cb(mbox, &InputShaperPanel::_placement_prompt_cb, LV_EVENT_VALUE_CHANGED, this);
+}
+
+void InputShaperPanel::_placement_prompt_cb(lv_event_t *e) {
   lv_obj_t *mbox = lv_event_get_current_target(e);
   InputShaperPanel *self = (InputShaperPanel *)lv_event_get_user_data(e);
   uint32_t btn = lv_msgbox_get_active_btn(mbox);
   lv_msgbox_close(mbox);
 
-  self->x_after_move = false;
-  if (btn == 0) {
-    // Continue -> run X (sensor now on the toolhead)
-    self->x_pending = true;
-    if (self->cal_watchdog != NULL) {
-      lv_timer_del(self->cal_watchdog);
-      self->cal_watchdog = NULL;
+  if (btn == 0) {                         // Continue
+    bool is_x = self->next_axis_is_x;
+    if (is_x) {
+      self->x_after_move = false;         // X is now running, nothing deferred
     }
-    self->cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb, 240000, self);
-    lv_timer_set_repeat_count(self->cal_watchdog, 1);
-    KUtils::notify_toast("Calibrating X — accelerometer on the toolhead. Leave it be.", 4000);
-    self->start_axis(true);
-  } else {
-    // Cancel -> keep Y's result; re-enable controls
-    self->end_calibration_ui();
+    self->begin_axis(is_x);
+  } else {                                // Cancel
+    self->x_after_move = false;
+    self->end_calibration_ui();           // idempotent; keeps any axis already saved
   }
 }

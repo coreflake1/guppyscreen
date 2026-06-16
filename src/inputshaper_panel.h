@@ -54,9 +54,12 @@ class InputShaperPanel {
   void handle_watchdog();
   // kick off TEST_RESONANCES for one axis (gcode + spinner/graph reset)
   void start_axis(bool is_x);
-  // both-axes flow: prompt to relocate the accelerometer, then run X on confirm
-  void show_move_sensor_prompt();
-  static void _move_prompt_cb(lv_event_t *e);
+  // lock controls + home (if needed) + watchdog + run one axis
+  void begin_axis(bool is_x);
+  // confirm accelerometer placement before an axis; runs it on Continue.
+  // moving=true is the "Y done, relocate for X" wording.
+  void show_placement_prompt(bool is_x, bool moving);
+  static void _placement_prompt_cb(lv_event_t *e);
 
  private:
   KWebSocketClient &ws;
@@ -109,6 +112,7 @@ class InputShaperPanel {
   bool x_pending;
   bool y_pending;
   bool x_after_move;   // both axes selected: X is deferred until the sensor is moved
+  bool next_axis_is_x; // which axis the active placement prompt will start on Continue
   lv_timer_t *cal_watchdog;
 
   static std::vector<std::string> shapers;
