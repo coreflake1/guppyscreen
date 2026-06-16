@@ -328,7 +328,7 @@ void InputShaperPanel::handle_callback(lv_event_t *event) {
       xhz, xbuf, yhz, ybuf));
 
     KUtils::notify_toast(
-      fmt::format("Saved — X: {} @ {:.1f} Hz, Y: {} @ {:.1f} Hz. Klipper is restarting to apply it "
+      fmt::format("Saved - X: {} @ {:.1f} Hz, Y: {} @ {:.1f} Hz. Klipper is restarting to apply it "
         "(if it shows 'shutdown', just restart it again).", xbuf, xhz, ybuf, yhz),
       6000);
 
@@ -383,7 +383,7 @@ void InputShaperPanel::handle_macro_response(json &j) {
             if (!b.is_null()) {
               auto bn = b.template get<std::string>();
               double bf = res["/shapers"][bn]["freq"].template get<double>();
-              KUtils::notify_toast(fmt::format("X done — recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
+              KUtils::notify_toast(fmt::format("X done - recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
             }
           }
           x_pending = false;   // X is finished regardless of what's next
@@ -428,7 +428,7 @@ void InputShaperPanel::handle_macro_response(json &j) {
             if (!b.is_null()) {
               auto bn = b.template get<std::string>();
               double bf = res["/shapers"][bn]["freq"].template get<double>();
-              KUtils::notify_toast(fmt::format("Y done — recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
+              KUtils::notify_toast(fmt::format("Y done - recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
             }
           }
           y_pending = false;   // Y is the last axis when both are run
@@ -439,7 +439,7 @@ void InputShaperPanel::handle_macro_response(json &j) {
       }
 
     } else if ("// Resonances data written to " Y_DATA " file" == resp) {
-      KUtils::notify_toast(graph_requested ? "Analysing Y + rendering graph (slower)…" : "Analysing Y…", 3000);
+      KUtils::notify_toast(graph_requested ? "Analysing Y + rendering graph (slower)..." : "Analysing Y...", 3000);
       auto config_root = KUtils::get_root_path("config");
       auto screen_width = (double)lv_disp_get_physical_hor_res(NULL) / 100.0;
       auto screen_height = (double)lv_disp_get_physical_ver_res(NULL) / 100.0;
@@ -451,7 +451,7 @@ void InputShaperPanel::handle_macro_response(json &j) {
       ws.gcode_script(fmt::format("RUN_SHELL_COMMAND CMD=guppy_input_shaper PARAMS={:?}", arg));
 
     } else if ("// Resonances data written to " X_DATA " file" == resp) {
-      KUtils::notify_toast(graph_requested ? "Analysing X + rendering graph (slower)…" : "Analysing X…", 3000);
+      KUtils::notify_toast(graph_requested ? "Analysing X + rendering graph (slower)..." : "Analysing X...", 3000);
       auto config_root = KUtils::get_root_path("config");
       auto screen_width = (double)lv_disp_get_physical_hor_res(NULL) / 100.0;
       auto screen_height = (double)lv_disp_get_physical_ver_res(NULL) / 100.0;
@@ -603,7 +603,7 @@ void InputShaperPanel::end_calibration_ui() {
 
 void InputShaperPanel::handle_watchdog() {
   // Runs on the LVGL timer thread (lv_timer_handler already holds lv_lock), and
-  // repeat_count is 1 so LVGL frees the timer after this returns — drop our handle
+  // repeat_count is 1 so LVGL frees the timer after this returns - drop our handle
   // and DON'T lv_timer_del it here.
   cal_watchdog = NULL;
   if (x_pending || y_pending) {
@@ -615,7 +615,7 @@ void InputShaperPanel::handle_watchdog() {
     lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(yspinner, LV_OBJ_FLAG_HIDDEN);
     KUtils::notify_toast(
-      "Calibration timed out — nothing was changed. Check the printer and try again.", 6000);
+      "Calibration timed out - nothing was changed. Check the printer and try again.", 6000);
   }
 }
 
@@ -648,7 +648,7 @@ void InputShaperPanel::begin_axis(bool is_x) {
   lv_obj_add_state(graph_switch, LV_STATE_DISABLED);
   lv_obj_clear_flag(graph_switch, LV_OBJ_FLAG_CLICKABLE);
   KUtils::notify_toast(
-    fmt::format("Calibrating {} — it'll move & shake for ~1 min. Leave it be.{}{}",
+    fmt::format("Calibrating {} - it'll move & shake for ~1 min. Leave it be.{}{}",
       is_x ? "X" : "Y",
       homing ? " (homing first)" : "",
       graph ? " Graph is on, so it's slower." : ""),
@@ -664,11 +664,12 @@ void InputShaperPanel::begin_axis(bool is_x) {
     lv_timer_del(cal_watchdog);
     cal_watchdog = NULL;
   }
-  // Timeout depends on the (now-locked) Graph mode: graph rendering on the KE is
-  // slow, so allow 6 min with it on; text-only finishes fast, so 3 min. Either
-  // way it recovers from a genuinely stuck run (no endless spinner).
+  // Backstop only (prevents an endless spinner) — must NOT fire on a normal run.
+  // One axis = resonance sweep (~2 min) + analysis, plus graph render when on,
+  // so be generous: 10 min with graph, 8 min without. The shell command has its
+  // own 600s timeout, so a real hang still surfaces.
   cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb,
-    graph ? 360000 : 180000, this);
+    graph ? 600000 : 480000, this);
   lv_timer_set_repeat_count(cal_watchdog, 1);
 
   if (homing) {
