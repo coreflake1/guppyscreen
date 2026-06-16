@@ -13,7 +13,7 @@ CONFIG_FILE="${HOME}/printer_data/config"
 PRINTER_DATA_DIR="${HOME}/printer_data"
 GUPPY_DIR="${HOME}/guppyscreen"
 BACKUP_DIR="${HOME}/guppyscreen-backup-$(date +%Y%m%d-%H%M%S)"
-PINNED_RELEASE="v0.6.0-OpenKE"
+PINNED_RELEASE="v1.0.0-OpenKE"
 WPA_SVC=/lib/systemd/system/wpa_supplicant.service
 
 has_moonraker() {
