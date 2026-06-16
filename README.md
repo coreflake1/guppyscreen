@@ -55,9 +55,9 @@ Already set some up by hand or via the **Creality Helper Script**? It detects an
 run on an existing setup, and it **never rewrites your saved calibrations**.
 
 **Updating:** from the screen, **Settings → Update Guppy**. Coming from an older version (or "GuppyKE")?
-See **[Upgrading](wiki/Upgrading.md)**.
+See **[Upgrading](https://github.com/coreflake1/guppyscreen/wiki/Upgrading)**.
 
-**Uninstall:** re-run the command above with `uninstall` appended. Details: **[Installation](wiki/Installation.md)**.
+**Uninstall:** re-run the command above with `uninstall` appended. Details: **[Installation](https://github.com/coreflake1/guppyscreen/wiki/Installation)**.
 
 ## Compatibility
 
@@ -84,13 +84,16 @@ Built and verified for the **Ender-3 V3 KE**. Other boards/screens can be built 
 
 ## Documentation
 
-Start at the **[wiki](wiki/Home.md)**. Highlights:
+Full documentation lives on the **[GitHub Wiki](https://github.com/coreflake1/guppyscreen/wiki)**. Highlights:
 
-- [Perfect prints — start here](wiki/Perfect-Prints.md) and the [calibration walkthrough](wiki/Calibration-Explained.md)
-- [Installation](wiki/Installation.md) · [Upgrading from an older version](wiki/Upgrading.md)
-- [Perfect first layer (KAMP + Axis Twist)](wiki/KAMP-and-Axis-Twist-Compensation.md) · [Skew Correction](wiki/Skew-Correction.md) · [TMC Autotune](wiki/TMC-Autotune.md)
-- [Camera tuning](wiki/Camera-Image-Tuning.md) · [H.264 stream](wiki/Camera-H264-Stream.md) · [Layer-shift fix](wiki/Pause-Park-Layer-Shift-Fix.md)
-- [Troubleshooting](wiki/Troubleshooting.md) · developer docs: [Building from Source](wiki/Building-from-Source.md), [Architecture](wiki/Architecture.md)
+- [Perfect prints — start here](https://github.com/coreflake1/guppyscreen/wiki/Perfect-Prints) and the [calibration walkthrough](https://github.com/coreflake1/guppyscreen/wiki/Calibration-Explained)
+- [Installation](https://github.com/coreflake1/guppyscreen/wiki/Installation) · [Upgrading from an older version](https://github.com/coreflake1/guppyscreen/wiki/Upgrading)
+- [Perfect first layer (KAMP + Axis Twist)](https://github.com/coreflake1/guppyscreen/wiki/KAMP-and-Axis-Twist-Compensation) · [Skew Correction](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction) · [TMC Autotune](https://github.com/coreflake1/guppyscreen/wiki/TMC-Autotune)
+- [Auto Z-offset: the load-sensor caveat](https://github.com/coreflake1/guppyscreen/wiki/Auto-Z-Offset)
+- [Camera tuning](https://github.com/coreflake1/guppyscreen/wiki/Camera-Image-Tuning) · [H.264 stream](https://github.com/coreflake1/guppyscreen/wiki/Camera-H264-Stream) · [Layer-shift fix](https://github.com/coreflake1/guppyscreen/wiki/Pause-Park-Layer-Shift-Fix)
+- [Troubleshooting](https://github.com/coreflake1/guppyscreen/wiki/Troubleshooting) · developer docs: [Building from Source](https://github.com/coreflake1/guppyscreen/wiki/Building-from-Source), [Architecture](https://github.com/coreflake1/guppyscreen/wiki/Architecture)
+
+> The wiki pages are also maintained as Markdown in [`wiki/`](wiki/) in this repo and auto-published to the Wiki tab.
 
 ## Build from source
 
@@ -99,7 +102,7 @@ git clone --recurse-submodules https://github.com/coreflake1/guppyscreen.git
 ```
 
 The desktop simulator (try the UI with no printer) and the MIPS cross-build for the KE are both covered in
-**[Building from Source](wiki/Building-from-Source.md)**. The cross-build runs in this repo's toolchain
+**[Building from Source](https://github.com/coreflake1/guppyscreen/wiki/Building-from-Source)**. The cross-build runs in this repo's toolchain
 container (`docker/Dockerfile`, published as `ghcr.io/coreflake1/guppydev`).
 
 ## License & credits
@@ -108,4 +111,4 @@ container (`docker/Dockerfile`, published as `ghcr.io/coreflake1/guppydev`).
 [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
 [probielodan/guppyscreen](https://github.com/probielodan/guppyscreen), with the 3D bed mesh from
 [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). Vendored Klipper mods keep their
-own upstream licenses and credits — see [Contributing](wiki/Contributing.md). *(Formerly "GuppyKE".)*
+own upstream licenses and credits — see [Contributing](https://github.com/coreflake1/guppyscreen/wiki/Contributing). *(Formerly "GuppyKE".)*
