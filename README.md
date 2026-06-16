@@ -69,6 +69,9 @@ See **[Upgrading](https://github.com/coreflake1/guppyscreen/wiki/Upgrading)**.
 
 Built and verified for the **Ender-3 V3 KE**. Other boards/screens can be built from source but aren't the focus.
 
+**Mounting the screen:** the 3D-printable bracket I use to attach the display to the printer is on
+Thingiverse — **[Ender-3 V3 KE screen mount](https://www.thingiverse.com/thing:6617266)**.
+
 ## Screenshots
 
 > Captured in the desktop simulator at the KE's native 480×272.

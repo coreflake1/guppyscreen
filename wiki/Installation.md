@@ -4,6 +4,10 @@
 > `printer.cfg`, and some Klipper extras. It saves backups to `/usr/data/guppyify-backup/`, but you
 > should keep your own copy as well.
 
+> 🖨️ **Mounting the screen:** the 3D-printable bracket I use to attach the display to the printer is on
+> Thingiverse — **[Ender-3 V3 KE screen mount](https://www.thingiverse.com/thing:6617266)**. Print it
+> before you start if you don't already have a mount.
+
 ## Install
 
 SSH into your printer and run:
