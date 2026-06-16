@@ -658,7 +658,9 @@ void InputShaperPanel::begin_axis(bool is_x) {
     lv_timer_del(cal_watchdog);
     cal_watchdog = NULL;
   }
-  cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb, 240000, this);
+  // 6 min: comfortably covers the resonance sweep + analysis + (slower) graph
+  // render on the KE, while still recovering from a genuinely stuck run.
+  cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb, 360000, this);
   lv_timer_set_repeat_count(cal_watchdog, 1);
 
   if (homing) {
