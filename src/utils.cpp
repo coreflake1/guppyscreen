@@ -39,7 +39,7 @@ namespace KUtils {
     return false;
   }
 
-  // The open homing prompt (or NULL). Static so the dedup spans every caller —
+  // The open homing prompt (or NULL). Static so the dedup spans every caller -
   // a panel guard and a Klipper-error path won't stack two identical modals.
   static lv_obj_t *homing_prompt_mbox = NULL;
 
@@ -55,7 +55,7 @@ namespace KUtils {
 
   void show_homing_prompt(KWebSocketClient &ws) {
     if (homing_prompt_mbox != NULL) {
-      return;  // already open — don't stack
+      return;  // already open - don't stack
     }
     static const char *btns[] = {"Home", "Cancel", ""};
     homing_prompt_mbox = lv_msgbox_create(NULL, "Homing required",
@@ -539,7 +539,7 @@ namespace KUtils {
         spdlog::debug("backlight scan failed: {}", e.what());
       }
       if (cached.empty()) {
-        spdlog::info("no /sys/class/backlight device — brightness control disabled");
+        spdlog::info("no /sys/class/backlight device - brightness control disabled");
       } else {
         spdlog::info("backlight device: {}", cached);
       }

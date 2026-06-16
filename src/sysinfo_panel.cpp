@@ -160,7 +160,7 @@ SysInfoPanel::SysInfoPanel()
   lv_obj_add_event_cb(display_sleep_dd, &SysInfoPanel::_handle_callback,
     LV_EVENT_VALUE_CHANGED, this);
 
-  // Brightness preset dropdown — same row layout as Display Sleep above.
+  // Brightness preset dropdown - same row layout as Display Sleep above.
   // Hidden if the device has no controllable backlight.
   lv_obj_set_size(brightness_cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(brightness_cont, 0, 0);
@@ -340,7 +340,7 @@ SysInfoPanel::SysInfoPanel()
   }
   lv_obj_add_event_cb(def_temp_dd, &SysInfoPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
 
-  // Factory Reset lives alone in the top-right corner — kept away from Back and
+  // Factory Reset lives alone in the top-right corner - kept away from Back and
   // the settings rows to avoid accidental presses.
   lv_obj_add_flag(factory_reset_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   lv_obj_align(factory_reset_btn.get_container(), LV_ALIGN_TOP_RIGHT, 0, 0);
@@ -351,7 +351,7 @@ SysInfoPanel::SysInfoPanel()
   // The network/version text is left-aligned and the Factory Reset button is
   // narrow and pinned to the right, so they don't overlap. Reserve only the
   // button's width on the right so a very long interface line can't slide under
-  // it — full vertical height stays available so the version never clips.
+  // it - full vertical height stays available so the version never clips.
   lv_obj_update_layout(cont);
   lv_obj_set_width(network_label,
     lv_obj_get_width(right_cont)

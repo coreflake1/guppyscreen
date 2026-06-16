@@ -234,8 +234,8 @@ void PowerPanel::handle_callback(lv_event_t *e) {
         // when ISCONTINUEPRINT=1; if no valid breakpoint exists it safely starts the
         // file normally rather than crashing.
         ws.gcode_script("SDCARD_PRINT_FILE FILENAME=\"" + recovery_relpath + "\" ISCONTINUEPRINT=1");
-        KUtils::notify_toast("Resuming print after power loss…", 2500);
-        lv_label_set_text(recovery_status, "Resuming…");
+        KUtils::notify_toast("Resuming print after power loss...", 2500);
+        lv_label_set_text(recovery_status, "Resuming...");
         lv_obj_add_flag(recovery_resume_btn, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(recovery_dismiss_btn, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_background(cont);

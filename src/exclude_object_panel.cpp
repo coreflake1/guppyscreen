@@ -39,7 +39,7 @@ ExcludeObjectPanel::ExcludeObjectPanel(KWebSocketClient &websocket_client, std::
   lv_canvas_fill_bg(canvas, lv_color_make(30, 30, 30), LV_OPA_COVER);
 
   // The canvas (an lv_img) isn't clickable, so a tap on the bed map routes up to
-  // the nearest clickable ancestor — panel_cont. Handle taps there and hit-test
+  // the nearest clickable ancestor - panel_cont. Handle taps there and hit-test
   // against the drawn object boxes (handle_canvas_click works off absolute
   // coords minus the canvas position, so it doesn't care which object caught it).
   lv_obj_add_flag(panel_cont, LV_OBJ_FLAG_CLICKABLE);
@@ -84,7 +84,7 @@ ExcludeObjectPanel::~ExcludeObjectPanel() {
 
 void ExcludeObjectPanel::foreground() {
   // Called from a button callback, which already runs under lv_lock (held by the
-  // main loop) — taking it again would deadlock the UI. consume() locks itself
+  // main loop) - taking it again would deadlock the UI. consume() locks itself
   // because it runs on the websocket thread.
   is_foreground = true;
   load_bed_bounds();
@@ -287,7 +287,7 @@ void ExcludeObjectPanel::handle_canvas_click(lv_event_t *e) {
 void ExcludeObjectPanel::confirm_exclude(const std::string &name) {
   pending_name = name;
   // Object names come from the slicer's labels (often the part/STL name) and can
-  // be long — ellipsize so the prompt stays one line and never overruns the card
+  // be long - ellipsize so the prompt stays one line and never overruns the card
   // or the button row. The full name still goes to EXCLUDE_OBJECT.
   std::string shown = name;
   const size_t MAXLEN = 22;

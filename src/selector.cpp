@@ -36,7 +36,7 @@ Selector::Selector(lv_obj_t *parent,
   lv_obj_set_width(label, LV_PCT(100));
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
 
-  /* Theme default is m10 on small screens now — no need to override per-widget here. */
+  /* Theme default is m10 on small screens now - no need to override per-widget here. */
 
   lv_btnmatrix_set_map(btnm, &map[0]);
   lv_obj_set_style_pad_all(btnm, small_screen ? 2 : 4, LV_PART_MAIN);

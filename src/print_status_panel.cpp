@@ -440,7 +440,7 @@ void PrintStatusPanel::consume(json &j) {
   std::lock_guard<std::mutex> lock(lv_lock);
 
   // Only surface the Exclude Objects button when the active print actually has
-  // labelled objects — otherwise it just crowds the button row.
+  // labelled objects - otherwise it just crowds the button row.
   auto objs = State::get_instance()->get_data("/printer_state/exclude_object/objects"_json_pointer);
   if (objs.is_array() && !objs.empty()) {
     lv_obj_clear_flag(objects_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
@@ -463,7 +463,7 @@ void PrintStatusPanel::consume(json &j) {
       mini_print_status.hide();
       mini_print_status.hide_chip();
       // Print just ended (#94). Show a completion summary (result + stats +
-      // Done) instead of dismissing — otherwise the user is left with no
+      // Done) instead of dismissing - otherwise the user is left with no
       // confirmation. Other terminal states (e.g. standby) just dismiss.
       if (last_print_state == "printing" || last_print_state == "paused") {
         if (print_status == "complete" || print_status == "cancelled") {
@@ -476,7 +476,7 @@ void PrintStatusPanel::consume(json &j) {
       // Swap the big overlay for a small "Paused" chip so the Homing/Extrude
       // buttons it sat over are revealed and tappable (purge/load filament,
       // jog) while a tap still returns to the full status panel. Don't dismiss
-      // the full status panel — the job isn't over.
+      // the full status panel - the job isn't over.
       mini_print_status.hide();
       mini_print_status.show_chip();
     } else {
@@ -803,7 +803,7 @@ ZOffsetPanel &PrintStatusPanel::get_zoffset_panel() {
 void PrintStatusPanel::sim_setup_mock_data() {
   // Mid-print snapshot: 20% in, 10 minutes elapsed.
   // To preview the auto-dismiss (#94) on this build, change "printing" to
-  // "complete" and rebuild — the panel should NOT foreground.
+  // "complete" and rebuild - the panel should NOT foreground.
   json mock = {{"params", {{
     {"print_stats", {
       {"filename", "BunnyHighResLongFilenameTest_v3.gcode"},

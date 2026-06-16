@@ -2063,7 +2063,7 @@ double BedMeshPanel::calculate_dynamic_fov_scale(int mesh_rows, int mesh_cols, i
   // Fold in the vertical Z swing. When the mesh is tilted, the surface + axis box can
   // extend a full world_z_half_extent above and below the flat footprint; ignoring it
   // (the old behaviour) let amplified meshes clip off the top/bottom. Combining it into
-  // the fitted extent can only enlarge the bound, i.e. only ever zoom out — never worse.
+  // the fitted extent can only enlarge the bound, i.e. only ever zoom out - never worse.
   double full_height = mesh_world_height + 2.0 * world_z_half_extent;
   mesh_diagonal = std::max(mesh_diagonal,
                            sqrt(mesh_world_width * mesh_world_width + full_height * full_height));

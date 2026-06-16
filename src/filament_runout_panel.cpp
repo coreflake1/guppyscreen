@@ -127,7 +127,7 @@ void FilamentRunoutPanel::send_load_chunk() {
   load_remaining_mm -= chunk;
   // The next chunk is only issued from this response callback, so setting
   // load_stop halts the feed within one chunk. (Assumes the hotend is at print
-  // temp — true for a paused runout; a cold-extrude error still fires the
+  // temp - true for a paused runout; a cold-extrude error still fires the
   // callback, so the loop drains harmlessly rather than hanging.)
   ws.gcode_script(fmt::format("M83\nG1 E{} F{}", chunk, RUNOUT_LOAD_FEED),
     [this](json &) {
@@ -212,7 +212,7 @@ void FilamentRunoutPanel::handle_mbox(lv_event_t *e) {
     } else {
       begin_load();
     }
-  } else if (id == 1) {     // Continue — re-check the sensor, then resume
+  } else if (id == 1) {     // Continue - re-check the sensor, then resume
     if (load_active) {
       // Don't resume mid-feed; stop first, then the user taps Continue again.
       load_stop = true;

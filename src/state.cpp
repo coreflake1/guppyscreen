@@ -287,7 +287,7 @@ json State::get_display_fans() {
     }
   }
 
-  // No user config: default to the fans you can actually drive — the part fan,
+  // No user config: default to the fans you can actually drive - the part fan,
   // generic fans, and PWM fan output_pins. heater_fan/controller_fan are
   // auto-managed by Klipper, so they're left to FanPanel's read-only list.
   if (display_fans.empty()) {
@@ -304,7 +304,7 @@ json State::get_display_fans() {
       }
       // System/auto fans (mainboard, controller, hotend) stay read-only; the
       // user-adjustable part fan (e.g. "fan0") becomes the editable slider.
-      // (Name-based, not the pwm flag — configfile isn't loaded yet at init.)
+      // (Name-based, not the pwm flag - configfile isn't loaded yet at init.)
       if (lower.find("board") != std::string::npos || lower.find("controller") != std::string::npos
           || lower.find("nozzle") != std::string::npos || lower.find("hotend") != std::string::npos
           || lower.find("heatbreak") != std::string::npos) {

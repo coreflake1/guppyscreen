@@ -141,7 +141,7 @@ void FirmwareRetractionPanel::build_row(Field &f) {
   lv_obj_set_style_text_color(name, lv_palette_lighten(LV_PALETTE_GREY, 2), 0);
 
   f.value = lv_label_create(row);
-  lv_label_set_text(f.value, "—");
+  lv_label_set_text(f.value, "-");
   lv_obj_set_width(f.value, 110);
   lv_obj_set_style_text_font(f.value, &lv_font_montserrat_20, 0);
   lv_obj_set_style_text_align(f.value, LV_TEXT_ALIGN_RIGHT, 0);

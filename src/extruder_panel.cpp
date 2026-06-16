@@ -112,7 +112,7 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
 
   /* Stretch each button to fill its flex column. ButtonContainer's default
    * 110*width_scale (~66 px on 480-wide) is too narrow for 7-8 char labels
-   * like "Spoolman" / "Cooldown" / "Extrude" — they truncate or wrap. */
+   * like "Spoolman" / "Cooldown" / "Extrude" - they truncate or wrap. */
   lv_obj_t *btns[] = {
     load_btn.get_container(), unload_btn.get_container(), cooldown_btn.get_container(),
     spoolman_btn.get_container(), extrude_btn.get_container(),
@@ -129,7 +129,7 @@ ExtruderPanel::ExtruderPanel(KWebSocketClient &websocket_client,
     LV_GRID_TEMPLATE_LAST};
   /* FR(2)/FR(8)/FR(2): side cols ~80 px (still room for 8-char labels with
    * pad_all=0 on the side containers) and middle ~320 px so each of the 7
-   * selector pills gets ~45 px — a usable touch target on the KE display. */
+   * selector pills gets ~45 px - a usable touch target on the KE display. */
   static lv_coord_t grid_main_col_dsc[] = {LV_GRID_FR(2), LV_GRID_FR(8), LV_GRID_FR(2), LV_GRID_TEMPLATE_LAST};
 
   lv_obj_clear_flag(panel_cont, LV_OBJ_FLAG_SCROLLABLE);
@@ -395,7 +395,7 @@ void ExtruderPanel::refresh_button_state() {
     unload_btn.disable();
     cooldown_btn.disable();
   } else if (load_active) {
-    // Chunked load feeding. Cooldown stays clickable and doubles as Stop — it
+    // Chunked load feeding. Cooldown stays clickable and doubles as Stop - it
     // halts the load after the in-flight chunk; the rest are blocked.
     extrude_btn.disable();
     retract_btn.disable();
@@ -464,13 +464,13 @@ void ExtruderPanel::arm_safety_timer(uint32_t ms) {
     auto *self = (ExtruderPanel *)t->user_data;
     self->safety_timer = NULL;  // one-shot, LVGL deletes after this callback
     if (self->load_active) {
-      // A load chunk's response never arrived — stop feeding rather than
+      // A load chunk's response never arrived - stop feeding rather than
       // leaving the load stuck mid-way with the buttons locked.
       spdlog::warn("load chunk response timeout, stopping load");
       self->finish_load();
       KUtils::notify_toast("Load timed out.");
     } else if (self->action_in_flight) {
-      // Response never arrived — assume the ws/klipper lost it and recover.
+      // Response never arrived - assume the ws/klipper lost it and recover.
       spdlog::warn("extruder action response timeout, unlocking buttons");
       self->action_in_flight = false;
       self->refresh_button_state();
@@ -495,7 +495,7 @@ void ExtruderPanel::send_action(const std::string &gcode) {
   refresh_button_state();
   arm_safety_timer(ACTION_TIMEOUT_MS);
   // Moonraker only sends the JSON-RPC response for printer.gcode.script once
-  // the script has finished executing — that's our reliable "done" signal.
+  // the script has finished executing - that's our reliable "done" signal.
   ws.gcode_script(gcode, [this](json &) {
     std::lock_guard<std::mutex> lock(lv_lock);
     on_action_response();
@@ -538,7 +538,7 @@ void ExtruderPanel::fire_pending() {
   clear_pending();   // resets pending state + button enables; the call below re-locks
   // action_name carries over so the caption stays correct.
   if (kind == PA_LOAD) {
-    begin_load();    // chunked, stoppable — not a one-shot macro
+    begin_load();    // chunked, stoppable - not a one-shot macro
   } else {
     send_action(gcode);
   }
@@ -595,7 +595,7 @@ void ExtruderPanel::run_when_hot(PendingKind kind, const std::string &name,
   auto_cool_after = true;
   int want = effective_temp();
 
-  // Non-blocking heat request. Avoids the M109 hang from #65 — we watch the
+  // Non-blocking heat request. Avoids the M109 hang from #65 - we watch the
   // temp stream ourselves and run the action once we're hot enough. Applies to
   // load/unload too, so the user's selected temp is honoured regardless of
   // which filament macro is configured.
@@ -612,7 +612,7 @@ void ExtruderPanel::run_when_hot(PendingKind kind, const std::string &name,
     return;
   }
 
-  // Cold — queue it. consume() will fire it once we reach the threshold.
+  // Cold - queue it. consume() will fire it once we reach the threshold.
   pending_kind = kind;
   pending_gcode = gcode;
   pending_want = want;
@@ -737,7 +737,7 @@ void ExtruderPanel::handle_callback(lv_event_t *e) {
 void ExtruderPanel::sim_show_busy() {
   // Pretend Extrude was pressed cold: heating toward target, action buttons
   // disabled, spinner + caption visible. We don't send_action() (no websocket;
-  // the safety timer would also fire ACTION_TIMEOUT_MS later) — just stage the
+  // the safety timer would also fire ACTION_TIMEOUT_MS later) - just stage the
   // pending state so the heat-up caption can be visually verified.
   action_name = "Extrude";
   pending_kind = PA_EXTRUDE;

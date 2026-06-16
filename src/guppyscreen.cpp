@@ -96,7 +96,7 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
   spdlog::set_default_logger(klogger);
   klogger->flush_on(ll);
 
-  // Re-apply the WiFi low-latency preference on every startup/respawn — the
+  // Re-apply the WiFi low-latency preference on every startup/respawn - the
   // driver resets to fast power-save (PM 2) on reboot/reconnect, so persisting
   // the choice here keeps `wl PM 0` in effect. No-op when `wl` is absent.
   if (!conf->get_json("/wifi_low_latency").empty()
@@ -184,9 +184,9 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
                                      conf->get<uint32_t>(conf->df() + "moonraker_port"));
 
 #ifdef SIMULATOR
-    /* Don't actually connect in simulator mode — the failing connect's
+    /* Don't actually connect in simulator mode - the failing connect's
      * disconnected callback re-shows the init overlay over the mock data. */
-    spdlog::info("simulator mode — skipping printer websocket connection to {}", ws_url);
+    spdlog::info("simulator mode - skipping printer websocket connection to {}", ws_url);
 #else
     spdlog::info("connecting to printer at {}", ws_url);
     gs->connect_ws(ws_url);
@@ -228,7 +228,7 @@ GuppyScreen *GuppyScreen::init(std::function<void(lv_color_t, lv_color_t)> hal_i
 #endif // OS_ANDROID
 
 #ifdef SIMULATOR
-  /* No Moonraker in simulator mode — hide the init overlay and fabricate
+  /* No Moonraker in simulator mode - hide the init overlay and fabricate
    * sensor data so the home panel renders something visible. */
   gs->init_panel.sim_hide();
   gs->main_panel.sim_setup_mock_data();

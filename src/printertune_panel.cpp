@@ -198,7 +198,7 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
     } else if (btn == axis_twist_btn.get_container()) {
       spdlog::trace("axis twist pressed");
       // Detect via the config section: the v0.12.0 module has no get_status, so
-      // it never shows up as a live printer object — only configfile.settings.
+      // it never shows up as a live printer object - only configfile.settings.
       if (!AxisTwistPanel::is_enabled()) {
         KUtils::notify_toast(
           "Axis Twist Compensation isn't enabled.\n"

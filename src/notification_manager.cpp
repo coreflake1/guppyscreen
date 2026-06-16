@@ -33,7 +33,7 @@ NotificationManager::NotificationManager(KWebSocketClient &websocket_client, std
                               [this](json &) { this->baselined = false; });
 
 #ifdef SIMULATOR
-  // no printer in the sim — periodically re-show a demo of each severity so the
+  // no printer in the sim - periodically re-show a demo of each severity so the
   // overlay can be inspected. (The info toast auto-dismisses; this re-adds it.)
   lv_timer_create([](lv_timer_t *t) {
     ((NotificationManager *)t->user_data)->sim_demo();
@@ -139,7 +139,7 @@ void NotificationManager::process(json &st) {
     last_print_state = st["print_stats"]["state"].template get<std::string>();
   }
 
-  // M117 / status messages — only when not printing (slicers spam M117 progress)
+  // M117 / status messages - only when not printing (slicers spam M117 progress)
   if (st.contains("display_status") && st["display_status"].contains("message")) {
     auto &m = st["display_status"]["message"];
     std::string msg = m.is_string() ? m.template get<std::string>() : "";

@@ -165,7 +165,7 @@ void MainPanel::handle_homing_cb(lv_event_t *event) {
   spdlog::trace("clicked homing1");
   if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
     spdlog::trace("clicked homing");
-    // Allowed while paused (toolhead is parked) — only block mid-print.
+    // Allowed while paused (toolhead is parked) - only block mid-print.
     if (KUtils::is_printing() && !KUtils::is_paused()) {
       KUtils::notify_locked();
       return;
@@ -178,7 +178,7 @@ void MainPanel::handle_extrude_cb(lv_event_t *event) {
   if (lv_event_get_code(event) == LV_EVENT_CLICKED) {
     spdlog::trace("clicked extruder");
     // Allowed while paused so the user can purge/load filament (runout, manual
-    // colour change) — only block mid-print.
+    // colour change) - only block mid-print.
     if (KUtils::is_printing() && !KUtils::is_paused()) {
       KUtils::notify_locked();
       return;
@@ -296,17 +296,17 @@ void MainPanel::create_main(lv_obj_t *parent)
   lv_obj_set_parent(paused_chip, main_cont);
   lv_obj_align(paused_chip, LV_ALIGN_TOP_RIGHT, -4, 4);
 
-  /* Disable scrolling on the sensor container — the 5px left border on each
+  /* Disable scrolling on the sensor container - the 5px left border on each
    * sensor row was tripping the horizontal scrollbar even though everything
    * fits visually. */
   lv_obj_clear_flag(temp_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scrollbar_mode(temp_cont, LV_SCROLLBAR_MODE_OFF);
   lv_obj_set_style_pad_all(temp_cont, 0, 0);
-  /* Zero row gap so sensor rows stack flush — default flex pad_row eats vertical space. */
+  /* Zero row gap so sensor rows stack flush - default flex pad_row eats vertical space. */
   lv_obj_set_style_pad_row(temp_cont, 0, 0);
 
   lv_obj_set_flex_flow(temp_cont, LV_FLEX_FLOW_COLUMN);
-  /* Row 0 is CONTENT-sized — it shrinks to fit only the sensor rows. */
+  /* Row 0 is CONTENT-sized - it shrinks to fit only the sensor rows. */
   lv_obj_set_grid_cell(temp_cont, LV_GRID_ALIGN_STRETCH, 0, 2, LV_GRID_ALIGN_STRETCH, 0, 1);
 
   lv_obj_align(temp_chart, LV_ALIGN_CENTER, 0, 0);
@@ -316,7 +316,7 @@ void MainPanel::create_main(lv_obj_t *parent)
   lv_chart_set_range(temp_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 300);
   /* Chart in row 1, stretches to fill remaining space below the sensor rows. */
   lv_obj_set_grid_cell(temp_chart, LV_GRID_ALIGN_END, 0, 2, LV_GRID_ALIGN_STRETCH, 1, 1);
-  /* 7 major ticks = labels at 0,50,100,...,300 — 50° steps for easier reading. */
+  /* 7 major ticks = labels at 0,50,100,...,300 - 50° steps for easier reading. */
   lv_chart_set_axis_tick(temp_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 0, 7, 5, true, 25);
   lv_obj_set_style_text_font(temp_chart, &lv_font_montserrat_8, LV_PART_TICKS);
 
@@ -430,7 +430,7 @@ void MainPanel::sim_setup_mock_data() {
   }
 
   /* Build a display_sensors json keyed by id, matching State::get_display_sensors
-   * shape — but bypass the Moonraker-dependent extruder/heater/sensor lookups. */
+   * shape - but bypass the Moonraker-dependent extruder/heater/sensor lookups. */
   json display_sensors;
   for (auto &s : user_sensors) {
     std::string id = s["id"].template get<std::string>();
@@ -615,7 +615,7 @@ void MainPanel::sim_setup_mock_data() {
 
   /* Enable the Spoolman entry points and populate the panel with fake spools
    * so the Spoolman UI is testable without a live Moonraker + Spoolman backend.
-   * Foregrounded last so it covers the others — press Back to step back through
+   * Foregrounded last so it covers the others - press Back to step back through
    * the stack (spoolman → extruder → home). */
   setting_panel.enable_spoolman();
   extruder_panel.enable_spoolman();

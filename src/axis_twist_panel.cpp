@@ -106,7 +106,7 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
   lv_obj_set_style_text_font(point_label, &lv_font_montserrat_16, 0);
 
   z_label = lv_label_create(hdr);
-  lv_label_set_text(z_label, "Z —");
+  lv_label_set_text(z_label, "Z -");
   lv_obj_set_style_text_font(z_label, &lv_font_montserrat_20, 0);
 
   instr_label = lv_label_create(probe_cont);
@@ -278,7 +278,7 @@ void AxisTwistPanel::start_calibration() {
   have_z = false;
   last_active = false;
   lv_label_set_text(point_label, "Point 1 of 5");
-  lv_label_set_text(z_label, "Z —");
+  lv_label_set_text(z_label, "Z -");
   lv_label_set_text(instr_label, "Homing and probing the first point...");
   show_stage(PROBING);
   update_probe_ui();
@@ -305,7 +305,7 @@ void AxisTwistPanel::update_probe_ui() {
 
   if (active) {
     if (have_z) lv_label_set_text(z_label, fmt::format("Z {:.3f}", last_z).c_str());
-    else        lv_label_set_text(z_label, "Z —");
+    else        lv_label_set_text(z_label, "Z -");
     lv_label_set_text(instr_label, "Lower until a sheet of paper just drags, then Accept.");
   } else {
     lv_label_set_text(instr_label, "Repositioning / probing next point...");

@@ -664,7 +664,7 @@ void InputShaperPanel::begin_axis(bool is_x) {
     lv_timer_del(cal_watchdog);
     cal_watchdog = NULL;
   }
-  // Backstop only (prevents an endless spinner) — must NOT fire on a normal run.
+  // Backstop only (prevents an endless spinner) - must NOT fire on a normal run.
   // One axis = resonance sweep (~2 min) + analysis, plus graph render when on,
   // so be generous: 10 min with graph, 8 min without. The shell command has its
   // own 600s timeout, so a real hang still surfaces.

@@ -46,7 +46,7 @@ ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
   lv_obj_set_width(step_selector.get_container(), LV_PCT(94));
 
   // the Helper Script's Save Z-Offset macros persist every adjustment to
-  // variables.cfg automatically, so there is no Save button — just say so.
+  // variables.cfg automatically, so there is no Save button - just say so.
   lv_label_set_text(auto_save_hint, LV_SYMBOL_OK "  Adjustments are saved automatically");
   lv_obj_set_style_text_font(auto_save_hint, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(auto_save_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
@@ -103,7 +103,7 @@ void ZOffsetPanel::update_value(double z) {
 void ZOffsetPanel::apply_step(bool raise) {
   // SET_GCODE_OFFSET ... MOVE=1 needs a homed axis: unhomed, Klipper still sets
   // the offset (the readout would change) but the move fails and the Helper
-  // Script's save macro aborts before SAVE_VARIABLE — so it'd be applied live,
+  // Script's save macro aborts before SAVE_VARIABLE - so it'd be applied live,
   // not moved, and never saved. Guard before sending so the three never drift.
   if (!KUtils::is_homed()) {
     KUtils::show_homing_prompt(ws);

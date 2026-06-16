@@ -110,7 +110,7 @@ WifiPanel::WifiPanel(std::mutex &l)
   // label; checked = Low Latency ON, unchecked = stock. When ON it drives a
   // whole bundle (see KUtils::set_wifi_low_latency): WiFi power-save / idle radio
   // sleep / background roam-scans all off, plus Bluetooth stopped to free the
-  // shared 2.4GHz radio — for lower, steadier latency.
+  // shared 2.4GHz radio - for lower, steadier latency.
   lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(pm_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_set_style_border_width(pm_cont, 0, 0);

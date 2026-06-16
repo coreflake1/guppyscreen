@@ -48,7 +48,7 @@ SensorContainer::SensorContainer(KWebSocketClient &c,
   lv_obj_set_size(sensor_cont, 330 * width_scale, 48 * height_scale);
   lv_obj_set_style_pad_all(sensor_cont, 0, 0);
 
-  /* Smaller, screen-aware font — on 480x272 the previous theme-default m12 felt oversized. */
+  /* Smaller, screen-aware font - on 480x272 the previous theme-default m12 felt oversized. */
   const lv_font_t *row_font = (width_scale < 0.8) ? &lv_font_montserrat_10 : &lv_font_montserrat_14;
 
   lv_img_set_src(sensor_img, img);
@@ -144,7 +144,7 @@ void SensorContainer::update_target(int new_target) {
   if (new_target >= 0) {
     target = new_target;
     lv_label_set_text(target_label, fmt::format("{}", new_target).c_str());
-    /* Paint the entire target series at the new target value — gives a flat
+    /* Paint the entire target series at the new target value - gives a flat
      * horizontal line at that temp so the user can see actual vs set at a glance. */
     if (target_series != NULL && chart != NULL) {
       lv_chart_set_all_value(chart, target_series, new_target);
@@ -169,7 +169,7 @@ void SensorContainer::update_value(int new_value) {
 void SensorContainer::update_series(int v) {
   if (series != NULL && chart != NULL) {
 #ifdef SIMULATOR
-    /* No throttling in simulator mode — driven entirely by the mock timer. */
+    /* No throttling in simulator mode - driven entirely by the mock timer. */
     lv_chart_set_next_value(chart, series, v);
 #else
     auto delta = std::time(nullptr) - last_updated_ts;

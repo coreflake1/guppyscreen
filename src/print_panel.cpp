@@ -71,7 +71,7 @@ PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatu
   // file view buttons
   lv_obj_t *label = NULL;
 
-  /* Explicit m10 override — theme cascade alone isn't reaching these labels for
+  /* Explicit m10 override - theme cascade alone isn't reaching these labels for
    * some reason, possibly because they're children of plain lv_btn which carries
    * its own default style. Forcing the font here matches the rest of the UI. */
   label = lv_label_create(refresh_btn);

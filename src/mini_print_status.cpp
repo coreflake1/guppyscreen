@@ -64,11 +64,11 @@ MiniPrintStatus::MiniPrintStatus(lv_obj_t *parent,
   // info column: remaining time (hh:mm:ss) prominent, progress % under it.
   // Fixed width so the overlay's right edge stays static as the ETA/percent digit widths
   // change each second (it was SIZE_CONTENT, so the whole box jittered). Width is measured
-  // from the widest string we can ever show — "ETA  88:88:88" at the time font — so it
+  // from the widest string we can ever show - "ETA  88:88:88" at the time font - so it
   // can't clip and tracks the font instead of a magic number. The spare room becomes
   // trailing whitespace via the left-aligned (START) labels below, which pins the text's
   // left edge ("ETA"/status stay put). The digits themselves still shift a pixel or two
-  // as they count — Montserrat's figures aren't equal-width ('1' is ~95u vs '0' ~171u) —
+  // as they count - Montserrat's figures aren't equal-width ('1' is ~95u vs '0' ~171u) -
   // which is accepted; only a monospaced font could remove it, and we keep Montserrat.
   lv_point_t info_w;
   lv_txt_get_size(&info_w, "ETA  88:88:88", &lv_font_montserrat_16, 0, 0, LV_COORD_MAX, 0);
@@ -182,10 +182,10 @@ void MiniPrintStatus::update_progress(int p) {
 
 void MiniPrintStatus::update_img(const std::string &img_path, size_t twidth) {
   auto screen_width = lv_disp_get_physical_hor_res(NULL);
-  // ~11% of screen width — compact preview alongside the time/percent
+  // ~11% of screen width - compact preview alongside the time/percent
   uint32_t normalized_thumb_scale = ((0.11 * (double)screen_width) / (double)twidth) * 256;
   lv_img_set_zoom(thumb, normalized_thumb_scale);
-  lv_obj_clear_flag(thumb, LV_OBJ_FLAG_HIDDEN);  // a real preview arrived — show it
+  lv_obj_clear_flag(thumb, LV_OBJ_FLAG_HIDDEN);  // a real preview arrived - show it
   lv_img_set_src(thumb, img_path.c_str());
 }
 
