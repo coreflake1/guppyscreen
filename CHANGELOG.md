@@ -71,6 +71,9 @@ release supersedes.)
 ### Safety
 - A fresh **timestamped `printer.cfg` backup on every installer run**; `probe.py` backed up before the
   Axis-Twist patch. Re-running the installer does **not** rewrite saved calibration values.
+- **Fully reversible uninstall** — `installer.sh uninstall` restores the Creality display/app stack from
+  backup *and* renames `Monitor`/`display-server` back automatically (guarded), so both install choices
+  revert cleanly on the next reboot.
 - **Duplicate-section guards**: the installer detects an existing `[axis_twist_compensation]`,
   `[skew_correction]`, KAMP, M600, Save-Z-Offset, or Exclude-Object setup and leaves it alone instead of
   adding a conflicting copy. The check looks only at **actively-loaded** config files (`printer.cfg` + its

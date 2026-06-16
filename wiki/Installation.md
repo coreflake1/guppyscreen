@@ -108,7 +108,7 @@ existing setup.
 | Replaces `S50dropbear` SSH init script¹ | No — original saved to backup |
 | Disables boot display (`S12boot_display` moved to backup) | Yes (restored from backup) |
 | Backs up + optionally removes `S99start_app` | Partially (restored from backup) |
-| Renames `Monitor` + `display-server` to `.disable` (if chosen) | No — restore manually |
+| Renames `Monitor` + `display-server` to `.disable` (if chosen) | Yes (renamed back automatically) |
 | Adds `[include GuppyScreen/*.cfg]` to `printer.cfg` | Yes (line removed) |
 | Creates `printer_data/config/GuppyScreen/` | Yes |
 | Overwrites `calibrate_shaper_config.py` in Klipper extras | No — original saved to backup |
@@ -140,16 +140,16 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 ```
 
 Uninstall stops GuppyScreen, removes `/etc/init.d/S99guppyscreen`, restores `S12boot_display` and
-`S99start_app` from backup, removes the `[include GuppyScreen/*.cfg]` line from `printer.cfg`, removes
-the GuppyScreen config directory, and removes the Klipper symlinks.
+`S99start_app` from backup, **renames `Monitor` / `display-server` back** if they were disabled, removes
+the `[include GuppyScreen/*.cfg]` line from `printer.cfg`, removes the GuppyScreen config directory, and
+removes the Klipper symlinks. So Creality's display/app stack comes back automatically on the next reboot,
+whichever install option you picked.
 
 **Not** automatically restored (originals live in `/usr/data/guppyify-backup/`):
 
 - `gcode_shell_command.py` and `calibrate_shaper_config.py` in Klipper extras
 - The `S50dropbear` replacement — restore with
   `cp /usr/data/guppyify-backup/S50dropbear /etc/init.d/S50dropbear`
-- `Monitor` / `display-server` if they were renamed to `.disable` — restore with
-  `mv /usr/bin/Monitor.disable /usr/bin/Monitor` (and likewise for `display-server`)
 - `libeinfo.so.1` / `librc.so.1` symlinks in `/lib/`
 - The print-quality mod modules in Klipper extras (`autotune_tmc.py`, `motor_constants.py`,
   `axis_twist_compensation.py`) and the `probe.py` Axis-Twist edit. These are left in place on purpose —
