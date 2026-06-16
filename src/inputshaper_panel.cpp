@@ -590,6 +590,9 @@ void InputShaperPanel::set_shaper_detail(json &res,
 void InputShaperPanel::end_calibration_ui() {
   calibrate_btn.enable();
   save_btn.enable();
+  // unlock the Graph switch
+  lv_obj_clear_state(graph_switch, LV_STATE_DISABLED);
+  lv_obj_add_flag(graph_switch, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(yspinner, LV_OBJ_FLAG_HIDDEN);
   if (cal_watchdog != NULL) {
@@ -641,6 +644,9 @@ void InputShaperPanel::begin_axis(bool is_x) {
 
   bool homing = !KUtils::is_homed();
   bool graph = lv_obj_has_state(graph_switch, LV_STATE_CHECKED);
+  // lock the Graph mode for the whole run so it can't be toggled mid-test
+  lv_obj_add_state(graph_switch, LV_STATE_DISABLED);
+  lv_obj_clear_flag(graph_switch, LV_OBJ_FLAG_CLICKABLE);
   KUtils::notify_toast(
     fmt::format("Calibrating {} — it'll move & shake for ~1 min. Leave it be.{}{}",
       is_x ? "X" : "Y",
@@ -658,9 +664,11 @@ void InputShaperPanel::begin_axis(bool is_x) {
     lv_timer_del(cal_watchdog);
     cal_watchdog = NULL;
   }
-  // 6 min: comfortably covers the resonance sweep + analysis + (slower) graph
-  // render on the KE, while still recovering from a genuinely stuck run.
-  cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb, 360000, this);
+  // Timeout depends on the (now-locked) Graph mode: graph rendering on the KE is
+  // slow, so allow 6 min with it on; text-only finishes fast, so 3 min. Either
+  // way it recovers from a genuinely stuck run (no endless spinner).
+  cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb,
+    graph ? 360000 : 180000, this);
   lv_timer_set_repeat_count(cal_watchdog, 1);
 
   if (homing) {
