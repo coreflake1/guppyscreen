@@ -58,6 +58,10 @@ class InputShaperPanel {
   // moving=true is the "Y done, relocate for X" wording.
   void show_placement_prompt(bool is_x, bool moving);
   static void _placement_prompt_cb(lv_event_t *e);
+  // assign the top result cells for the run: graph + single axis -> that axis's
+  // graph on the left (col1) + its text console on the right (col2); otherwise
+  // axis-home columns (X col1, Y col2, graphs only when both selected).
+  void layout_panes(bool graph, bool x_sel, bool y_sel);
 
  private:
   KWebSocketClient &ws;

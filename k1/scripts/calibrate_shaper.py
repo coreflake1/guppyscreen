@@ -73,7 +73,8 @@ def plot_freq_response(lognames, calibration_data, shapers,
     freqs = freqs[freqs <= max_freq]
 
     fontP = matplotlib.font_manager.FontProperties()
-    fontP.set_size('small')
+    # tiny screen (480x272): keep the legend from swamping the plot
+    fontP.set_size('xx-small')
 
     fig, ax = matplotlib.pyplot.subplots()
     ax.set_xlabel('Frequency, Hz')
@@ -97,10 +98,9 @@ def plot_freq_response(lognames, calibration_data, shapers,
     ax2.set_ylabel('Shaper vibration reduction (ratio)')
     best_shaper_vals = None
     for shaper in shapers:
-        label = "%s (%.1f Hz, vibr=%.1f%%, sm~=%.2f, accel<=%.f)" % (
-                shaper.name.upper(), shaper.freq,
-                shaper.vibrs * 100., shaper.smoothing,
-                round(shaper.max_accel / 100.) * 100.)
+        # short label - the full numbers are shown in the on-screen console
+        label = "%s %.1fHz %.0f%%" % (
+                shaper.name.upper(), shaper.freq, shaper.vibrs * 100.)
         linestyle = 'dotted'
         if shaper.name == selected_shaper:
             linestyle = 'dashdot'
@@ -126,6 +126,15 @@ def setup_matplotlib(output_to_file):
     global matplotlib
     if output_to_file:
         matplotlib.rcParams.update({'figure.autolayout': True})
+        # small base fonts so the plot is legible at 480x272
+        matplotlib.rcParams.update({
+            'font.size': 6,
+            'axes.titlesize': 7,
+            'axes.labelsize': 6,
+            'xtick.labelsize': 5,
+            'ytick.labelsize': 5,
+            'lines.linewidth': 0.8,
+        })
         matplotlib.use('Agg')
     import matplotlib.pyplot, matplotlib.dates, matplotlib.font_manager
     import matplotlib.ticker

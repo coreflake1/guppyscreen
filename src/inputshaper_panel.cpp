@@ -311,6 +311,8 @@ void InputShaperPanel::handle_callback(lv_event_t *event) {
     // Axes run ONE AT A TIME so the accelerometer can be moved between them.
     // Confirm placement before each axis; both -> Y first, then prompt for X.
     y_after_move = (x_requested && y_requested);
+    // lay out the result panes for this run (graph + console for a single axis)
+    layout_panes(lv_obj_has_state(graph_switch, LV_STATE_CHECKED), x_requested, y_requested);
     // X is shown on top in the GUI, so run X first when selected; Y second.
     show_placement_prompt(/*is_x=*/x_requested, /*moving=*/false);
 
@@ -366,10 +368,17 @@ void InputShaperPanel::handle_macro_response(json &j) {
 
             spdlog::trace("x freq png path {}", png_path);
 
-            lv_label_set_text(xoutput, "");
+            // single-axis run -> show the readable console beside the graph (col2)
+            bool only_x = !lv_obj_has_state(y_switch, LV_STATE_CHECKED);
             lv_img_set_src(xgraph, png_path.c_str());
             lv_obj_clear_flag(xgraph_cont, LV_OBJ_FLAG_HIDDEN);
-            set_shaper_detail(res, NULL, xslider, xlabel, xshaper_dd);
+            if (only_x) {
+              set_shaper_detail(res, xoutput, xslider, xlabel, xshaper_dd);
+              lv_obj_move_foreground(xoutput);
+            } else {
+              lv_label_set_text(xoutput, "");
+              set_shaper_detail(res, NULL, xslider, xlabel, xshaper_dd);
+            }
             lv_obj_move_foreground(xgraph_cont);
           } else {
             set_shaper_detail(res, xoutput, xslider, xlabel, xshaper_dd);
@@ -414,10 +423,17 @@ void InputShaperPanel::handle_macro_response(json &j) {
 
             spdlog::trace("y freq png path {}", png_path);
 
-            lv_label_set_text(youtput, "");
+            // single-axis run -> show the readable console beside the graph (col2)
+            bool only_y = !lv_obj_has_state(x_switch, LV_STATE_CHECKED);
             lv_img_set_src(ygraph, png_path.c_str());
             lv_obj_clear_flag(ygraph_cont, LV_OBJ_FLAG_HIDDEN);
-            set_shaper_detail(res, NULL, yslider, ylabel, yshaper_dd);
+            if (only_y) {
+              set_shaper_detail(res, youtput, yslider, ylabel, yshaper_dd);
+              lv_obj_move_foreground(youtput);
+            } else {
+              lv_label_set_text(youtput, "");
+              set_shaper_detail(res, NULL, yslider, ylabel, yshaper_dd);
+            }
             lv_obj_move_foreground(ygraph_cont);
           } else {
             set_shaper_detail(res, youtput, yslider, ylabel, yshaper_dd);
@@ -580,16 +596,53 @@ void InputShaperPanel::set_shaper_detail(json &res,
 
     if (label != NULL) {
       // compact, proportional-font-friendly list (the full table is on the graph)
-      for (auto &el : shapers_resp.items()) {
+      // Order to match the graph legend (Klipper's INPUT_SHAPERS order), NOT the
+      // alphabetical order nlohmann::json's default map would give us.
+      static const std::vector<std::string> graph_order = {
+        "zv", "mzv", "zvd", "ei", "2hump_ei", "3hump_ei"
+      };
+      auto emit = [&](const std::string &name, json &el) {
         shaper_details.push_back(
           fmt::format("{}  {:.1f} Hz  {:.1f}% vib",
-            el.key(),
-            el.value()["freq"].template get<double>(),
-            el.value()["vib"].template get<double>()));
+            name,
+            el["freq"].template get<double>(),
+            el["vib"].template get<double>()));
+      };
+      for (auto &name : graph_order) {
+        auto it = shapers_resp.find(name);
+        if (it != shapers_resp.end()) {
+          emit(name, *it);
+        }
+      }
+      // safety: surface any shaper the graph order list doesn't know about
+      for (auto &el : shapers_resp.items()) {
+        if (std::find(graph_order.cbegin(), graph_order.cend(), el.key())
+            == graph_order.cend()) {
+          emit(el.key(), el.value());
+        }
       }
 
       lv_label_set_text(label, fmt::format("{}", fmt::join(shaper_details, "\n")).c_str());
     }
+  }
+}
+
+void InputShaperPanel::layout_panes(bool graph, bool x_sel, bool y_sel) {
+  auto cell = [](lv_obj_t *o, uint8_t col) {
+    lv_obj_set_grid_cell(o, LV_GRID_ALIGN_CENTER, col, 1, LV_GRID_ALIGN_CENTER, 0, 1);
+  };
+  // wipe stale console text so a previous run can't peek out behind a new pane
+  lv_label_set_text(xoutput, "");
+  lv_label_set_text(youtput, "");
+  // default: each axis owns its column (X=1, Y=2) - graphs side by side
+  cell(xspinner, 1); cell(xgraph_cont, 1); cell(xoutput, 1);
+  cell(yspinner, 2); cell(ygraph_cont, 2); cell(youtput, 2);
+
+  // single axis WITH graph -> graph on the left, its text console on the right
+  if (graph && x_sel && !y_sel) {
+    cell(xoutput, 2);                       // X graph stays col1, console to col2
+  } else if (graph && y_sel && !x_sel) {
+    cell(yspinner, 1); cell(ygraph_cont, 1); // Y graph to col1, console stays col2
   }
 }
 
