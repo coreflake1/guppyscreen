@@ -52,6 +52,11 @@ class InputShaperPanel {
     panel->handle_watchdog();
   };
   void handle_watchdog();
+  // kick off TEST_RESONANCES for one axis (gcode + spinner/graph reset)
+  void start_axis(bool is_x);
+  // both-axes flow: prompt to relocate the accelerometer, then run X on confirm
+  void show_move_sensor_prompt();
+  static void _move_prompt_cb(lv_event_t *e);
 
  private:
   KWebSocketClient &ws;
@@ -103,6 +108,7 @@ class InputShaperPanel {
   // calibration progress tracking (for feedback + button locking)
   bool x_pending;
   bool y_pending;
+  bool x_after_move;   // both axes selected: X is deferred until the sensor is moved
   lv_timer_t *cal_watchdog;
 
   static std::vector<std::string> shapers;

@@ -78,6 +78,7 @@ InputShaperPanel::InputShaperPanel(KWebSocketClient &c, std::mutex &l)
   , yimage_fullsized(false)
   , x_pending(false)
   , y_pending(false)
+  , x_after_move(false)
   , cal_watchdog(NULL)
 {
   lv_obj_move_background(cont);
@@ -308,19 +309,26 @@ void InputShaperPanel::handle_callback(lv_event_t *event) {
 
     bool graph = lv_obj_has_state(graph_switch, LV_STATE_CHECKED);
     bool homing = !KUtils::is_homed();
-    KUtils::notify_toast(
-      fmt::format("Calibrating {}{}{}{} — the toolhead will move & shake for ~1 min{}. Leave it be.{}",
-        homing ? "(homing first) " : "",
-        x_requested ? "X" : "", (x_requested && y_requested) ? "+" : "", y_requested ? "Y" : "",
-        (x_requested && y_requested) ? " each" : "",
-        graph ? " Graph is on, so it's slower." : ""),
-      5000);
+    std::string graph_note = graph ? " Graph is on, so it's slower." : "";
+    std::string home_note = homing ? " (homing first)" : "";
+    std::string msg;
+    if (x_requested && y_requested) {
+      msg = fmt::format("Calibrating both axes. Mount the accelerometer for Y (on the bed) first — "
+        "you'll be prompted to move it to the toolhead for X. ~1 min each.{}{}", graph_note, home_note);
+    } else if (y_requested) {
+      msg = fmt::format("Calibrating Y — accelerometer on the bed. ~1 min.{}{}", graph_note, home_note);
+    } else {
+      msg = fmt::format("Calibrating X — accelerometer on the toolhead. ~1 min.{}{}", graph_note, home_note);
+    }
+    KUtils::notify_toast(msg, 5000);
 
-    // lock the controls + start a watchdog so a stuck run can't spin forever
-    x_pending = x_requested;
-    y_pending = y_requested;
+    // Axes run ONE AT A TIME so the accelerometer can be moved between them.
+    // Both selected -> run Y now, prompt to relocate the sensor, then run X.
     calibrate_btn.disable();
     save_btn.disable();
+    x_after_move = (x_requested && y_requested);
+    y_pending = y_requested;
+    x_pending = x_requested && !y_requested;   // X runs first only when it's X-only
     if (cal_watchdog != NULL) {
       lv_timer_del(cal_watchdog);
       cal_watchdog = NULL;
@@ -332,38 +340,8 @@ void InputShaperPanel::handle_callback(lv_event_t *event) {
       ws.gcode_script("G28");
     }
 
-    if (x_requested) {
-      // ws.gcode_script(fmt::format("TEST_RESONANCES AXIS=X NAME=x FREQ_START={} FREQ_END={}\nM400", 5, 10));
-      ws.gcode_script(fmt::format("TEST_RESONANCES AXIS=X NAME=x\nM400"));
-
-      // free src
-      lv_img_set_src(xgraph, NULL);
-      // hack to color in empty space.
-      ((lv_img_t *)xgraph)->src_type = LV_IMG_SRC_SYMBOL;
-
-      lv_label_set_text(xoutput, "");
-      lv_obj_add_flag(xgraph_cont, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_move_foreground(xspinner);
-    }
-
-    if (y_requested) {
-      // ws.gcode_script(fmt::format("TEST_RESONANCES AXIS=Y NAME=y FREQ_START={} FREQ_END={}\nM400", 5, 10));
-      ws.gcode_script(fmt::format("TEST_RESONANCES AXIS=Y NAME=y\nM400"));
-
-      // free src
-      lv_img_set_src(ygraph, NULL);
-      // hack to color in empty space.
-      ((lv_img_t *)ygraph)->src_type = LV_IMG_SRC_SYMBOL;
-
-      lv_label_set_text(youtput, "");
-      lv_obj_add_flag(ygraph_cont, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(yspinner, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_move_foreground(yspinner);
-    }
-    // ws.gcode_script(fmt::format("TEST_RESONANCES AXIS=X NAME=x FREQ_START={} FREQ_END={}\nM400\nTEST_RESONANCES AXIS=Y NAME=y FREQ_START={} FREQ_END={}\nM400", 5, 10, 5, 10));
-    // ws.gcode_script(fmt::format("TEST_RESONANCES AXIS=X NAME=x FREQ_START={} FREQ_END={}\nM400", 5, 10));
-    // ws.gcode_script(fmt::format("TEST_RESONANCES AXIS=X NAME=x\nM400\nTEST_RESONANCES AXIS=Y NAME=y\nM400"));
+    // run Y first whenever it's requested (sensor on the bed); otherwise X
+    start_axis(!y_requested);
 
   } else if (btn == save_btn.get_container()) {
     double xhz = (double)lv_slider_get_value(xslider) / 10.0;
@@ -472,7 +450,17 @@ void InputShaperPanel::handle_macro_response(json &j) {
               KUtils::notify_toast(fmt::format("Y done — recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
             }
           }
-          axis_finished(false);
+          if (x_after_move) {
+            // both axes: stop the watchdog (the user may take a while to move the
+            // sensor) and prompt; X runs when they confirm.
+            if (cal_watchdog != NULL) {
+              lv_timer_del(cal_watchdog);
+              cal_watchdog = NULL;
+            }
+            show_move_sensor_prompt();
+          } else {
+            axis_finished(false);
+          }
         }
       }
 
@@ -655,11 +643,64 @@ void InputShaperPanel::handle_watchdog() {
   if (x_pending || y_pending) {
     x_pending = false;
     y_pending = false;
+    x_after_move = false;
     calibrate_btn.enable();
     save_btn.enable();
     lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(yspinner, LV_OBJ_FLAG_HIDDEN);
     KUtils::notify_toast(
       "Calibration timed out — nothing was changed. Check the printer and try again.", 6000);
+  }
+}
+
+void InputShaperPanel::start_axis(bool is_x) {
+  lv_obj_t *graph = is_x ? xgraph : ygraph;
+  lv_obj_t *graph_cont = is_x ? xgraph_cont : ygraph_cont;
+  lv_obj_t *output = is_x ? xoutput : youtput;
+  lv_obj_t *spinner = is_x ? xspinner : yspinner;
+
+  ws.gcode_script(fmt::format("TEST_RESONANCES AXIS={} NAME={}\nM400",
+    is_x ? "X" : "Y", is_x ? "x" : "y"));
+
+  // free src + hack to color in empty space (same as the original per-axis path)
+  lv_img_set_src(graph, NULL);
+  ((lv_img_t *)graph)->src_type = LV_IMG_SRC_SYMBOL;
+
+  lv_label_set_text(output, "");
+  lv_obj_add_flag(graph_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_move_foreground(spinner);
+}
+
+void InputShaperPanel::show_move_sensor_prompt() {
+  static const char *btns[] = {"Continue", "Cancel", ""};
+  lv_obj_t *mbox = lv_msgbox_create(NULL, "Move the accelerometer",
+    "Y axis done.\n\nMount the accelerometer on the TOOLHEAD (for X), then tap Continue.",
+    btns, false);
+  KUtils::style_lock_mbox(mbox, 90);
+  lv_obj_add_event_cb(mbox, &InputShaperPanel::_move_prompt_cb, LV_EVENT_VALUE_CHANGED, this);
+}
+
+void InputShaperPanel::_move_prompt_cb(lv_event_t *e) {
+  lv_obj_t *mbox = lv_event_get_current_target(e);
+  InputShaperPanel *self = (InputShaperPanel *)lv_event_get_user_data(e);
+  uint32_t btn = lv_msgbox_get_active_btn(mbox);
+  lv_msgbox_close(mbox);
+
+  self->x_after_move = false;
+  if (btn == 0) {
+    // Continue -> run X (sensor now on the toolhead)
+    self->x_pending = true;
+    if (self->cal_watchdog != NULL) {
+      lv_timer_del(self->cal_watchdog);
+      self->cal_watchdog = NULL;
+    }
+    self->cal_watchdog = lv_timer_create(&InputShaperPanel::_watchdog_cb, 240000, self);
+    lv_timer_set_repeat_count(self->cal_watchdog, 1);
+    KUtils::notify_toast("Calibrating X — accelerometer on the toolhead. Leave it be.", 4000);
+    self->start_axis(true);
+  } else {
+    // Cancel -> keep Y's result; re-enable controls
+    self->end_calibration_ui();
   }
 }
