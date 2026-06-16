@@ -87,9 +87,16 @@ uninstall_guppy() {
     fi
 
     printf "${yellow}NOTE: calibrate_shaper_config.py and gcode_shell_command.py NOT removed (may be shared with Klipper).${white}\n"
-    printf "${yellow}NOTE: If Monitor/display-server were renamed to .disable, restore manually:${white}\n"
-    printf "${yellow}      mv /usr/bin/Monitor.disable /usr/bin/Monitor${white}\n"
-    printf "${yellow}      mv /usr/bin/display-server.disable /usr/bin/display-server${white}\n"
+
+    # Re-enable Monitor / display-server if install renamed them to .disable.
+    # Guard: only restore when the .disable exists and the original isn't already back.
+    for bin in Monitor display-server; do
+        if [ -f "/usr/bin/$bin.disable" ] && [ ! -f "/usr/bin/$bin" ]; then
+            mv "/usr/bin/$bin.disable" "/usr/bin/$bin"
+            printf "${green}Restored /usr/bin/$bin${white}\n"
+        fi
+    done
+
     printf "${yellow}NOTE: Backup files remain at $BACKUP_DIR (ft2font.so, printer.cfg.bak, etc.)${white}\n"
     printf "${green}GuppyScreen uninstalled. Reboot printer to restore display services.${white}\n"
 }
