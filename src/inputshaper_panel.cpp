@@ -78,7 +78,7 @@ InputShaperPanel::InputShaperPanel(KWebSocketClient &c, std::mutex &l)
   , yimage_fullsized(false)
   , x_pending(false)
   , y_pending(false)
-  , x_after_move(false)
+  , y_after_move(false)
   , next_axis_is_x(false)
   , cal_watchdog(NULL)
 {
@@ -310,9 +310,9 @@ void InputShaperPanel::handle_callback(lv_event_t *event) {
 
     // Axes run ONE AT A TIME so the accelerometer can be moved between them.
     // Confirm placement before each axis; both -> Y first, then prompt for X.
-    x_after_move = (x_requested && y_requested);
-    // Y first whenever it's requested (sensor on the bed); otherwise X.
-    show_placement_prompt(/*is_x=*/!y_requested, /*moving=*/false);
+    y_after_move = (x_requested && y_requested);
+    // X is shown on top in the GUI, so run X first when selected; Y second.
+    show_placement_prompt(/*is_x=*/x_requested, /*moving=*/false);
 
   } else if (btn == save_btn.get_container()) {
     double xhz = (double)lv_slider_get_value(xslider) / 10.0;
@@ -386,7 +386,17 @@ void InputShaperPanel::handle_macro_response(json &j) {
               KUtils::notify_toast(fmt::format("X done — recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
             }
           }
-          axis_finished(true);
+          x_pending = false;   // X is finished regardless of what's next
+          if (y_after_move) {
+            // both axes: pause the watchdog and prompt to move the sensor for Y
+            if (cal_watchdog != NULL) {
+              lv_timer_del(cal_watchdog);
+              cal_watchdog = NULL;
+            }
+            show_placement_prompt(/*is_x=*/false, /*moving=*/true);
+          } else if (!x_pending && !y_pending) {
+            end_calibration_ui();
+          }
 
         } else if (Y_DATA == fn) {
           if (graph_requested && !axis_png.is_null()) {
@@ -421,16 +431,8 @@ void InputShaperPanel::handle_macro_response(json &j) {
               KUtils::notify_toast(fmt::format("Y done — recommended {} @ {:.1f} Hz. Tap Save to apply.", bn, bf), 4000);
             }
           }
-          y_pending = false;   // Y is finished regardless of what's next
-          if (x_after_move) {
-            // both axes: stop the watchdog (the user may take a while to move the
-            // sensor) and prompt; X runs when they confirm.
-            if (cal_watchdog != NULL) {
-              lv_timer_del(cal_watchdog);
-              cal_watchdog = NULL;
-            }
-            show_placement_prompt(/*is_x=*/true, /*moving=*/true);
-          } else if (!x_pending && !y_pending) {
+          y_pending = false;   // Y is the last axis when both are run
+          if (!x_pending && !y_pending) {
             end_calibration_ui();
           }
         }
@@ -585,17 +587,6 @@ void InputShaperPanel::set_shaper_detail(json &res,
   }
 }
 
-void InputShaperPanel::axis_finished(bool is_x) {
-  if (is_x) {
-    x_pending = false;
-  } else {
-    y_pending = false;
-  }
-  if (!x_pending && !y_pending) {
-    end_calibration_ui();
-  }
-}
-
 void InputShaperPanel::end_calibration_ui() {
   calibrate_btn.enable();
   save_btn.enable();
@@ -615,7 +606,7 @@ void InputShaperPanel::handle_watchdog() {
   if (x_pending || y_pending) {
     x_pending = false;
     y_pending = false;
-    x_after_move = false;
+    y_after_move = false;
     calibrate_btn.enable();
     save_btn.enable();
     lv_obj_add_flag(xspinner, LV_OBJ_FLAG_HIDDEN);
@@ -680,12 +671,10 @@ void InputShaperPanel::show_placement_prompt(bool is_x, bool moving) {
   next_axis_is_x = is_x;
   static const char *btns[] = {"Continue", "Cancel", ""};
   const char *title = moving ? "Move the accelerometer" : "Position the accelerometer";
-  std::string body =
-    moving
-      ? std::string("Y axis done.\n\nMount the accelerometer on the TOOLHEAD (for X), then tap Continue.")
-      : (is_x
-          ? std::string("Mount the accelerometer on the TOOLHEAD (for X), then tap Continue.")
-          : std::string("Mount the accelerometer on the BED (for Y), then tap Continue."));
+  std::string where = is_x ? "the TOOLHEAD (for X)" : "the BED (for Y)";
+  std::string body = moving
+    ? fmt::format("First axis done.\n\nNow mount the accelerometer on {}, then tap Continue.", where)
+    : fmt::format("Mount the accelerometer on {}, then tap Continue.", where);
   lv_obj_t *mbox = lv_msgbox_create(NULL, title, body.c_str(), btns, false);
   KUtils::style_lock_mbox(mbox, 90);
   lv_obj_add_event_cb(mbox, &InputShaperPanel::_placement_prompt_cb, LV_EVENT_VALUE_CHANGED, this);
@@ -699,12 +688,12 @@ void InputShaperPanel::_placement_prompt_cb(lv_event_t *e) {
 
   if (btn == 0) {                         // Continue
     bool is_x = self->next_axis_is_x;
-    if (is_x) {
-      self->x_after_move = false;         // X is now running, nothing deferred
+    if (!is_x) {
+      self->y_after_move = false;         // Y is now running, nothing deferred
     }
     self->begin_axis(is_x);
   } else {                                // Cancel
-    self->x_after_move = false;
+    self->y_after_move = false;
     self->end_calibration_ui();           // idempotent; keeps any axis already saved
   }
 }

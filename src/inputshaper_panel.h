@@ -43,8 +43,6 @@ class InputShaperPanel {
 			 lv_obj_t *slider_label,
 			 lv_obj_t *dd);
 
-  // mark one axis finished; re-enables controls + stops the watchdog once both done
-  void axis_finished(bool is_x);
   // re-enable Calibrate/Save, hide spinners, clear the watchdog timer
   void end_calibration_ui();
   static void _watchdog_cb(lv_timer_t *t) {
@@ -111,7 +109,7 @@ class InputShaperPanel {
   // calibration progress tracking (for feedback + button locking)
   bool x_pending;
   bool y_pending;
-  bool x_after_move;   // both axes selected: X is deferred until the sensor is moved
+  bool y_after_move;   // both axes selected: Y is deferred until the sensor is moved (X runs first)
   bool next_axis_is_x; // which axis the active placement prompt will start on Continue
   lv_timer_t *cal_watchdog;
 
