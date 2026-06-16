@@ -62,6 +62,10 @@ Z-offset baby-stepping** (Tune tab, or tap the Z-offset readout while a first-la
 It saves automatically (with Save Z-Offset installed). **Done when:** the first layer is uniform and the
 lines have no gaps between them.
 
+> **Why not let the printer auto-set it?** The KE *can* set Z-offset automatically with its nozzle-load
+> sensor, but it drifts run-to-run and isn't reliable enough for a consistent first layer — here's the
+> data and what to do instead: [Auto Z-offset: the load-sensor caveat](Auto-Z-Offset).
+
 ## 4. Axis Twist Compensation (only if the first layer is uneven left↔right)
 
 Classic symptom: first layer is perfect in the **middle** but squished on one side and lifting on the

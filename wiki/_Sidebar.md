@@ -9,6 +9,7 @@
 **Get perfect prints**
 - [Calibrate step by step (A→Z)](Calibration-Explained)
 - [Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation)
+- [Auto Z-offset: the load-sensor caveat](Auto-Z-Offset)
 - [Square parts (Skew Correction)](Skew-Correction)
 - [Quieter steppers (TMC Autotune)](TMC-Autotune)
 
