@@ -21,6 +21,11 @@ documentation.
   homing-jog toggle (bed-slinger feel); **auto-cooldown** of the hotend after a manual
   extrude/retract/load/unload; a **Spoolman "Use this filament?"** confirmation before a manual load; and
   a regrouped **Tune** tab + rebalanced **Settings** panel.
+- **Guided on-screen input shaper** — calibrates X/Y **one axis at a time** with an
+  accelerometer-placement confirmation before each axis (correct for the bed-slinger: toolhead for X, bed
+  for Y), locks **Calibrate**/**Save** while a run is in progress, shows progress and recommendation
+  toasts, presents the frequency-response **graph + a readable console side-by-side**, and has a watchdog
+  so a hung run can't spin forever.
 - **Hardware H.264 camera stream** (go2rtc) — a low-bandwidth WebRTC/RTSP feed for the Creality Nebula,
   alongside the stock MJPEG.
 - **Vendored Klipper mods** under `k1/k1_mods/klipper_mods/` (ship in the release tarball): **KAMP**
@@ -56,6 +61,10 @@ documentation.
 ### Fixed
 - **Filament-runout Cancel dialog** — now shows "Cancelling print…", disables its buttons, and stays up
   with feedback until the print actually stops (the runout sensor could otherwise re-fire and re-pop it).
+- **Input shaper** — fixed a crash after each axis (a result toast read the wrong JSON key); the console
+  shaper list now lists shapers in the **same order as the graph legend** (Klipper's `INPUT_SHAPERS`
+  order) instead of alphabetically; ASCII-only toast text so it renders cleanly in the compact font; and
+  a much longer calibration watchdog (the KE's numpy analysis is genuinely slow, ~3 min/axis).
 
 ### Safety
 - A fresh **timestamped `printer.cfg` backup on every installer run**; `probe.py` backed up before the

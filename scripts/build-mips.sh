@@ -4,7 +4,7 @@
 set -e
 
 CROSS_COMPILE="${CROSS_COMPILE:-mipsel-linux-}"
-GUPPYSCREEN_VERSION="${GUPPYSCREEN_VERSION:-v0.5.5-GuppyKE}"
+GUPPYSCREEN_VERSION="${GUPPYSCREEN_VERSION:-v0.6.0-OpenKE}"
 GUPPY_THEME="${GUPPY_THEME:-blue}"
 JOBS="$(nproc)"
 WORKDIR="$(cd "$(dirname "$0")/.." && pwd)"
