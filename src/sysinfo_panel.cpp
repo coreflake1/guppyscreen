@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "config.h"
 #include "theme.h"
+#include "touch_beep.h"
 #include "spdlog/spdlog.h"
 #include "guppyscreen.h"
 
@@ -105,6 +106,9 @@ SysInfoPanel::SysInfoPanel()
 
   , def_temp_cont(lv_obj_create(right_cont))
   , def_temp_dd(lv_dropdown_create(def_temp_cont))
+
+  , touch_beep_cont(lv_obj_create(right_cont))
+  , touch_beep_toggle(lv_switch_create(touch_beep_cont))
 
   , factory_reset_btn(cont, &cancel, "Factory\nReset", &SysInfoPanel::_handle_callback, this, "Reset GuppyScreen to default settings?", [](){
       Config *conf = Config::get_instance();
@@ -340,6 +344,25 @@ SysInfoPanel::SysInfoPanel()
   }
   lv_obj_add_event_cb(def_temp_dd, &SysInfoPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
 
+  // Touch Beep: opt-in audible click feedback on the hardware buzzer. Off by
+  // default; mirrors the stock Creality KE click sound.
+  lv_obj_set_size(touch_beep_cont, LV_PCT(100), LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_all(touch_beep_cont, 0, 0);
+  l = lv_label_create(touch_beep_cont);
+  lv_label_set_text(l, "Touch Beep");
+  lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
+  lv_obj_align(touch_beep_toggle, LV_ALIGN_RIGHT_MID, 0, 0);
+
+  v = conf->get_json("/touch_beep");
+  if (!v.is_null() && v.template get<bool>()) {
+    lv_obj_add_state(touch_beep_toggle, LV_STATE_CHECKED);
+  } else {
+    lv_obj_clear_state(touch_beep_toggle, LV_STATE_CHECKED);
+  }
+
+  lv_obj_add_event_cb(touch_beep_toggle, &SysInfoPanel::_handle_callback,
+    LV_EVENT_VALUE_CHANGED, this);
+
   // Factory Reset lives alone in the top-right corner - kept away from Back and
   // the settings rows to avoid accidental presses.
   lv_obj_add_flag(factory_reset_btn.get_container(), LV_OBJ_FLAG_FLOATING);
@@ -369,6 +392,7 @@ SysInfoPanel::SysInfoPanel()
   lv_coord_t right_row_w = lv_obj_get_width(right_cont) - corner_btn_w - 12;
   lv_obj_set_width(theme_cont, right_row_w);
   lv_obj_set_width(def_temp_cont, right_row_w);
+  lv_obj_set_width(touch_beep_cont, right_row_w);
 }
 
 SysInfoPanel::~SysInfoPanel() {
@@ -442,6 +466,14 @@ void SysInfoPanel::handle_callback(lv_event_t *e)
       bool inverted = lv_obj_has_state(y_icon_toggle, LV_STATE_CHECKED);
       conf->set<bool>("/invert_y_direction", inverted);
       conf->save();
+    } else if (obj == touch_beep_toggle) {
+      bool enabled = lv_obj_has_state(touch_beep_toggle, LV_STATE_CHECKED);
+      conf->set<bool>("/touch_beep", enabled);
+      conf->save();
+      TouchBeep::set_enabled(enabled);
+      if (enabled) {
+        TouchBeep::beep(); // immediate confirmation that it works
+      }
     } else if (obj == theme_dd) {
       auto idx = lv_dropdown_get_selected(theme_dd);
       if (idx != theme) {

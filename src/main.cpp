@@ -27,6 +27,7 @@ static void hal_init(lv_color_t p, lv_color_t s);
 #include "guppyscreen.h"
 #include "hv/hlog.h"
 #include "config.h"
+#include "touch_beep.h"
 
 #include <algorithm>
 
@@ -138,6 +139,11 @@ static void hal_init(lv_color_t primary, lv_color_t secondary) {
     // Wrap whichever read_cb is active (raw or calibrated) with the smoother.
     s_base_read_cb = indev_drv_1.read_cb;
     indev_drv_1.read_cb = evdev_read_smoothed;
+
+    // Optional audible click feedback on the hardware buzzer (opt-in).
+    auto touch_beep = conf->get_json("/touch_beep");
+    TouchBeep::set_enabled(touch_beep.is_boolean() && touch_beep.template get<bool>());
+    indev_drv_1.feedback_cb = TouchBeep::feedback_cb;
 
     lv_indev_drv_register(&indev_drv_1);
 }

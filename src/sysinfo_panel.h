@@ -54,6 +54,9 @@ class SysInfoPanel {
   lv_obj_t *def_temp_cont;
   lv_obj_t *def_temp_dd;
 
+  lv_obj_t *touch_beep_cont;
+  lv_obj_t *touch_beep_toggle;
+
   ButtonContainer factory_reset_btn;
   ButtonContainer back_btn;
 
