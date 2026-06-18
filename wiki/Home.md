@@ -48,6 +48,7 @@ your problem:
 - **Fine-tune mid-print** — speed, flow, Z-offset, pressure advance, firmware retraction
 - File browser (incl. USB sticks), macro/console shell, Spoolman, TMC metrics
 - **WiFi Low-Latency toggle** — snappier Mainsail/screen (power-save off, roam off, Bluetooth off)
+- **Buzzer beeps & songs** — real-pitch `M300`, `PLAY_TUNE` jingles, and a soft touchscreen click ([Beeps & songs](Buzzer-and-Sounds))
 - **Print-state safety locks** — anything that could wreck a running job is blocked or asks first
 - Power-loss recovery, and a 480×272 layout tuned for the KE (screen the right way up)
 
