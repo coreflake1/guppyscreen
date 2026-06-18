@@ -69,18 +69,13 @@ if [ ! -s "$DIR/go2rtc" ]; then
     printf "${red}go2rtc download failed. Check internet / download manually to $DIR/go2rtc${white}\n"; exit 1
 fi
 
-# --- 3. register the webcam in Moonraker (Mainsail + Fluidd both read this) ---
+# --- 3. start. The init script (S96h264cam) registers the Moonraker webcam with
+#        the CURRENT IP every time it starts, including on every boot — so the
+#        stream keeps working after a DHCP/IP change, with no manual edit. ---
 IP=$(detect_ip); [ -z "$IP" ] && IP="127.0.0.1"
-printf "${green}Registering '${WEBCAM_NAME}' webcam (IP ${IP})...${white}\n"
-cat > /tmp/h264_webcam.json <<JEOF
-{"name":"${WEBCAM_NAME}","service":"webrtc-go2rtc","target_fps":15,"target_fps_idle":5,"aspect_ratio":"16:9","stream_url":"http://${IP}:1984/stream.html?src=nebula&mode=webrtc","snapshot_url":"http://${IP}:1984/api/frame.jpeg?src=nebula"}
-JEOF
-curl -s -X POST "$MOONRAKER/server/webcams/item" -H "Content-Type: application/json" -d @/tmp/h264_webcam.json >/dev/null 2>&1
-rm -f /tmp/h264_webcam.json
-
-# --- 4. start ---
+printf "${green}Starting go2rtc and registering '${WEBCAM_NAME}' webcam...${white}\n"
 "$INIT" start
-sleep 2
+sleep 3
 
 printf "${green}=== Done ===${white}\n"
 printf "${white}In Mainsail/Fluidd: pick the '${WEBCAM_NAME}' webcam (alongside the stock one).\n"
@@ -90,5 +85,7 @@ printf "  ${green}Snapshot${white} http://${IP}:1984/api/frame.jpeg?src=nebula\n
 printf "  ${green}MJPEG${white}    http://${IP}:1984/api/stream.mjpeg?src=nebula\n"
 printf "  ${green}HLS${white}      http://${IP}:1984/api/stream.m3u8?src=nebula\n"
 printf "  ${green}go2rtc UI${white} http://${IP}:1984/\n"
-printf "${yellow}Note: if the printer's IP changes, re-run this installer (the URLs above bake in ${IP}).${white}\n"
+printf "${white}The Mainsail/Fluidd webcam auto-updates to the current IP on every boot, so it\n"
+printf "keeps working after a DHCP/IP change. The direct URLs above show ${IP} as of now;\n"
+printf "after an IP change just use the printer's new address (or check the go2rtc UI).${white}\n"
 printf "${white}Uninstall: sh $0 uninstall${white}\n"

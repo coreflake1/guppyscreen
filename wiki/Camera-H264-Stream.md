@@ -33,7 +33,7 @@ Over SSH (the mod ships in `…/guppyscreen/k1_mods/h264cam/`):
 sh /usr/data/guppyscreen/k1_mods/h264cam/install.sh
 ```
 
-It will: copy the reader + wrapper + config to `/usr/data/h264cam/`, download the pinned go2rtc binary, install a boot service (`/etc/init.d/S96h264cam`), register a **"Nebula H264"** webcam in Moonraker (auto-detecting your printer's IP), and start it.
+It will: copy the reader + wrapper + config to `/usr/data/h264cam/`, download the pinned go2rtc binary, install a boot service (`/etc/init.d/S96h264cam`), register a **"Nebula H264"** webcam in Moonraker (auto-detecting your printer's IP, and refreshing it on every boot so it survives DHCP changes), and start it.
 
 Then in Mainsail/Fluidd, open the webcam panel and pick **"Nebula H264"** (it sits next to the stock "Creality Cam").
 
@@ -83,5 +83,5 @@ Stops + removes the service, deletes `/usr/data/h264cam/`, and removes the Moonr
 - **Webcam stuck on "connecting" in Mainsail** — go2rtc rejecting the cross-origin WebSocket. The shipped `go2rtc.yaml` sets `api: origin: "*"` to allow it; if you edited the config, make sure that line is present, then restart: `/etc/init.d/S96h264cam restart`.
 - **Slow/black on first open** — expected cold-start (on-demand pipeline + keyframe wait, a few seconds). If it never loads, check `/usr/data/h264cam/go2rtc.log`.
 - **Nothing after a reboot** — confirm `pidof go2rtc` returns a PID; `/etc/init.d/S96h264cam start` to start manually. (The init script uses `pidof`/`kill`, not `pkill`, which isn't present on this firmware.)
-- **Wrong IP after a DHCP change** — the webcam/URLs bake in the IP detected at install; just re-run `install.sh`.
+- **Wrong IP after a DHCP change** — handled automatically: the boot service (`S96h264cam`) re-registers the webcam with the current IP every time it starts, so a reboot fixes it on its own. (Mainsail's go2rtc player needs an absolute URL — it can't use a relative one like the stock MJPEG cam — so the IP is refreshed at boot rather than avoided.) If the IP changed *without* a reboot, just restart the service: `/etc/init.d/S96h264cam restart`.
 - **A firmware update wiped it** — re-run `install.sh` (everything lives in `/usr/data` + `/etc/init.d`, which a Creality FW update can reset).
