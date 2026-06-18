@@ -15,9 +15,9 @@ OpenKE is three things in one project:
 3. **Guides that explain the *why*.** Not just "tap this button" — *when* to recalibrate, what each
    tool fixes, and how to chase down a specific print problem.
 
-> **Heads-up on the name:** this project used to be called **GuppyKE** and is being renamed to
-> **OpenKE**. You'll still see `GuppyKE` in the current release tag (`v0.5.5-GuppyKE`) and a few file
-> names — that's the same project. **Already running an older version?** See
+> **Heads-up on the name:** this project used to be called **GuppyKE** and is now **OpenKE**. Recent
+> releases are tagged `vX.Y-OpenKE` (older ones were `vX.Y-GuppyKE`), and you'll still see `GuppyKE` in
+> a few file names — same project. **Already running an older version?** See
 > [Upgrading from an older version](Upgrading).
 
 ## New here? Do this
