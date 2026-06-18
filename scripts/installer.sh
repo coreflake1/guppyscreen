@@ -61,6 +61,13 @@ uninstall_guppy() {
         printf "${green}Removed GuppyScreen config directory${white}\n"
     fi
 
+    # Remove the buzzer songs file (lives at the config-dir top level, so it
+    # isn't covered by the GuppyScreen dir removal above).
+    if [ -f "$K1_CONFIG_DIR_U/songs.conf" ]; then
+        rm -f "$K1_CONFIG_DIR_U/songs.conf"
+        printf "${green}Removed songs.conf${white}\n"
+    fi
+
     # Remove Klipper symlinks
     rm -f "$KLIPPY_EXTRA_DIR_U/guppy_module_loader.py"
     rm -f "$KLIPPY_EXTRA_DIR_U/guppy_config_helper.py"
