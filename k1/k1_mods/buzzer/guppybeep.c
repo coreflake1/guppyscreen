@@ -76,19 +76,27 @@ static void pwm_off(void){ wr(PWMENC,1u<<CH); wr(PWMOEN, rd(PWMOEN)&~(1u<<CH)); 
 static void cleanup(void){ pwm_off(); gpio_restore(); }
 static void on_sig(int s){ (void)s; cleanup(); _exit(1); }
 
-/* smallest PRESCALE (0..15) whose period fits the 16-bit HIGH/LOW fields */
+/* smallest PRESCALE (0..15) whose whole period fits one 16-bit field. We keep
+ * the full period < 65536 (not just each half) so any duty cycle is safe: a low
+ * duty makes the LOW count approach the whole period. */
 static unsigned pick_prescale(unsigned freq, unsigned *total_out){
   for(unsigned P=0;P<=15;P++){
     unsigned total=(300000000u>>P)/freq;
-    if(total>0 && total<131000){ *total_out=total; return P; }
+    if(total>0 && total<65500){ *total_out=total; return P; }
   }
   *total_out=(300000000u>>15)/freq; return 15;
 }
 
+/* duty cycle in percent for the PWM high phase. 50 = square wave (loudest);
+ * a low duty drives the piezo with narrow pulses -> much softer/quieter. */
+static unsigned g_duty = 50;
+
 static void pwm_note(unsigned freq){
   if(freq<20){ pwm_off(); return; }            /* treat as rest */
   unsigned total, P=pick_prescale(freq,&total);
-  unsigned hi=total/2, lo=total-hi;
+  unsigned hi=(unsigned)((unsigned long long)total*g_duty/100);
+  if(hi<1) hi=1; if(hi>=total) hi=total-1;
+  unsigned lo=total-hi;
   wr(PWMENC,1u<<CH);                            /* stop before reconfig */
   uint32_t c=rd(PWMCCFG0); c&=~(0xFu<<(CH*4)); c|=(P<<(CH*4)); wr(PWMCCFG0,c);
   wr(PWMWCFG(CH),(hi<<16)|(lo&0xFFFF));
@@ -191,8 +199,15 @@ int main(int argc,char**argv){
     if(f>=20) play(f,ms); else { pwm_off(); usleep(ms*1000); }
   } else if(!strcmp(mode,"rtttl")){
     if(argc>2) play_rtttl(argv[2]);
+  } else if(!strcmp(mode,"click")){
+    /* Soft phone-style touch tick: short, low duty, low pitch (well off the
+     * ~2.3kHz resonance so it stays faint). Args optional: click [freq] [ms] [duty%]. */
+    unsigned f    = argc>2?strtoul(argv[2],0,0):260;
+    unsigned ms   = argc>3?strtoul(argv[3],0,0):4;
+    g_duty        = argc>4?strtoul(argv[4],0,0):2;
+    play(f,ms);
   } else {
-    fprintf(stderr,"usage: %s tone <freq> <ms> | m300 S<f> P<ms> | rtttl \"<str>\"\n",argv[0]);
+    fprintf(stderr,"usage: %s tone <freq> <ms> | m300 S<f> P<ms> | rtttl <str> | click [f] [ms] [duty]\n",argv[0]);
     cleanup(); return 2;
   }
   cleanup();

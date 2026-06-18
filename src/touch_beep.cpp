@@ -19,7 +19,9 @@ namespace {
   constexpr uint32_t DEBOUNCE_MS = 120;
   uint32_t s_last_tick = 0;
 
-  const char *BEEP_PATH = "/usr/bin/beep";
+  // Hardware-PWM soft "tick" (see k1/k1_mods/buzzer/guppybeep.c). Far quieter
+  // and lower than /usr/bin/beep's fixed loud pulse - a phone-like touch tick.
+  const char *BEEP_PATH = "/usr/data/guppyscreen/guppybeep";
 }
 
 namespace TouchBeep {
@@ -34,7 +36,7 @@ bool is_enabled() {
 
 void beep() {
 #ifndef SIMULATOR
-  // Double-fork: the grandchild execs /usr/bin/beep and is reparented to init
+  // Double-fork: the grandchild execs guppybeep and is reparented to init
   // (which reaps it), so we leave no zombie and never block the UI thread on
   // the buzzer pulse. The parent only waits on the short-lived middle child,
   // which exits immediately.
@@ -42,8 +44,8 @@ void beep() {
   if (pid == 0) {
     pid_t grandchild = fork();
     if (grandchild == 0) {
-      execl(BEEP_PATH, "beep", (char *)NULL);
-      _exit(127); // exec failed (beep missing) - nothing we can do here
+      execl(BEEP_PATH, "guppybeep", "click", (char *)NULL);
+      _exit(127); // exec failed (guppybeep missing) - nothing we can do here
     }
     _exit(0);
   } else if (pid > 0) {
