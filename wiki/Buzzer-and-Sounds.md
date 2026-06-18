@@ -11,10 +11,11 @@ There are three things this gives you:
 2. **`M300` beeps** with real pitch and duration (the standard slicer "beep" command).
 3. **`PLAY_TUNE` songs** — built-in tunes, plus your own, kept in an editable file.
 
-> **Already running OpenKE and don't see `M300`/`PLAY_TUNE`?** These commands and the default song list
-> are installed into your Klipper config, which the on-screen **Update Guppy** button doesn't touch.
-> **Re-run the [installer](Installation)** once (it's safe and keeps your config) and they'll appear.
-> See [Upgrading](Upgrading) for details. Fresh installs already have everything.
+> **Upgraded from before `v1.1.0-OpenKE` and don't see `M300`/`PLAY_TUNE`?** These commands and the
+> default song list install into your Klipper config, which the on-screen **Update Guppy** button doesn't
+> touch — so **re-run the [installer](Installation)** once (safe, keeps your config) and they'll appear.
+> This is a one-time step only for that upgrade; **fresh installs already have everything**, and from
+> `v1.1.0-OpenKE` onward it's automatic. See [Upgrading](Upgrading) for details.
 
 ---
 
