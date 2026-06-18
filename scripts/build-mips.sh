@@ -81,5 +81,10 @@ make -j"$JOBS" \
     GUPPYSCREEN_VERSION="$GUPPYSCREEN_VERSION" \
     GUPPY_THEME="$GUPPY_THEME"
 
+# --- guppybeep (hardware-PWM buzzer player) ---
+echo "=== Building guppybeep (buzzer) for MIPS ==="
+"${CROSS_COMPILE}gcc" -O2 -static -o build/bin/guppybeep k1/k1_mods/buzzer/guppybeep.c
+
 echo "=== Build complete ==="
 file build/bin/guppyscreen
+file build/bin/guppybeep

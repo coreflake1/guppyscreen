@@ -8,6 +8,10 @@ ASSET_NAME=$1
 
 "$CROSS_COMPILE"strip ./build/bin/guppyscreen
 cp ./build/bin/guppyscreen $RELEASES_DIR/guppyscreen
+if [ -f ./build/bin/guppybeep ]; then
+    "$CROSS_COMPILE"strip ./build/bin/guppybeep
+    cp ./build/bin/guppybeep $RELEASES_DIR/guppybeep
+fi
 if [ -f ./build/bin/kd_graphic_mode ]; then
     "$CROSS_COMPILE"strip ./build/bin/kd_graphic_mode
     cp ./build/bin/kd_graphic_mode $RELEASES_DIR/debian
