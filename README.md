@@ -29,11 +29,12 @@ It bundles three things people usually hunt down separately:
 - 🎯 **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset baby-stepping, input-shaper & belt graphs
 - 🎚️ **Fine-tune mid-print** — speed, flow, Z-offset, pressure advance, firmware retraction
 - 📷 **Camera** — persistent image tuning, plus an optional low-bandwidth hardware **H.264** stream
+- 🔔 **Buzzer beeps & songs** — real-pitch `M300`, `PLAY_TUNE` jingles (editable `songs.conf`), soft touchscreen click
 - 🔌 **Power-loss recovery**, **WiFi low-latency** toggle, on-screen notifications
 - 🔒 **Print-state safety locks** — anything that could ruin a running job is blocked or asks first
 - 📐 Tuned **480×272** layout, with the screen mounted the right way up
 
-> Full screen tour: **[Using OpenKE](wiki/Using-GuppyKE.md)** · complete change history: **[CHANGELOG](CHANGELOG.md)**
+> Full screen tour: **[Using OpenKE](wiki/Using-GuppyKE.md)** · complete change history: **[Releases](https://github.com/coreflake1/guppyscreen/releases)**
 
 ## Install
 

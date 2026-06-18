@@ -98,6 +98,9 @@ jobs:
     - name: make kd_graphic_mode
       run: make kd_graphic_mode
 
+    - name: make guppybeep
+      run: ${CROSS_COMPILE}gcc -O2 -static -o build/bin/guppybeep k1/k1_mods/buzzer/guppybeep.c
+
     - name: package release
       run: |
         chmod +x ./scripts/release.sh
