@@ -38,6 +38,14 @@ the Creality Nebula camera (persistent image tuning + H.264 stream), the Pause/R
 and the Creality macros (M600, Save Z-Offset, useful macros, Exclude Object). See
 [Installation](Installation) for the full list.
 
+> **Buzzer beeps & songs need an installer re-run.** The [buzzer sounds](Buzzer-and-Sounds) feature
+> (real-pitch `M300`, `PLAY_TUNE`, the soft touch click) has two parts: a player program that updates
+> with the screen via **Settings → Update Guppy**, and the Klipper **macros + `songs.conf`** that live in
+> your config dir. The on-screen updater does **not** touch your config dir, so the `M300`/`PLAY_TUNE`
+> macros and the default song list only arrive when you **re-run the installer** (safe, keeps your
+> config). After that, your `songs.conf` is preserved on every future install/update — it's the same
+> "config-side features come from the installer" rule as the items above.
+
 - **Already set these up yourself** — by hand or via the **Creality Helper Script**? You don't have to do
   anything. And if you *do* re-run the installer, it **detects what you already have and skips it** — no
   duplicate sections, nothing overwritten, your working setup left intact.
