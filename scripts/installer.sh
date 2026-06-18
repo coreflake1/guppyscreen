@@ -229,6 +229,15 @@ mkdir -p $K1_CONFIG_DIR/GuppyScreen/scripts
 cp $K1_GUPPY_DIR/scripts/*.cfg $K1_CONFIG_DIR/GuppyScreen
 cp $K1_GUPPY_DIR/scripts/*.py $K1_CONFIG_DIR/GuppyScreen/scripts
 
+## Seed the buzzer songs file only if absent, so user-added songs (PLAY_TUNE)
+## survive reinstalls and updates.
+if [ ! -f "$K1_CONFIG_DIR/songs.conf" ]; then
+    cp $K1_GUPPY_DIR/scripts/songs.conf $K1_CONFIG_DIR/songs.conf
+    printf "${green}Installed default buzzer songs to $K1_CONFIG_DIR/songs.conf ${white}\n"
+else
+    printf "${green}Keeping existing $K1_CONFIG_DIR/songs.conf (your songs are preserved) ${white}\n"
+fi
+
 ## backup printer.cfg before any modification
 mkdir -p $BACKUP_DIR
 if [ ! -f "$BACKUP_DIR/printer.cfg.bak" ]; then

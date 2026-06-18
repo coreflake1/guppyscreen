@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
+#include <strings.h>
 #include <ctype.h>
 #include <stdint.h>
 #include <signal.h>
@@ -179,6 +180,28 @@ static void play_rtttl(const char *s){
   pwm_off();
 }
 
+/* Play a named song from a songs file. Each line is  name = <rtttl> ; lines
+ * starting with '#' or ';' are comments. Read directly here (never via Klipper),
+ * so RTTTL in the file may use standard '#' sharps. Returns 0 if played. */
+static int play_song(const char *name, const char *path){
+  FILE *f=fopen(path,"r");
+  if(!f){ fprintf(stderr,"guppybeep: cannot open %s\n",path); return -1; }
+  char line[1024];
+  while(fgets(line,sizeof line,f)){
+    char *p=line; while(*p==' '||*p=='\t') p++;
+    if(*p=='#'||*p==';'||*p=='\n'||*p=='\r'||*p=='\0') continue;
+    char *eq=strchr(p,'='); if(!eq) continue;
+    char *ne=eq; while(ne>p && (ne[-1]==' '||ne[-1]=='\t')) ne--; *ne='\0';   /* trim name */
+    char *val=eq+1; while(*val==' '||*val=='\t') val++;                       /* skip lead ws */
+    char *ve=val+strlen(val);
+    while(ve>val && (ve[-1]=='\n'||ve[-1]=='\r'||ve[-1]==' '||ve[-1]=='\t')) ve--; *ve='\0';
+    if(strcasecmp(p,name)==0){ fclose(f); play_rtttl(val); return 0; }
+  }
+  fclose(f);
+  fprintf(stderr,"guppybeep: song '%s' not found in %s\n",name,path);
+  return -1;
+}
+
 int main(int argc,char**argv){
   const char *mode = argc>1?argv[1]:"";
   if(map_all()) return 1;
@@ -199,6 +222,10 @@ int main(int argc,char**argv){
     if(f>=20) play(f,ms); else { pwm_off(); usleep(ms*1000); }
   } else if(!strcmp(mode,"rtttl")){
     if(argc>2) play_rtttl(argv[2]);
+  } else if(!strcmp(mode,"song")){
+    const char *name = argc>2?argv[2]:"";
+    const char *path = argc>3?argv[3]:"/usr/data/printer_data/config/songs.conf";
+    if(*name) play_song(name,path);
   } else if(!strcmp(mode,"click")){
     /* Soft phone-style touch tick: short, low duty, low pitch (well off the
      * ~2.3kHz resonance so it stays faint). Args optional: click [freq] [ms] [duty%]. */
@@ -207,7 +234,7 @@ int main(int argc,char**argv){
     g_duty        = argc>4?strtoul(argv[4],0,0):2;
     play(f,ms);
   } else {
-    fprintf(stderr,"usage: %s tone <freq> <ms> | m300 S<f> P<ms> | rtttl <str> | click [f] [ms] [duty]\n",argv[0]);
+    fprintf(stderr,"usage: %s tone <freq> <ms> | m300 S<f> P<ms> | rtttl <str> | song <name> [file] | click [f] [ms] [duty]\n",argv[0]);
     cleanup(); return 2;
   }
   cleanup();
