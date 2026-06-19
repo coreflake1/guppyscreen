@@ -1,0 +1,64 @@
+#!/bin/sh
+# guppy-webrtc: low-RAM WebRTC H.264 from cam_app's hardware encoder (no cloud,
+# no go2rtc/ffmpeg). Discovers cam_app's H.264 memfd and serves WebRTC signaling
+# + a self-contained viewer on :8585. Registers it as a Mainsail/Fluidd
+# "iframe" webcam pointing at that viewer.
+DIR=/usr/data/guppy-webrtc
+BIN=$DIR/guppy-webrtc
+PORT=8585
+MOONRAKER="http://localhost:7125"
+WEBCAM_NAME="Nebula WebRTC"
+
+killprocs() {
+  for p in $(pidof guppy-webrtc); do kill "$p" 2>/dev/null; done
+  sleep 1
+  for p in $(pidof guppy-webrtc); do kill -9 "$p" 2>/dev/null; done  # fallback
+}
+
+detect_ip() {
+  ip route get 1.1.1.1 2>/dev/null | grep -oE 'src [0-9.]+' | awk '{print $2}' | head -1
+}
+
+# Find the H.264 main_memfd fd that cam_app holds (skip the mjpg one).
+find_memfd() {
+  CAMPID=""
+  for i in $(seq 1 60); do CAMPID=$(pidof cam_app); [ -n "$CAMPID" ] && break; sleep 1; done
+  [ -z "$CAMPID" ] && return 1
+  for f in /proc/$CAMPID/fd/*; do
+    l=$(readlink "$f" 2>/dev/null)
+    case "$l" in *mjpg_main_memfd*) : ;; *main_memfd*) echo "$f"; return 0 ;; esac
+  done
+  return 1
+}
+
+register_webcam() {
+  IP=$(detect_ip); [ -z "$IP" ] && return 0
+  i=0
+  while [ $i -lt 30 ]; do
+    curl -s "$MOONRAKER/server/info" 2>/dev/null | grep -q klippy && break
+    i=$((i + 1)); sleep 1
+  done
+  curl -s -X DELETE "$MOONRAKER/server/webcams/item?name=Nebula%20WebRTC" >/dev/null 2>&1
+  cat > /tmp/guppy_webrtc_cam.json <<JEOF
+{"name":"${WEBCAM_NAME}","service":"iframe","target_fps":15,"target_fps_idle":5,"aspect_ratio":"16:9","stream_url":"http://${IP}:${PORT}/","snapshot_url":"http://${IP}:8080/?action=snapshot"}
+JEOF
+  curl -s -X POST "$MOONRAKER/server/webcams/item" -H "Content-Type: application/json" -d @/tmp/guppy_webrtc_cam.json >/dev/null 2>&1
+  rm -f /tmp/guppy_webrtc_cam.json
+}
+
+case "$1" in
+  start)
+    echo "Starting guppy-webrtc..."
+    MEMFD=$(find_memfd) || { echo "guppy-webrtc: cam_app H.264 memfd not found" >&2; exit 1; }
+    "$BIN" "$MEMFD" "$PORT" >$DIR/guppy-webrtc.log 2>&1 &
+    register_webcam &
+    ;;
+  stop)
+    echo "Stopping guppy-webrtc..."
+    killprocs
+    ;;
+  restart)
+    killprocs; sleep 1; $0 start
+    ;;
+  *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
+esac
