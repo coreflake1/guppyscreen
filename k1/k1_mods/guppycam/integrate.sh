@@ -15,10 +15,11 @@ GC=${GC:-/usr/data/guppycam/guppycam}
 WEBRTC=${WEBRTC:-/usr/data/guppy-webrtc/guppy-webrtc}
 SOCK=/tmp/guppycam.sock
 W=${W:-1280}; H=${H:-720}; FPS=${FPS:-15}; BR=${BR:-2000000}
-# INPUT=auto picks the camera's native H.264 (passthrough: correct image, zero
-# transcode). INPUT=mjpeg forces the transcode path (enables adaptive bitrate /
-# simulcast, but its HW JPEG-decode currently produces a bad image - WIP).
-INPUT=${INPUT:-auto}
+# INPUT=mjpeg is the full stack: captures MJPEG -> serves :8080 (passthrough) +
+# transcodes to H.264 for :8585 (with adaptive bitrate). INPUT=auto/h264 is the
+# lighter passthrough path (correct image, zero transcode) but serves only :8585.
+INPUT=${INPUT:-mjpeg}
+MJPEG_PORT=${MJPEG_PORT:-8080}
 CAMARGS="-i /dev/v4l/by-id/main-video-4 -t 0 -w 1920 -h 1080 -f 15 -c"
 MJPGARGS="-i input_memfd.so -t 0 -o output_http.so -w /usr/share/mjpg-streamer/www/ -p 8080"
 
@@ -31,9 +32,10 @@ start() {
   kill -9 $(pidof mjpg_streamer) 2>/dev/null
   kill -9 $(pidof cam_app) 2>/dev/null
   sleep 3
-  echo "starting guppycam (input=$INPUT -> memfd, adaptive @ $SOCK)..."
+  echo "starting guppycam (input=$INPUT -> memfd + MJPEG :$MJPEG_PORT, adaptive @ $SOCK)..."
+  MJOPT=""; [ "$INPUT" = "mjpeg" ] && MJOPT="--mjpeg $MJPEG_PORT"
   setsid "$GC" --input "$INPUT" -w "$W" -h "$H" -f "$FPS" -b "$BR" --gop "$FPS" \
-      --memfd --control "$SOCK" </dev/null >/tmp/guppycam.log 2>&1 &
+      --memfd --control "$SOCK" $MJOPT </dev/null >/tmp/guppycam.log 2>&1 &
   sleep 4
   GP=$(gcpid)
   [ -z "$GP" ] && { echo "ERROR: guppycam did not start"; tail -5 /tmp/guppycam.log; return 1; }

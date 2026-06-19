@@ -32,9 +32,12 @@
  *     force_key_frame, jpeg compression_quality
  */
 #define _GNU_SOURCE
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <poll.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -223,6 +226,185 @@ static void nv12_downscale(const uint8_t* src, int sw, int sh, uint8_t* dst, int
 }
 
 /* ----------------------------------------------------------------------------- */
+/* MJPEG Huffman-table fix                                                        */
+/* Many UVC cameras emit abbreviated MJPEG without Huffman tables (DHT). Software */
+/* JPEG decoders insert the standard tables implicitly; the Helix HW JPEG decoder */
+/* does NOT, so it produces garbage (green) frames. Splice the standard JPEG      */
+/* Huffman tables in just before the SOS (FFDA) marker when none are present.     */
+/* The table blob below is the canonical JPEG/IJG standard set (DHT, len 0x01A2). */
+/* ----------------------------------------------------------------------------- */
+static const uint8_t STD_DHT[] = {
+    0xFF, 0xC4, 0x01, 0xA2,
+    0x00, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, /* DC luma */
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    0x10, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d, /* AC luma */
+    0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06, 0x13, 0x51, 0x61, 0x07,
+    0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xa1, 0x08, 0x23, 0x42, 0xb1, 0xc1, 0x15, 0x52, 0xd1, 0xf0,
+    0x24, 0x33, 0x62, 0x72, 0x82, 0x09, 0x0a, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x25, 0x26, 0x27, 0x28,
+    0x29, 0x2a, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+    0x4a, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69,
+    0x6a, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89,
+    0x8a, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7,
+    0xa8, 0xa9, 0xaa, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xc2, 0xc3, 0xc4, 0xc5,
+    0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xe1, 0xe2,
+    0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8,
+    0xf9, 0xfa,
+    0x01, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, /* DC chroma */
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    0x11, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 0x77, /* AC chroma */
+    0x00, 0x01, 0x02, 0x03, 0x11, 0x04, 0x05, 0x21, 0x31, 0x06, 0x12, 0x41, 0x51, 0x07, 0x61, 0x71,
+    0x13, 0x22, 0x32, 0x81, 0x08, 0x14, 0x42, 0x91, 0xa1, 0xb1, 0xc1, 0x09, 0x23, 0x33, 0x52, 0xf0,
+    0x15, 0x62, 0x72, 0xd1, 0x0a, 0x16, 0x24, 0x34, 0xe1, 0x25, 0xf1, 0x17, 0x18, 0x19, 0x1a, 0x26,
+    0x27, 0x28, 0x29, 0x2a, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
+    0x49, 0x4a, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68,
+    0x69, 0x6a, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87,
+    0x88, 0x89, 0x8a, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0xa2, 0xa3, 0xa4, 0xa5,
+    0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xc2, 0xc3,
+    0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda,
+    0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8,
+    0xf9, 0xfa};
+
+/* Returns length written to out (0 on overflow). If the frame already has a DHT,
+ * it's copied unchanged; otherwise the standard DHT is inserted before SOS. */
+static size_t mjpeg_ensure_huffman(const uint8_t* in, size_t len, uint8_t* out, size_t cap) {
+  size_t sos = 0;
+  for (size_t i = 0; i + 1 < len; i++) {
+    if (in[i] == 0xFF && in[i + 1] == 0xC4) { /* DHT already present */
+      if (len > cap) return 0;
+      memcpy(out, in, len);
+      return len;
+    }
+    if (in[i] == 0xFF && in[i + 1] == 0xDA) { sos = i; break; } /* SOS - stop scan */
+  }
+  if (sos == 0) { /* no SOS found - pass through */
+    if (len > cap) return 0;
+    memcpy(out, in, len);
+    return len;
+  }
+  size_t total = sos + sizeof(STD_DHT) + (len - sos);
+  if (total > cap) return 0;
+  memcpy(out, in, sos);
+  memcpy(out + sos, STD_DHT, sizeof(STD_DHT));
+  memcpy(out + sos + sizeof(STD_DHT), in + sos, len - sos);
+  return total;
+}
+
+/* ----------------------------------------------------------------------------- */
+/* MJPEG HTTP server (replaces mjpg_streamer on :8080)                            */
+/* Serves /?action=stream (multipart/x-mixed-replace) and /?action=snapshot from  */
+/* the latest captured MJPEG frame. Only active in MJPEG capture mode.            */
+/* ----------------------------------------------------------------------------- */
+static pthread_mutex_t g_jpg_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_jpg_cond = PTHREAD_COND_INITIALIZER;
+static uint8_t* g_jpg_buf = NULL;
+static size_t g_jpg_len = 0, g_jpg_cap = 0;
+static unsigned g_jpg_seq = 0;
+
+static void mjpeg_publish(const void* f, size_t len) {
+  pthread_mutex_lock(&g_jpg_lock);
+  if (len > g_jpg_cap) {
+    free(g_jpg_buf);
+    g_jpg_buf = malloc(len);
+    g_jpg_cap = g_jpg_buf ? len : 0;
+  }
+  if (g_jpg_buf) {
+    memcpy(g_jpg_buf, f, len);
+    g_jpg_len = len;
+    g_jpg_seq++;
+  }
+  pthread_cond_broadcast(&g_jpg_cond);
+  pthread_mutex_unlock(&g_jpg_lock);
+}
+
+static int write_all(int fd, const void* p, size_t n) {
+  const char* c = p;
+  while (n) {
+    ssize_t w = write(fd, c, n);
+    if (w <= 0) return -1;
+    c += w;
+    n -= (size_t)w;
+  }
+  return 0;
+}
+
+static void* mjpeg_client(void* arg) {
+  int fd = (int)(intptr_t)arg;
+  char req[1024];
+  int n = read(fd, req, sizeof(req) - 1);
+  if (n <= 0) { close(fd); return NULL; }
+  req[n] = 0;
+  int snapshot = strstr(req, "action=snapshot") != NULL;
+  if (snapshot) {
+    pthread_mutex_lock(&g_jpg_lock);
+    size_t len = g_jpg_len;
+    uint8_t* tmp = len ? malloc(len) : NULL;
+    if (tmp) memcpy(tmp, g_jpg_buf, len);
+    pthread_mutex_unlock(&g_jpg_lock);
+    if (tmp) {
+      char h[256];
+      int hn = snprintf(h, sizeof(h),
+                        "HTTP/1.0 200 OK\r\nContent-Type: image/jpeg\r\nContent-Length: %zu\r\n"
+                        "Access-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n", len);
+      if (write_all(fd, h, hn) == 0) write_all(fd, tmp, len);
+      free(tmp);
+    } else {
+      const char* e = "HTTP/1.0 503 Service Unavailable\r\nConnection: close\r\n\r\n";
+      write_all(fd, e, strlen(e));
+    }
+  } else { /* multipart stream */
+    const char* h = "HTTP/1.0 200 OK\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\n"
+                    "Content-Type: multipart/x-mixed-replace;boundary=guppycam\r\n\r\n";
+    if (write_all(fd, h, strlen(h)) == 0) {
+      unsigned last = 0;
+      while (g_run) {
+        pthread_mutex_lock(&g_jpg_lock);
+        while (g_jpg_seq == last && g_run) pthread_cond_wait(&g_jpg_cond, &g_jpg_lock);
+        size_t len = g_jpg_len;
+        uint8_t* tmp = len ? malloc(len) : NULL;
+        if (tmp) memcpy(tmp, g_jpg_buf, len);
+        last = g_jpg_seq;
+        pthread_mutex_unlock(&g_jpg_lock);
+        if (!tmp) break;
+        char part[128];
+        int pn = snprintf(part, sizeof(part),
+                          "--guppycam\r\nContent-Type: image/jpeg\r\nContent-Length: %zu\r\n\r\n", len);
+        int bad = write_all(fd, part, pn) || write_all(fd, tmp, len) || write_all(fd, "\r\n", 2);
+        free(tmp);
+        if (bad) break;
+      }
+    }
+  }
+  close(fd);
+  return NULL;
+}
+
+static void* mjpeg_server(void* arg) {
+  int port = (int)(intptr_t)arg;
+  int s = socket(AF_INET, SOCK_STREAM, 0);
+  int one = 1;
+  setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+  struct sockaddr_in a = {0};
+  a.sin_family = AF_INET;
+  a.sin_addr.s_addr = INADDR_ANY;
+  a.sin_port = htons(port);
+  if (bind(s, (struct sockaddr*)&a, sizeof(a)) < 0 || listen(s, 4) < 0) {
+    logmsg("mjpeg: bind :%d failed: %s", port, strerror(errno));
+    close(s);
+    return NULL;
+  }
+  logmsg("mjpeg: serving on :%d (/?action=stream|snapshot)", port);
+  while (g_run) {
+    int c = accept(s, NULL, NULL);
+    if (c < 0) continue;
+    pthread_t t;
+    if (pthread_create(&t, NULL, mjpeg_client, (void*)(intptr_t)c) == 0) pthread_detach(t);
+    else close(c);
+  }
+  close(s);
+  return NULL;
+}
+
+/* ----------------------------------------------------------------------------- */
 /* UVC capture (single-planar MMAP) with format auto-select                      */
 /* ----------------------------------------------------------------------------- */
 typedef enum { SRC_H264, SRC_MJPEG, SRC_YUYV } SrcKind;
@@ -392,6 +574,7 @@ typedef struct {
   int out_planes, cap_planes;
   int out_memory; /* V4L2_MEMORY_MMAP or V4L2_MEMORY_DMABUF */
   int w, h;
+  uint8_t* gather; /* contiguous NV12 scratch when CAPTURE is multi-plane */
 } M2M;
 
 static int m2m_open(M2M* m, const char* dev, int w, int h, uint32_t src_fourcc, uint32_t dst_fourcc) {
@@ -436,6 +619,16 @@ static int m2m_open(M2M* m, const char* dev, int w, int h, uint32_t src_fourcc, 
     return -1;
   }
   m->out_planes = ofmt.fmt.pix_mp.num_planes;
+  if (m->cap_planes >= 2) { /* multi-plane raw output (decoder NV12): need a gather buffer */
+    m->gather = malloc((size_t)w * h * 3 / 2 + 64);
+    if (!m->gather) return -1;
+  }
+  logmsg("m2m %s: OUT %.4s %ux%u/%dpl bpl=%u sz=%u | CAP %.4s %ux%u/%dpl bpl=%u sz=%u", dev,
+         (char*)&ofmt.fmt.pix_mp.pixelformat, ofmt.fmt.pix_mp.width, ofmt.fmt.pix_mp.height,
+         m->out_planes, ofmt.fmt.pix_mp.plane_fmt[0].bytesperline,
+         ofmt.fmt.pix_mp.plane_fmt[0].sizeimage, (char*)&cfmt.fmt.pix_mp.pixelformat,
+         cfmt.fmt.pix_mp.width, cfmt.fmt.pix_mp.height, m->cap_planes,
+         cfmt.fmt.pix_mp.plane_fmt[0].bytesperline, cfmt.fmt.pix_mp.plane_fmt[0].sizeimage);
   return 0;
 }
 
@@ -554,6 +747,17 @@ static int m2m_process(M2M* m, const void* in, size_t in_len, int dmafd, void** 
     oplanes[0].m.fd = dmafd;
     oplanes[0].bytesused = (uint32_t)m->w * m->h * 3 / 2;
     oplanes[0].length = oplanes[0].bytesused;
+  } else if (m->out_planes >= 2) {
+    /* multi-plane NV12 input (encoder): split contiguous `in` (Y then UV). */
+    size_t ysz = (size_t)m->w * m->h, uvsz = ysz / 2;
+    if (ysz > m->out[0].length[0]) ysz = m->out[0].length[0];
+    if (uvsz > m->out[0].length[1]) uvsz = m->out[0].length[1];
+    memcpy(m->out[0].start[0], in, ysz);
+    memcpy(m->out[0].start[1], (const uint8_t*)in + (size_t)m->w * m->h, uvsz);
+    oplanes[0].bytesused = ysz;
+    oplanes[0].length = m->out[0].length[0];
+    oplanes[1].bytesused = uvsz;
+    oplanes[1].length = m->out[0].length[1];
   } else {
     size_t cap0 = m->out[0].length[0];
     size_t n = in_len < cap0 ? in_len : cap0;
@@ -586,8 +790,18 @@ static int m2m_process(M2M* m, const void* in, size_t in_len, int dmafd, void** 
   cb.length = m->cap_planes;
   cb.m.planes = cp;
   if (xioctl(m->fd, VIDIOC_DQBUF, &cb) == -1) { logmsg("m2m: DQBUF(CAPTURE) %s", strerror(errno)); return -1; }
-  *out = m->cap[cb.index].start[0];
-  *out_len = cp[0].bytesused;
+  if (m->cap_planes >= 2) {
+    /* multi-plane NV12 output (decoder): gather Y + UV into one contiguous buffer.
+     * Raw planes report bytesused=0 on this driver, so use the known sizes. */
+    size_t ysz = (size_t)m->w * m->h, uvsz = ysz / 2;
+    memcpy(m->gather, (const void*)m->cap[cb.index].start[0], ysz);
+    memcpy(m->gather + ysz, (const void*)m->cap[cb.index].start[1], uvsz);
+    *out = m->gather;
+    *out_len = ysz + uvsz;
+  } else {
+    *out = m->cap[cb.index].start[0];
+    *out_len = cp[0].bytesused;
+  }
   if (keyframe) *keyframe = (cb.flags & V4L2_BUF_FLAG_KEYFRAME) ? 1 : 0;
   if (cap_index) *cap_index = cb.index;
 
@@ -620,6 +834,7 @@ static void m2m_close(M2M* m) {
       if (m->cap[i].start[p]) munmap(m->cap[i].start[p], m->cap[i].length[p]);
     if (m->cap[i].dmafd >= 0) close(m->cap[i].dmafd);
   }
+  free(m->gather);
   close(m->fd);
   m->fd = -1;
 }
@@ -704,6 +919,7 @@ static void usage(const char* p) {
           "     --zerocopy <m>  auto|on|off (dmabuf decode->encode, default auto)\n"
           "     --control <sock> unix control socket    (default off)\n"
           "     --memfd        stream0 H.264 -> a cam_app-layout memfd (feed guppy-webrtc)\n"
+          "     --mjpeg <port> serve MJPEG (/?action=stream|snapshot) on <port> (MJPEG mode)\n"
           "     --frames <n>    stop after n frames     (default 0=forever)\n"
           "     --snapshot <f>  one MJPEG/JPEG frame to f and exit\n"
           "  SIGUSR1 = force keyframe.\n",
@@ -749,6 +965,7 @@ int main(int argc, char** argv) {
   int force_input = -1;
   int zerocopy = 1; /* auto */
   int use_memfd = 0;
+  int mjpeg_port = 0;
   long max_frames = 0;
   MemfdSink sink = {0};
 
@@ -773,6 +990,7 @@ int main(int argc, char** argv) {
     else if (!strcmp(a, "--zerocopy")) { const char* m = NEXT(); zerocopy = !strcmp(m, "off") ? 0 : !strcmp(m, "on") ? 2 : 1; }
     else if (!strcmp(a, "--control")) ctrlpath = NEXT();
     else if (!strcmp(a, "--memfd")) use_memfd = 1;
+    else if (!strcmp(a, "--mjpeg")) mjpeg_port = atoi(NEXT());
     else if (!strcmp(a, "--frames")) max_frames = atol(NEXT());
     else if (!strcmp(a, "--snapshot")) snappath = NEXT();
     else if (!strcmp(a, "--stream")) {
@@ -869,11 +1087,16 @@ int main(int argc, char** argv) {
   /* ---- decoder (MJPEG path only); YUYV is converted on CPU ---- */
   M2M dec;
   int have_dec = 0;
-  uint8_t* nv12_cpu = NULL; /* YUYV->NV12 scratch */
+  uint8_t* nv12_cpu = NULL;  /* YUYV->NV12 scratch */
+  uint8_t* mjpeg_fix = NULL; /* Huffman-table-spliced MJPEG scratch */
+  size_t mjpeg_fix_cap = 0;
   if (cap.kind == SRC_MJPEG) {
     if (m2m_open(&dec, codec_dev, w, h, V4L2_PIX_FMT_JPEG, V4L2_PIX_FMT_NV12) < 0) return 1;
     if (m2m_start(&dec) < 0) { logmsg("decoder start failed"); return 1; }
     have_dec = 1;
+    mjpeg_fix_cap = (size_t)w * h * 2 + sizeof(STD_DHT) + 1024;
+    mjpeg_fix = malloc(mjpeg_fix_cap);
+    if (!mjpeg_fix) return 1;
   } else { /* YUYV */
     nv12_cpu = malloc((size_t)w * h * 3 / 2);
     if (!nv12_cpu) return 1;
@@ -908,6 +1131,10 @@ int main(int argc, char** argv) {
   }
 
   int ctrlfd = ctrlpath ? ctrl_open(ctrlpath) : -1;
+  if (mjpeg_port > 0) {
+    pthread_t t;
+    if (pthread_create(&t, NULL, mjpeg_server, (void*)(intptr_t)mjpeg_port) == 0) pthread_detach(t);
+  }
 
   logmsg("guppycam: %dx%d@%dfps, %d stream(s), src=%s. SIGUSR1=IDR%s%s", w, h, fps, total_streams,
          cap.kind == SRC_MJPEG ? "MJPEG" : "YUYV", ctrlfd >= 0 ? ", ctrl=on" : "",
@@ -966,14 +1193,27 @@ int main(int argc, char** argv) {
       g_force_idr = 0;
     }
 
+    /* feed the MJPEG HTTP server (:8080) the native camera frame (it already has DHT) */
+    if (mjpeg_port > 0 && cap.kind == SRC_MJPEG) mjpeg_publish(raw, raw_len);
+
     /* get full-res NV12 */
     void* nv12 = NULL; size_t nv12_len = 0; int nv12_dmafd = -1, dec_capidx = 0;
     if (cap.kind == SRC_MJPEG) {
-      if (m2m_process(&dec, raw, raw_len, -1, &nv12, &nv12_len, NULL, &dec_capidx) != 0) {
+      /* insert standard Huffman tables if the camera's MJPEG lacks them */
+      size_t fl = mjpeg_ensure_huffman(raw, raw_len, mjpeg_fix, mjpeg_fix_cap);
+      const void* jin = fl ? (const void*)mjpeg_fix : raw;
+      size_t jlen = fl ? fl : raw_len;
+      if (m2m_process(&dec, jin, jlen, -1, &nv12, &nv12_len, NULL, &dec_capidx) != 0) {
         cap_release(&cap, idx);
         continue;
       }
       nv12_dmafd = dec.cap[dec_capidx].dmafd; /* fd of the buffer actually produced */
+      static int _dbg = 0;
+      if (!_dbg) {
+        _dbg = 1;
+        logmsg("decode: first NV12 = %zu bytes (expect %u), idx=%d", nv12_len,
+               (unsigned)((size_t)w * h * 3 / 2), dec_capidx);
+      }
     } else {
       yuyv_to_nv12(raw, nv12_cpu, w, h);
       nv12 = nv12_cpu;
@@ -1017,6 +1257,7 @@ int main(int argc, char** argv) {
   }
   if (have_dec) m2m_close(&dec);
   free(nv12_cpu);
+  free(mjpeg_fix);
   if (ctrlfd >= 0) { close(ctrlfd); unlink(ctrlpath); }
   cap_close(&cap);
   logmsg("guppycam: stopped (stream0 %ld frames, %ld keyframes).", streams[0].frames,

@@ -10,7 +10,7 @@ docker run --rm -v "$HERE":/work -w /work "$IMAGE" bash -lc '
 set -e
 TC=/toolchains/mips32el--musl--stable-2024.02-1
 GCC=$TC/bin/mipsel-linux-gcc
-"$GCC" -O2 -static -Wall -Wextra -o /work/guppycam /work/guppycam.c
+"$GCC" -O2 -static -Wall -Wextra -o /work/guppycam /work/guppycam.c -lpthread
 "$TC"/bin/mipsel-linux-strip /work/guppycam
 '
 echo "=== built: $HERE/guppycam ==="
