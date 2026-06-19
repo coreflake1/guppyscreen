@@ -45,6 +45,7 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
@@ -89,6 +90,52 @@
 
 #define MAX_BUFS 6
 #define MAX_STREAMS 3
+
+/* ----------------------------------------------------------------------------- */
+/* memfd output sink - mirrors Creality cam_app's "main_memfd" layout so the      */
+/* existing guppy-webrtc memfd_reader consumes our H.264 unchanged:               */
+/*   - u32 current-frame offset at byte 16                                        */
+/*   - each frame stored as [u32 size][Annex-B data] at that offset              */
+/* Two alternating regions (double-buffer) so the reader never sees a torn frame. */
+/* ----------------------------------------------------------------------------- */
+#define SINK_SZ (8u << 20)
+#define SINK_HDR 4096
+typedef struct {
+  int fd;
+  uint8_t* base;
+  size_t sz;
+  size_t regoff[2];
+  int cur;
+} MemfdSink;
+
+/* call the syscall directly - avoids depending on the libc wrapper's presence */
+static int gc_memfd_create(const char* name, unsigned flags) {
+  return (int)syscall(SYS_memfd_create, name, flags);
+}
+
+static int memfd_sink_open(MemfdSink* s, const char* name) {
+  s->fd = gc_memfd_create(name, 0);
+  if (s->fd < 0) return -1;
+  s->sz = SINK_SZ;
+  if (ftruncate(s->fd, s->sz) < 0) return -1;
+  s->base = mmap(NULL, s->sz, PROT_READ | PROT_WRITE, MAP_SHARED, s->fd, 0);
+  if (s->base == MAP_FAILED) return -1;
+  memset(s->base, 0, SINK_HDR);
+  s->regoff[0] = SINK_HDR;
+  s->regoff[1] = SINK_HDR + (s->sz - SINK_HDR) / 2;
+  s->cur = 1; /* first frame lands in region 0 */
+  return 0;
+}
+
+static void memfd_sink_write(MemfdSink* s, const void* frame, size_t len) {
+  int r = s->cur ^ 1;
+  size_t off = s->regoff[r];
+  if (off + 4 + len > s->sz) return; /* frame too big - skip */
+  *(volatile uint32_t*)(s->base + off) = (uint32_t)len;
+  memcpy(s->base + off + 4, frame, len);
+  *(volatile uint32_t*)(s->base + 16) = (uint32_t)off; /* publish atomically-ish */
+  s->cur = r;
+}
 #define BITRATE_MAX 4000000
 #define BITRATE_MIN 150000
 
@@ -656,6 +703,7 @@ static void usage(const char* p) {
           "     --stream WxH@bps[:file]  add a simulcast stream (repeatable)\n"
           "     --zerocopy <m>  auto|on|off (dmabuf decode->encode, default auto)\n"
           "     --control <sock> unix control socket    (default off)\n"
+          "     --memfd        stream0 H.264 -> a cam_app-layout memfd (feed guppy-webrtc)\n"
           "     --frames <n>    stop after n frames     (default 0=forever)\n"
           "     --snapshot <f>  one MJPEG/JPEG frame to f and exit\n"
           "  SIGUSR1 = force keyframe.\n",
@@ -700,7 +748,9 @@ int main(int argc, char** argv) {
   const char* ctrlpath = NULL;
   int force_input = -1;
   int zerocopy = 1; /* auto */
+  int use_memfd = 0;
   long max_frames = 0;
+  MemfdSink sink = {0};
 
   Stream streams[MAX_STREAMS];
   memset(streams, 0, sizeof(streams));
@@ -722,6 +772,7 @@ int main(int argc, char** argv) {
     else if (!strcmp(a, "-o") || !strcmp(a, "--out")) outpath = NEXT();
     else if (!strcmp(a, "--zerocopy")) { const char* m = NEXT(); zerocopy = !strcmp(m, "off") ? 0 : !strcmp(m, "on") ? 2 : 1; }
     else if (!strcmp(a, "--control")) ctrlpath = NEXT();
+    else if (!strcmp(a, "--memfd")) use_memfd = 1;
     else if (!strcmp(a, "--frames")) max_frames = atol(NEXT());
     else if (!strcmp(a, "--snapshot")) snappath = NEXT();
     else if (!strcmp(a, "--stream")) {
@@ -785,9 +836,14 @@ int main(int argc, char** argv) {
   s0->profile = profile; s0->outpath = outpath;
   int total_streams = 1 + nstreams;
 
-  /* open output files */
+  /* H.264 sink: stream0 either to a memfd (live feed for guppy-webrtc) or a file/stdout */
+  if (use_memfd) {
+    if (memfd_sink_open(&sink, "main_memfd") < 0) { logmsg("memfd sink open failed: %s", strerror(errno)); return 1; }
+    logmsg("guppycam: stream0 H.264 -> memfd (fd %d, name main_memfd)", sink.fd);
+  }
   for (int i = 0; i < total_streams; i++) {
     Stream* s = &streams[i];
+    if (i == 0 && use_memfd) { s->fp = NULL; continue; }  /* stream0 -> memfd */
     s->fp = s->outpath ? fopen(s->outpath, "wb") : (i == 0 ? stdout : NULL);
     if (!s->fp) { logmsg("stream %d: cannot open output '%s'", i, s->outpath ? s->outpath : "(none)"); return 1; }
   }
@@ -800,7 +856,8 @@ int main(int argc, char** argv) {
       void* d; size_t l;
       int idx = cap_get(&cap, &d, &l, 1000);
       if (idx < 0) continue;
-      fwrite(d, 1, l, s0->fp);
+      if (use_memfd) memfd_sink_write(&sink, d, l);
+      else fwrite(d, 1, l, s0->fp);
       cap_release(&cap, idx);
       if (max_frames && ++frames >= max_frames) break;
     }
@@ -937,7 +994,8 @@ int main(int argc, char** argv) {
       }
       int dmafd = (i == 0 && s->enc.out_memory == V4L2_MEMORY_DMABUF) ? nv12_dmafd : -1;
       if (m2m_process(&s->enc, enc_in, enc_in_len, dmafd, &h264, &h264_len, &key, NULL) == 0) {
-        if (s->fp) { fwrite(h264, 1, h264_len, s->fp); fflush(s->fp); }
+        if (i == 0 && use_memfd) memfd_sink_write(&sink, h264, h264_len);
+        else if (s->fp) { fwrite(h264, 1, h264_len, s->fp); fflush(s->fp); }
         s->frames++; s->bytes += h264_len; if (key) s->keyframes++;
       }
     }

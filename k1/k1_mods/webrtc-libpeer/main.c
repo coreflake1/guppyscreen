@@ -26,6 +26,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include "cJSON.h"
@@ -37,6 +38,10 @@ static PeerConnection* g_pc = NULL;
 static pthread_mutex_t g_pc_lock = PTHREAD_MUTEX_INITIALIZER;
 static volatile PeerConnectionState g_state = PEER_CONNECTION_CLOSED;
 static MemfdReader* g_reader = NULL;
+/* Optional: forward browser-reported packet loss to guppycam's adaptive-bitrate
+ * control socket, closing the loop (bad link -> encoder backs off). */
+static int g_ctrl_fd = -1;
+static struct sockaddr_un g_ctrl_addr;
 
 static const char VIEWER_HTML[] =
     "<!doctype html><meta charset=utf-8><title>Guppy WebRTC</title>"
@@ -56,6 +61,17 @@ static const char VIEWER_HTML[] =
 static void on_state(PeerConnectionState s, void* u) {
   (void)u;
   g_state = s;
+}
+
+/* libpeer fires this from RTCP receiver reports (fraction_loss in 0..1). Forward
+ * it as "loss <percent>" to guppycam's control socket for adaptive bitrate. */
+static void on_loss(float fraction_loss, uint32_t total_loss, void* u) {
+  (void)total_loss;
+  (void)u;
+  if (g_ctrl_fd < 0) return;
+  char msg[32];
+  int n = snprintf(msg, sizeof(msg), "loss %.1f", fraction_loss * 100.0f);
+  sendto(g_ctrl_fd, msg, n, MSG_DONTWAIT, (struct sockaddr*)&g_ctrl_addr, sizeof(g_ctrl_addr));
 }
 
 /* Chrome obfuscates its host ICE candidates as "<hash>.local" mDNS names; the
@@ -200,6 +216,7 @@ static int negotiate(const char* offer_raw, const char* peer_ip, char* out, size
   g_pc = peer_connection_create(&cfg);
   if (g_pc) {
     peer_connection_oniceconnectionstatechange(g_pc, on_state);
+    peer_connection_on_receiver_packet_loss(g_pc, on_loss);
     int pt = parse_h264_pt(offer);
     peer_connection_set_remote_description(g_pc, offer, SDP_TYPE_OFFER);
     const char* answer = peer_connection_create_answer(g_pc);
@@ -406,10 +423,17 @@ static void on_sigint(int s) {
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    fprintf(stderr, "usage: %s <h264_memfd_path> [http_port]\n", argv[0]);
+    fprintf(stderr, "usage: %s <h264_memfd_path> [http_port] [control_socket]\n", argv[0]);
     return 2;
   }
   int port = (argc > 2) ? atoi(argv[2]) : 8585;
+  const char* ctrl_path = (argc > 3) ? argv[3] : NULL;
+  if (ctrl_path) {
+    g_ctrl_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    memset(&g_ctrl_addr, 0, sizeof(g_ctrl_addr));
+    g_ctrl_addr.sun_family = AF_UNIX;
+    snprintf(g_ctrl_addr.sun_path, sizeof(g_ctrl_addr.sun_path), "%s", ctrl_path);
+  }
   setvbuf(stdout, NULL, _IONBF, 0);  /* flush libpeer's INFO logs to the logfile */
   setvbuf(stderr, NULL, _IONBF, 0);
   /* No SA_RESTART: SIGTERM/SIGINT must interrupt accept() so the process
