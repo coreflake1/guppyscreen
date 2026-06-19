@@ -405,6 +405,179 @@ static void* mjpeg_server(void* arg) {
 }
 
 /* ----------------------------------------------------------------------------- */
+/* WebSocket H.264 server (Mainsail "Raw H264 (jmuxer)" stream)                   */
+/* jmuxer.js in the browser decodes raw H.264 NAL units delivered as binary       */
+/* WebSocket frames via MediaSource. We do the WS handshake (SHA-1 + base64) and  */
+/* send each encoded access unit as one binary frame. Replaces guppy-webrtc.      */
+/* ----------------------------------------------------------------------------- */
+typedef struct {
+  uint32_t h[5];
+  uint64_t len;
+  uint8_t buf[64];
+  int n;
+} SHA1;
+static void sha1_init(SHA1* s) {
+  s->h[0] = 0x67452301;
+  s->h[1] = 0xEFCDAB89;
+  s->h[2] = 0x98BADCFE;
+  s->h[3] = 0x10325476;
+  s->h[4] = 0xC3D2E1F0;
+  s->len = 0;
+  s->n = 0;
+}
+static void sha1_block(SHA1* s, const uint8_t* p) {
+  uint32_t w[80], a, b, c, d, e, f, k, t;
+  for (int i = 0; i < 16; i++) w[i] = (p[i * 4] << 24) | (p[i * 4 + 1] << 16) | (p[i * 4 + 2] << 8) | p[i * 4 + 3];
+  for (int i = 16; i < 80; i++) { uint32_t v = w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]; w[i] = (v << 1) | (v >> 31); }
+  a = s->h[0]; b = s->h[1]; c = s->h[2]; d = s->h[3]; e = s->h[4];
+  for (int i = 0; i < 80; i++) {
+    if (i < 20) { f = (b & c) | ((~b) & d); k = 0x5A827999; }
+    else if (i < 40) { f = b ^ c ^ d; k = 0x6ED9EBA1; }
+    else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8F1BBCDC; }
+    else { f = b ^ c ^ d; k = 0xCA62C1D6; }
+    t = ((a << 5) | (a >> 27)) + f + e + k + w[i];
+    e = d; d = c; c = (b << 30) | (b >> 2); b = a; a = t;
+  }
+  s->h[0] += a; s->h[1] += b; s->h[2] += c; s->h[3] += d; s->h[4] += e;
+}
+static void sha1_update(SHA1* s, const uint8_t* p, size_t n) {
+  s->len += n;
+  while (n) {
+    int t = 64 - s->n;
+    if (t > (int)n) t = (int)n;
+    memcpy(s->buf + s->n, p, t);
+    s->n += t; p += t; n -= t;
+    if (s->n == 64) { sha1_block(s, s->buf); s->n = 0; }
+  }
+}
+static void sha1_final(SHA1* s, uint8_t out[20]) {
+  uint64_t bits = s->len * 8;
+  uint8_t pad = 0x80, z = 0;
+  sha1_update(s, &pad, 1);
+  while (s->n != 56) sha1_update(s, &z, 1);
+  uint8_t lb[8];
+  for (int i = 0; i < 8; i++) lb[i] = (uint8_t)(bits >> (56 - i * 8));
+  sha1_update(s, lb, 8);
+  for (int i = 0; i < 5; i++) {
+    out[i * 4] = s->h[i] >> 24; out[i * 4 + 1] = s->h[i] >> 16;
+    out[i * 4 + 2] = s->h[i] >> 8; out[i * 4 + 3] = s->h[i];
+  }
+}
+static void b64(const uint8_t* in, int n, char* out) {
+  static const char t[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  int o = 0;
+  for (int i = 0; i < n; i += 3) {
+    int v = in[i] << 16 | (i + 1 < n ? in[i + 1] << 8 : 0) | (i + 2 < n ? in[i + 2] : 0);
+    out[o++] = t[(v >> 18) & 63];
+    out[o++] = t[(v >> 12) & 63];
+    out[o++] = (i + 1 < n) ? t[(v >> 6) & 63] : '=';
+    out[o++] = (i + 2 < n) ? t[v & 63] : '=';
+  }
+  out[o] = 0;
+}
+
+static pthread_mutex_t g_h264_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_h264_cond = PTHREAD_COND_INITIALIZER;
+static uint8_t* g_h264_buf = NULL;
+static size_t g_h264_len = 0, g_h264_cap = 0;
+static unsigned g_h264_seq = 0;
+
+static void h264_publish(const void* f, size_t len) {
+  pthread_mutex_lock(&g_h264_lock);
+  if (len > g_h264_cap) {
+    free(g_h264_buf);
+    g_h264_buf = malloc(len);
+    g_h264_cap = g_h264_buf ? len : 0;
+  }
+  if (g_h264_buf) { memcpy(g_h264_buf, f, len); g_h264_len = len; g_h264_seq++; }
+  pthread_cond_broadcast(&g_h264_cond);
+  pthread_mutex_unlock(&g_h264_lock);
+}
+
+static int ws_send(int fd, const uint8_t* p, size_t len) {
+  uint8_t hdr[10];
+  int hn;
+  hdr[0] = 0x82; /* FIN + binary opcode */
+  if (len < 126) { hdr[1] = (uint8_t)len; hn = 2; }
+  else if (len < 65536) { hdr[1] = 126; hdr[2] = len >> 8; hdr[3] = len & 0xff; hn = 4; }
+  else { hdr[1] = 127; for (int i = 0; i < 8; i++) hdr[2 + i] = (uint8_t)((uint64_t)len >> (56 - i * 8)); hn = 10; }
+  if (write_all(fd, hdr, hn)) return -1;
+  return write_all(fd, p, len);
+}
+
+static void* ws_client(void* arg) {
+  int fd = (int)(intptr_t)arg;
+  char req[2048];
+  int n = read(fd, req, sizeof(req) - 1);
+  if (n <= 0) { close(fd); return NULL; }
+  req[n] = 0;
+  char* k = strcasestr(req, "Sec-WebSocket-Key:");
+  if (!k) { close(fd); return NULL; }
+  k += 18;
+  while (*k == ' ') k++;
+  char key[128];
+  int i = 0;
+  while (*k && *k != '\r' && *k != '\n' && i < 100) key[i++] = *k++;
+  key[i] = 0;
+  char cat[200];
+  snprintf(cat, sizeof(cat), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", key);
+  SHA1 s;
+  sha1_init(&s);
+  sha1_update(&s, (const uint8_t*)cat, strlen(cat));
+  uint8_t dig[20];
+  sha1_final(&s, dig);
+  char acc[40];
+  b64(dig, 20, acc);
+  char resp[256];
+  int rn = snprintf(resp, sizeof(resp),
+                    "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                    "Sec-WebSocket-Accept: %s\r\n\r\n", acc);
+  if (write_all(fd, resp, rn)) { close(fd); return NULL; }
+  unsigned last = 0;
+  while (g_run) {
+    pthread_mutex_lock(&g_h264_lock);
+    while (g_h264_seq == last && g_run) pthread_cond_wait(&g_h264_cond, &g_h264_lock);
+    size_t len = g_h264_len;
+    uint8_t* tmp = len ? malloc(len) : NULL;
+    if (tmp) memcpy(tmp, g_h264_buf, len);
+    last = g_h264_seq;
+    pthread_mutex_unlock(&g_h264_lock);
+    if (!tmp) break;
+    int bad = ws_send(fd, tmp, len);
+    free(tmp);
+    if (bad) break;
+  }
+  close(fd);
+  return NULL;
+}
+
+static void* ws_server(void* arg) {
+  int port = (int)(intptr_t)arg;
+  int s = socket(AF_INET, SOCK_STREAM, 0);
+  int one = 1;
+  setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+  struct sockaddr_in a = {0};
+  a.sin_family = AF_INET;
+  a.sin_addr.s_addr = INADDR_ANY;
+  a.sin_port = htons(port);
+  if (bind(s, (struct sockaddr*)&a, sizeof(a)) < 0 || listen(s, 4) < 0) {
+    logmsg("ws: bind :%d failed: %s", port, strerror(errno));
+    close(s);
+    return NULL;
+  }
+  logmsg("ws: H.264 WebSocket serving on :%d (jmuxer)", port);
+  while (g_run) {
+    int c = accept(s, NULL, NULL);
+    if (c < 0) continue;
+    pthread_t t;
+    if (pthread_create(&t, NULL, ws_client, (void*)(intptr_t)c) == 0) pthread_detach(t);
+    else close(c);
+  }
+  close(s);
+  return NULL;
+}
+
+/* ----------------------------------------------------------------------------- */
 /* UVC capture (single-planar MMAP) with format auto-select                      */
 /* ----------------------------------------------------------------------------- */
 typedef enum { SRC_H264, SRC_MJPEG, SRC_YUYV } SrcKind;
@@ -920,6 +1093,7 @@ static void usage(const char* p) {
           "     --control <sock> unix control socket    (default off)\n"
           "     --memfd        stream0 H.264 -> a cam_app-layout memfd (feed guppy-webrtc)\n"
           "     --mjpeg <port> serve MJPEG (/?action=stream|snapshot) on <port> (MJPEG mode)\n"
+          "     --ws <port>    serve raw H.264 over WebSocket on <port> (Mainsail jmuxer)\n"
           "     --frames <n>    stop after n frames     (default 0=forever)\n"
           "     --snapshot <f>  one MJPEG/JPEG frame to f and exit\n"
           "  SIGUSR1 = force keyframe.\n",
@@ -966,6 +1140,7 @@ int main(int argc, char** argv) {
   int zerocopy = 1; /* auto */
   int use_memfd = 0;
   int mjpeg_port = 0;
+  int ws_port = 0;
   long max_frames = 0;
   MemfdSink sink = {0};
 
@@ -991,6 +1166,7 @@ int main(int argc, char** argv) {
     else if (!strcmp(a, "--control")) ctrlpath = NEXT();
     else if (!strcmp(a, "--memfd")) use_memfd = 1;
     else if (!strcmp(a, "--mjpeg")) mjpeg_port = atoi(NEXT());
+    else if (!strcmp(a, "--ws")) ws_port = atoi(NEXT());
     else if (!strcmp(a, "--frames")) max_frames = atol(NEXT());
     else if (!strcmp(a, "--snapshot")) snappath = NEXT();
     else if (!strcmp(a, "--stream")) {
@@ -1061,7 +1237,7 @@ int main(int argc, char** argv) {
   }
   for (int i = 0; i < total_streams; i++) {
     Stream* s = &streams[i];
-    if (i == 0 && use_memfd) { s->fp = NULL; continue; }  /* stream0 -> memfd */
+    if (i == 0 && (use_memfd || ws_port)) { s->fp = NULL; continue; }  /* stream0 -> memfd/ws */
     s->fp = s->outpath ? fopen(s->outpath, "wb") : (i == 0 ? stdout : NULL);
     if (!s->fp) { logmsg("stream %d: cannot open output '%s'", i, s->outpath ? s->outpath : "(none)"); return 1; }
   }
@@ -1074,8 +1250,9 @@ int main(int argc, char** argv) {
       void* d; size_t l;
       int idx = cap_get(&cap, &d, &l, 1000);
       if (idx < 0) continue;
+      if (ws_port > 0) h264_publish(d, l);
       if (use_memfd) memfd_sink_write(&sink, d, l);
-      else fwrite(d, 1, l, s0->fp);
+      if (s0->fp) fwrite(d, 1, l, s0->fp);
       cap_release(&cap, idx);
       if (max_frames && ++frames >= max_frames) break;
     }
@@ -1134,6 +1311,10 @@ int main(int argc, char** argv) {
   if (mjpeg_port > 0) {
     pthread_t t;
     if (pthread_create(&t, NULL, mjpeg_server, (void*)(intptr_t)mjpeg_port) == 0) pthread_detach(t);
+  }
+  if (ws_port > 0) {
+    pthread_t t;
+    if (pthread_create(&t, NULL, ws_server, (void*)(intptr_t)ws_port) == 0) pthread_detach(t);
   }
 
   logmsg("guppycam: %dx%d@%dfps, %d stream(s), src=%s. SIGUSR1=IDR%s%s", w, h, fps, total_streams,
@@ -1234,8 +1415,9 @@ int main(int argc, char** argv) {
       }
       int dmafd = (i == 0 && s->enc.out_memory == V4L2_MEMORY_DMABUF) ? nv12_dmafd : -1;
       if (m2m_process(&s->enc, enc_in, enc_in_len, dmafd, &h264, &h264_len, &key, NULL) == 0) {
+        if (i == 0 && ws_port > 0) h264_publish(h264, h264_len);
         if (i == 0 && use_memfd) memfd_sink_write(&sink, h264, h264_len);
-        else if (s->fp) { fwrite(h264, 1, h264_len, s->fp); fflush(s->fp); }
+        if (s->fp) { fwrite(h264, 1, h264_len, s->fp); fflush(s->fp); }
         s->frames++; s->bytes += h264_len; if (key) s->keyframes++;
       }
     }
