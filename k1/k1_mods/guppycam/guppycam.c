@@ -294,26 +294,33 @@ static size_t mjpeg_ensure_huffman(const uint8_t* in, size_t len, uint8_t* out, 
 /* Serves /?action=stream (multipart/x-mixed-replace) and /?action=snapshot from  */
 /* the latest captured MJPEG frame. Only active in MJPEG capture mode.            */
 /* ----------------------------------------------------------------------------- */
-static pthread_mutex_t g_jpg_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t g_jpg_cond = PTHREAD_COND_INITIALIZER;
-static uint8_t* g_jpg_buf = NULL;
-static size_t g_jpg_len = 0, g_jpg_cap = 0;
-static unsigned g_jpg_seq = 0;
+/* One MJPEG output (its own latest-frame buffer + listen port). We run two:
+ * mid (e.g. 720p) and low (e.g. 360p). */
+typedef struct {
+  pthread_mutex_t lock;
+  pthread_cond_t cond;
+  uint8_t* buf;
+  size_t len, cap;
+  unsigned seq;
+  int port;
+  volatile int clients; /* connected viewers - lets the pipeline encode lazily */
+} MjpegOut;
 
-static void mjpeg_publish(const void* f, size_t len) {
-  pthread_mutex_lock(&g_jpg_lock);
-  if (len > g_jpg_cap) {
-    free(g_jpg_buf);
-    g_jpg_buf = malloc(len);
-    g_jpg_cap = g_jpg_buf ? len : 0;
+/* mid = compatibility stream (native MJPEG passthrough @ master res);
+ * low = remote stream (downscaled + HW JPEG re-encode). */
+static MjpegOut g_mout_mid = {.lock = PTHREAD_MUTEX_INITIALIZER, .cond = PTHREAD_COND_INITIALIZER};
+static MjpegOut g_mout_low = {.lock = PTHREAD_MUTEX_INITIALIZER, .cond = PTHREAD_COND_INITIALIZER};
+
+static void mjpeg_publish(MjpegOut* m, const void* f, size_t len) {
+  pthread_mutex_lock(&m->lock);
+  if (len > m->cap) {
+    free(m->buf);
+    m->buf = malloc(len);
+    m->cap = m->buf ? len : 0;
   }
-  if (g_jpg_buf) {
-    memcpy(g_jpg_buf, f, len);
-    g_jpg_len = len;
-    g_jpg_seq++;
-  }
-  pthread_cond_broadcast(&g_jpg_cond);
-  pthread_mutex_unlock(&g_jpg_lock);
+  if (m->buf) { memcpy(m->buf, f, len); m->len = len; m->seq++; }
+  pthread_cond_broadcast(&m->cond);
+  pthread_mutex_unlock(&m->lock);
 }
 
 static int write_all(int fd, const void* p, size_t n) {
@@ -327,19 +334,28 @@ static int write_all(int fd, const void* p, size_t n) {
   return 0;
 }
 
+typedef struct {
+  int fd;
+  MjpegOut* m;
+} MjpegClient;
+
 static void* mjpeg_client(void* arg) {
-  int fd = (int)(intptr_t)arg;
+  MjpegClient* cc = arg;
+  int fd = cc->fd;
+  MjpegOut* m = cc->m;
+  free(cc);
   char req[1024];
   int n = read(fd, req, sizeof(req) - 1);
   if (n <= 0) { close(fd); return NULL; }
   req[n] = 0;
   int snapshot = strstr(req, "action=snapshot") != NULL;
+  __sync_add_and_fetch(&m->clients, 1);
   if (snapshot) {
-    pthread_mutex_lock(&g_jpg_lock);
-    size_t len = g_jpg_len;
+    pthread_mutex_lock(&m->lock);
+    size_t len = m->len;
     uint8_t* tmp = len ? malloc(len) : NULL;
-    if (tmp) memcpy(tmp, g_jpg_buf, len);
-    pthread_mutex_unlock(&g_jpg_lock);
+    if (tmp) memcpy(tmp, m->buf, len);
+    pthread_mutex_unlock(&m->lock);
     if (tmp) {
       char h[256];
       int hn = snprintf(h, sizeof(h),
@@ -357,13 +373,13 @@ static void* mjpeg_client(void* arg) {
     if (write_all(fd, h, strlen(h)) == 0) {
       unsigned last = 0;
       while (g_run) {
-        pthread_mutex_lock(&g_jpg_lock);
-        while (g_jpg_seq == last && g_run) pthread_cond_wait(&g_jpg_cond, &g_jpg_lock);
-        size_t len = g_jpg_len;
+        pthread_mutex_lock(&m->lock);
+        while (m->seq == last && g_run) pthread_cond_wait(&m->cond, &m->lock);
+        size_t len = m->len;
         uint8_t* tmp = len ? malloc(len) : NULL;
-        if (tmp) memcpy(tmp, g_jpg_buf, len);
-        last = g_jpg_seq;
-        pthread_mutex_unlock(&g_jpg_lock);
+        if (tmp) memcpy(tmp, m->buf, len);
+        last = m->seq;
+        pthread_mutex_unlock(&m->lock);
         if (!tmp) break;
         char part[128];
         int pn = snprintf(part, sizeof(part),
@@ -374,31 +390,36 @@ static void* mjpeg_client(void* arg) {
       }
     }
   }
+  __sync_sub_and_fetch(&m->clients, 1);
   close(fd);
   return NULL;
 }
 
 static void* mjpeg_server(void* arg) {
-  int port = (int)(intptr_t)arg;
+  MjpegOut* m = arg;
   int s = socket(AF_INET, SOCK_STREAM, 0);
   int one = 1;
   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
   struct sockaddr_in a = {0};
   a.sin_family = AF_INET;
   a.sin_addr.s_addr = INADDR_ANY;
-  a.sin_port = htons(port);
+  a.sin_port = htons(m->port);
   if (bind(s, (struct sockaddr*)&a, sizeof(a)) < 0 || listen(s, 4) < 0) {
-    logmsg("mjpeg: bind :%d failed: %s", port, strerror(errno));
+    logmsg("mjpeg: bind :%d failed: %s", m->port, strerror(errno));
     close(s);
     return NULL;
   }
-  logmsg("mjpeg: serving on :%d (/?action=stream|snapshot)", port);
+  logmsg("mjpeg: serving on :%d (/?action=stream|snapshot)", m->port);
   while (g_run) {
     int c = accept(s, NULL, NULL);
     if (c < 0) continue;
+    MjpegClient* cc = malloc(sizeof(*cc));
+    if (!cc) { close(c); continue; }
+    cc->fd = c;
+    cc->m = m;
     pthread_t t;
-    if (pthread_create(&t, NULL, mjpeg_client, (void*)(intptr_t)c) == 0) pthread_detach(t);
-    else close(c);
+    if (pthread_create(&t, NULL, mjpeg_client, cc) == 0) pthread_detach(t);
+    else { free(cc); close(c); }
   }
   close(s);
   return NULL;
@@ -1092,7 +1113,8 @@ static void usage(const char* p) {
           "     --zerocopy <m>  auto|on|off (dmabuf decode->encode, default auto)\n"
           "     --control <sock> unix control socket    (default off)\n"
           "     --memfd        stream0 H.264 -> a cam_app-layout memfd (feed guppy-webrtc)\n"
-          "     --mjpeg <port> serve MJPEG (/?action=stream|snapshot) on <port> (MJPEG mode)\n"
+          "     --mjpeg <port> serve MJPEG (native passthrough @ master res) on <port>\n"
+          "     --mjpeg-low <port> serve a downscaled 640x360 HW-JPEG MJPEG on <port>\n"
           "     --ws <port>    serve raw H.264 over WebSocket on <port> (Mainsail jmuxer)\n"
           "     --frames <n>    stop after n frames     (default 0=forever)\n"
           "     --snapshot <f>  one MJPEG/JPEG frame to f and exit\n"
@@ -1140,6 +1162,7 @@ int main(int argc, char** argv) {
   int zerocopy = 1; /* auto */
   int use_memfd = 0;
   int mjpeg_port = 0;
+  int mjpeg_low_port = 0;
   int ws_port = 0;
   long max_frames = 0;
   MemfdSink sink = {0};
@@ -1166,6 +1189,7 @@ int main(int argc, char** argv) {
     else if (!strcmp(a, "--control")) ctrlpath = NEXT();
     else if (!strcmp(a, "--memfd")) use_memfd = 1;
     else if (!strcmp(a, "--mjpeg")) mjpeg_port = atoi(NEXT());
+    else if (!strcmp(a, "--mjpeg-low")) mjpeg_low_port = atoi(NEXT());
     else if (!strcmp(a, "--ws")) ws_port = atoi(NEXT());
     else if (!strcmp(a, "--frames")) max_frames = atol(NEXT());
     else if (!strcmp(a, "--snapshot")) snappath = NEXT();
@@ -1307,10 +1331,29 @@ int main(int argc, char** argv) {
     }
   }
 
+  /* low (remote) stream: downscale master NV12 to 640x360 and HW-JPEG-encode it */
+  M2M jpeg_low = {0};
+  int have_jlow = 0;
+  uint8_t* low_scale = NULL;
+  if (mjpeg_low_port > 0 && cap.kind != SRC_H264) {
+    if (m2m_open(&jpeg_low, codec_dev, 640, 360, V4L2_PIX_FMT_NV12, V4L2_PIX_FMT_JPEG) < 0) return 1;
+    set_ctrl(jpeg_low.fd, V4L2_CID_JPEG_COMPRESSION_QUALITY, 1);
+    if (m2m_start(&jpeg_low) < 0) { logmsg("jpeg-low encoder start failed"); return 1; }
+    low_scale = malloc((size_t)640 * 360 * 3 / 2);
+    if (!low_scale) return 1;
+    have_jlow = 1;
+  }
+
   int ctrlfd = ctrlpath ? ctrl_open(ctrlpath) : -1;
   if (mjpeg_port > 0) {
+    g_mout_mid.port = mjpeg_port;
     pthread_t t;
-    if (pthread_create(&t, NULL, mjpeg_server, (void*)(intptr_t)mjpeg_port) == 0) pthread_detach(t);
+    if (pthread_create(&t, NULL, mjpeg_server, &g_mout_mid) == 0) pthread_detach(t);
+  }
+  if (mjpeg_low_port > 0) {
+    g_mout_low.port = mjpeg_low_port;
+    pthread_t t;
+    if (pthread_create(&t, NULL, mjpeg_server, &g_mout_low) == 0) pthread_detach(t);
   }
   if (ws_port > 0) {
     pthread_t t;
@@ -1374,8 +1417,8 @@ int main(int argc, char** argv) {
       g_force_idr = 0;
     }
 
-    /* feed the MJPEG HTTP server (:8080) the native camera frame (it already has DHT) */
-    if (mjpeg_port > 0 && cap.kind == SRC_MJPEG) mjpeg_publish(raw, raw_len);
+    /* feed the mid MJPEG server the native camera frame (it already has DHT) */
+    if (mjpeg_port > 0 && cap.kind == SRC_MJPEG) mjpeg_publish(&g_mout_mid, raw, raw_len);
 
     /* get full-res NV12 */
     void* nv12 = NULL; size_t nv12_len = 0; int nv12_dmafd = -1, dec_capidx = 0;
@@ -1401,6 +1444,15 @@ int main(int argc, char** argv) {
       nv12_len = (size_t)w * h * 3 / 2;
     }
     cap_release(&cap, idx);
+
+    /* low/remote MJPEG: lazy - only downscale+JPEG-encode when a viewer is connected */
+    if (have_jlow && g_mout_low.clients > 0) {
+      nv12_downscale(nv12, w, h, low_scale, 640, 360);
+      void* jl;
+      size_t jll;
+      if (m2m_process(&jpeg_low, low_scale, (size_t)640 * 360 * 3 / 2, -1, &jl, &jll, NULL, NULL) == 0)
+        mjpeg_publish(&g_mout_low, jl, jll);
+    }
 
     /* encode for every stream */
     for (int i = 0; i < total_streams; i++) {
@@ -1438,6 +1490,8 @@ int main(int argc, char** argv) {
     free(streams[i].scalebuf);
   }
   if (have_dec) m2m_close(&dec);
+  if (have_jlow) m2m_close(&jpeg_low);
+  free(low_scale);
   free(nv12_cpu);
   free(mjpeg_fix);
   if (ctrlfd >= 0) { close(ctrlfd); unlink(ctrlpath); }
