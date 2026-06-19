@@ -5,12 +5,24 @@ plain Linux **V4L2** API on the Ingenic X2000 ("Helix") hardware codec. One smal
 static binary, no proprietary SDK, no cloud, no AI middleware — and **every encoder
 parameter is under our control** (the thing Creality's black box denied us).
 
-> **Status (2026-06-19):** v2 — all five planned improvements + camera-portability
-> implemented. Cross-compiles clean to a **139 KB static mipsel binary**; arg/flow
-> paths host-smoke-tested; the binary is confirmed to **execute on the printer**
-> (`--help`, opens no devices). **The camera pipeline itself has not yet been run on
-> hardware** — that bring-up is deliberately deferred to a joint session (see _Test
-> plan_). The printer's live camera stack was never disrupted.
+> **Status (2026-06-19):** v2 — **hardware-tested on the printer.** 10 of 12 capabilities
+> verified working; 2 have driver limitations that are handled. Each test stopped
+> cam_app, ran, and restored it; the camera stack was left healthy.
+>
+> | Tested on-device | Result |
+> |---|---|
+> | UVC capture → snapshot (JPEG) | ✅ valid JPEG |
+> | Source auto-select (H264>MJPEG>YUYV) | ✅ picks best |
+> | **Native H.264 passthrough** | ✅ valid stream, zero transcode (camera *does* offer UVC H.264) |
+> | **MJPEG → Helix HW decode → HW H.264 encode** | ✅ valid h264 1280x720, exact keyframe count |
+> | **YUYV → CPU convert → HW encode** | ✅ valid h264 640x480 |
+> | **Simulcast** (1080p-class + downscaled) | ✅ two valid streams (1280x720 + 640x360) |
+> | Bitrate control | ✅ measured 1.39 Mbps @ 1.5M target; 415 kbps @ 400k |
+> | GOP control | ✅ gop=15 → exactly N/15 keyframes |
+> | **Adaptive bitrate (AIMD via socket)** | ✅ loss 8%→×0.7, 10%→×0.7, 0%→+200k probe |
+> | Robustness (kill-9/reconnect/poll-timeout) | ✅ no wedge, clean restore |
+> | Zero-copy DMABUF | ❌ driver returns EFAULT on QBUF → **opt-in only, memcpy default** |
+> | Force-IDR (`FORCE_KEY_FRAME`) | ❌ control unsupported by helix → periodic GOP keyframes only |
 
 ---
 
@@ -135,15 +147,21 @@ then `/etc/init.d/S96guppywebrtc start`.
 8. **Compare vs cam_app:** CPU/RSS; confirm HW encoder keeps CPU ~0.
 9. **Restore + verify camera healthy** every time.
 
-### Known hardware-validation risks (from V4L2 research)
-- **DMABUF import** on the OUTPUT queue may not be supported by this 4.4 vendor driver →
-  auto-fallback to memcpy (correctness unaffected, just no zero-copy win).
-- **Live bitrate** `S_CTRL` may return `-EBUSY` on some drivers → would then need
-  drain→set→resume; verify it applies cleanly first.
-- **NV12 plane count / stride**: code assumes single-plane NV12; if the driver reports 2
-  planes or padded strides, the converter/scaler offsets need adjusting.
-- **Drain**: `VIDIOC_ENCODER_CMD` / `V4L2_BUF_FLAG_LAST` may be unimplemented; `STREAMOFF`
-  backstop handles shutdown regardless.
+### Confirmed hardware behavior (from the 2026-06-19 test run)
+- **DMABUF import: NOT supported** by this 4.4 helix driver — `REQBUFS(DMABUF)` succeeds but
+  `QBUF` returns `EFAULT`. So zero-copy is **opt-in (`--zerocopy on`)**; the default/auto
+  path is **memcpy**, which is verified working. (The dmabuf code is kept for hardware that
+  genuinely supports import.)
+- **Live bitrate `S_CTRL`: works** mid-stream, no `-EBUSY` — adaptive bitrate verified.
+- **NV12 single-plane: confirmed** — the converter/scaler offsets are correct (valid output
+  at 1280x720, 640x480, 640x360).
+- **`FORCE_KEY_FRAME`: unsupported** by the helix driver (`Invalid argument`); on-demand IDR
+  isn't available, but periodic GOP keyframes work (gop is honored exactly). A future
+  workaround could temporarily lower `GOP_SIZE`.
+- **Wedge caution:** a *blocking* V4L2 query (`v4l2-ctl -L`) on the codec while cam_app is
+  using it once hung the driver in D-state (needed a reboot). guppycam avoids blocking codec
+  ioctls and uses a `poll()` timeout before DQBUF; testing must stop cam_app first and use
+  `kill -9` (cam_app traps SIGTERM) + `setsid` relaunch.
 
 ## 8. Integration roadmap (after bring-up)
 - **A** — feed `guppy-webrtc` directly (shared buffer we both own) + wire its packet-loss

@@ -516,6 +516,14 @@ static int m2m_process(M2M* m, const void* in, size_t in_len, int dmafd, void** 
   }
   if (xioctl(m->fd, VIDIOC_QBUF, &ob) == -1) { logmsg("m2m: QBUF(OUTPUT) %s", strerror(errno)); return -1; }
 
+  /* Wait (bounded) for the coded frame to be ready (POLLIN on a CAPTURE-side M2M
+   * fd), rather than blocking forever in DQBUF - a stalled, uninterruptible V4L2
+   * wait is how the driver wedges. POLLIN fires only when the encode/decode of
+   * this frame is done, at which point both queues are dequeue-able. */
+  struct pollfd pfd = {.fd = m->fd, .events = POLLIN};
+  int pr = poll(&pfd, 1, 3000);
+  if (pr <= 0) { logmsg("m2m: codec poll timeout/err (%d) - dropping frame", pr); return -1; }
+
   struct v4l2_plane o2[VIDEO_MAX_PLANES] = {0};
   struct v4l2_buffer odq = {0};
   odq.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
@@ -819,13 +827,15 @@ int main(int argc, char** argv) {
     Stream* s = &streams[i];
     if (m2m_open(&s->enc, codec_dev, s->w, s->h, V4L2_PIX_FMT_NV12, V4L2_PIX_FMT_H264) < 0) return 1;
     enc_apply_controls(&s->enc, s);
-    /* zero-copy: only the primary same-res stream fed by the HW decoder can share
-     * dmabufs (scaled streams need a CPU pass anyway). Attempt + fall back. */
-    if (i == 0 && have_dec && zerocopy && s->w == w && s->h == h) {
+    /* zero-copy dmabuf decode->encode: OPT-IN ONLY (--zerocopy on). On the KE's
+     * 4.4 helix driver, REQBUFS(DMABUF) succeeds but QBUF rejects the imported fd
+     * with EFAULT, so "auto" must NOT use it - the memcpy path is the reliable one.
+     * Kept behind an explicit flag for hardware that genuinely supports import. */
+    if (i == 0 && have_dec && zerocopy == 2 && s->w == w && s->h == h) {
       if (m2m_export_capture(&dec) == 0 && m2m_reqbuf_dmabuf_out(&s->enc, 2) == 0) {
-        logmsg("stream0: zero-copy dmabuf decode->encode ENABLED");
+        logmsg("stream0: zero-copy dmabuf decode->encode ENABLED (experimental)");
       } else {
-        if (zerocopy == 2) logmsg("stream0: zero-copy requested but unsupported; using copy");
+        logmsg("stream0: zero-copy requested but unsupported; using copy");
         s->enc.out_memory = V4L2_MEMORY_MMAP;
         if (m2m_reqbuf_mmap(&s->enc, V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE, 2) < 0) return 1;
       }
