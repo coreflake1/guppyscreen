@@ -13,8 +13,8 @@ parameter is under our control** (the thing Creality's black box denied us).
 > |---|---|
 > | UVC capture → snapshot (JPEG) | ✅ valid JPEG |
 > | Source auto-select (H264>MJPEG>YUYV) | ✅ picks best |
-> | **Native H.264 passthrough** | ✅ valid stream, zero transcode (camera *does* offer UVC H.264) |
-> | **MJPEG → Helix HW decode → HW H.264 encode** | ✅ valid h264 1280x720, exact keyframe count |
+> | **Native H.264 passthrough** | ✅ **correct image** (PNG-verified) + live WebRTC; zero transcode. **This is the working default.** |
+> | **MJPEG → Helix HW decode → HW H.264 encode** | ⚠️ stream is valid h264 but the **image is corrupt (green)** — the HW JPEG-decoder mis-decodes the camera's abbreviated UVC MJPEG (missing Huffman tables). WIP; needed only for adaptive/simulcast. |
 > | **YUYV → CPU convert → HW encode** | ✅ valid h264 640x480 |
 > | **Simulcast** (1080p-class + downscaled) | ✅ two valid streams (1280x720 + 640x360) |
 > | Bitrate control | ✅ measured 1.39 Mbps @ 1.5M target; 415 kbps @ 400k |

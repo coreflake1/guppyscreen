@@ -15,6 +15,10 @@ GC=${GC:-/usr/data/guppycam/guppycam}
 WEBRTC=${WEBRTC:-/usr/data/guppy-webrtc/guppy-webrtc}
 SOCK=/tmp/guppycam.sock
 W=${W:-1280}; H=${H:-720}; FPS=${FPS:-15}; BR=${BR:-2000000}
+# INPUT=auto picks the camera's native H.264 (passthrough: correct image, zero
+# transcode). INPUT=mjpeg forces the transcode path (enables adaptive bitrate /
+# simulcast, but its HW JPEG-decode currently produces a bad image - WIP).
+INPUT=${INPUT:-auto}
 CAMARGS="-i /dev/v4l/by-id/main-video-4 -t 0 -w 1920 -h 1080 -f 15 -c"
 MJPGARGS="-i input_memfd.so -t 0 -o output_http.so -w /usr/share/mjpg-streamer/www/ -p 8080"
 
@@ -27,8 +31,8 @@ start() {
   kill -9 $(pidof mjpg_streamer) 2>/dev/null
   kill -9 $(pidof cam_app) 2>/dev/null
   sleep 3
-  echo "starting guppycam (MJPEG -> Helix encode -> memfd, adaptive @ $SOCK)..."
-  setsid "$GC" --input mjpeg -w "$W" -h "$H" -f "$FPS" -b "$BR" --gop "$FPS" \
+  echo "starting guppycam (input=$INPUT -> memfd, adaptive @ $SOCK)..."
+  setsid "$GC" --input "$INPUT" -w "$W" -h "$H" -f "$FPS" -b "$BR" --gop "$FPS" \
       --memfd --control "$SOCK" </dev/null >/tmp/guppycam.log 2>&1 &
   sleep 4
   GP=$(gcpid)
