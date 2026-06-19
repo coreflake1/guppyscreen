@@ -32,6 +32,12 @@ grep -q "packetization-mode=1" src/sdp.c || { echo "PATCH FAILED: sdp.c H264 fmt
 # Quiet the per-RTP-packet INFO spam so the log stays readable (keeps ICE/DTLS INFO).
 sed -i "s/LOGI(\"markbit/LOGD(\"markbit/" src/rtp.c || true
 
+# Demote the "Only UDP transport is supported" line from ERROR to DEBUG: it fires
+# once per TCP ICE candidate the browser offers (Chrome always sends TCP host
+# candidates), which libpeer correctly ignores - normal, non-actionable, and
+# misleading at ERROR level. Stays visible under GUPPY_WEBRTC_DEBUG.
+sed -i "s/LOGE(\"Only UDP transport is supported\")/LOGD(\"Only UDP transport is supported\")/" src/ice.c || true
+
 # cam_app streams 15 fps; libpeer hardcodes the RTP timestamp step for 30 fps.
 sed -i "s#rtp_encoder->timestamp_increment = 90000 / 30;#rtp_encoder->timestamp_increment = 90000 / 15;#" src/rtp.c
 
