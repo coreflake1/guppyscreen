@@ -334,6 +334,17 @@ static int write_all(int fd, const void* p, size_t n) {
   return 0;
 }
 
+/* Bound every client socket so a dead/slow viewer can't block a server thread
+ * forever (the thread- and buffer-leak that can starve a 197MB box). */
+static void set_sock_timeout(int fd, int secs) {
+  struct timeval tv = {secs, 0};
+  setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+}
+
+#define MAX_CLIENTS_PER_STREAM 8
+static volatile int g_ws_clients = 0;
+
 typedef struct {
   int fd;
   MjpegOut* m;
@@ -344,12 +355,17 @@ static void* mjpeg_client(void* arg) {
   int fd = cc->fd;
   MjpegOut* m = cc->m;
   free(cc);
+  set_sock_timeout(fd, 5);
   char req[1024];
   int n = read(fd, req, sizeof(req) - 1);
   if (n <= 0) { close(fd); return NULL; }
   req[n] = 0;
   int snapshot = strstr(req, "action=snapshot") != NULL;
-  __sync_add_and_fetch(&m->clients, 1);
+  if (__sync_add_and_fetch(&m->clients, 1) > MAX_CLIENTS_PER_STREAM) {
+    __sync_sub_and_fetch(&m->clients, 1);
+    close(fd);
+    return NULL;
+  }
   if (snapshot) {
     pthread_mutex_lock(&m->lock);
     size_t len = m->len;
@@ -528,6 +544,7 @@ static int ws_send(int fd, const uint8_t* p, size_t len) {
 
 static void* ws_client(void* arg) {
   int fd = (int)(intptr_t)arg;
+  set_sock_timeout(fd, 5);
   char req[2048];
   int n = read(fd, req, sizeof(req) - 1);
   if (n <= 0) { close(fd); return NULL; }
@@ -554,6 +571,11 @@ static void* ws_client(void* arg) {
                     "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                     "Sec-WebSocket-Accept: %s\r\n\r\n", acc);
   if (write_all(fd, resp, rn)) { close(fd); return NULL; }
+  if (__sync_add_and_fetch(&g_ws_clients, 1) > MAX_CLIENTS_PER_STREAM) {
+    __sync_sub_and_fetch(&g_ws_clients, 1);
+    close(fd);
+    return NULL;
+  }
   unsigned last = 0;
   while (g_run) {
     pthread_mutex_lock(&g_h264_lock);
@@ -568,6 +590,7 @@ static void* ws_client(void* arg) {
     free(tmp);
     if (bad) break;
   }
+  __sync_sub_and_fetch(&g_ws_clients, 1);
   close(fd);
   return NULL;
 }
