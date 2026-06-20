@@ -37,6 +37,38 @@ del_webcam() { # name
   python3 -c "import urllib.request,urllib.parse; urllib.request.urlopen(urllib.request.Request('http://localhost:7125/server/webcams/item?name='+urllib.parse.quote('$1'),method='DELETE'),timeout=5)" 2>/dev/null
 }
 
+# Idempotently add an nginx WebSocket proxy /webcam-h264/ -> 127.0.0.1:8554 so the
+# H.264 (jmuxer) stream works via a relative path (no hard-coded IP -> survives
+# DHCP changes). Validates with `nginx -t` and only reloads on success.
+ensure_nginx_ws() {
+  python3 - <<'PY' 2>&1
+import subprocess, shutil
+CONF="/usr/data/nginx/nginx/nginx.conf"; NGINX="/usr/data/nginx/sbin/nginx"
+block=("""        location /webcam-h264/ {
+            proxy_pass http://127.0.0.1:8554/;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_buffering off;
+            proxy_read_timeout 86400s;
+        }
+""")
+try:
+    src=open(CONF).read()
+except Exception as e:
+    print("nginx: cannot read config:",e); raise SystemExit
+if "location /webcam-h264/" in src:
+    print("nginx: /webcam-h264/ already present"); raise SystemExit
+shutil.copy(CONF, CONF+".bak-guppycam")
+open(CONF,"w").write(src.replace("        location /webcam/ {", block+"\n        location /webcam/ {"))
+r=subprocess.run([NGINX,"-t","-c",CONF],capture_output=True,text=True)
+if r.returncode==0:
+    subprocess.run([NGINX,"-s","reload","-c",CONF]); print("nginx: added /webcam-h264/ + reloaded")
+else:
+    shutil.copy(CONF+".bak-guppycam",CONF); print("nginx: -t FAILED, restored backup")
+PY
+}
+
 start() {
   echo "stopping stock camera stack..."
   /etc/init.d/S96guppywebrtc stop 2>/dev/null
@@ -49,16 +81,15 @@ start() {
       --ws "$WS" --mjpeg "$MID" --mjpeg-low "$LOW" </dev/null >/tmp/guppycam.log 2>&1 &
   sleep 4
   [ -z "$(gcpid)" ] && { echo "ERROR: guppycam did not start"; tail -5 /tmp/guppycam.log; return 1; }
-  IP=$(ip)
-  echo "registering Moonraker webcams (IP=$IP)..."
-  # remove the old WebRTC cam (guppy-webrtc is gone)
+  echo "configuring nginx + registering 3 IP-free webcams..."
+  ensure_nginx_ws
+  # exactly 3 streams, all relative (IP-drift-proof); remove leftovers
   del_webcam "Nebula WebRTC"
-  reg "guppycam Local (H264)"  "jmuxer-stream"          "ws://$IP:$WS/"                          "http://$IP:$MID/?action=snapshot"
-  reg "guppycam (Apps)"        "mjpegstreamer-adaptive" "http://$IP:$MID/?action=stream"         "http://$IP:$MID/?action=snapshot"
-  reg "guppycam Remote (low)"  "mjpegstreamer-adaptive" "http://$IP:$LOW/?action=stream"         "http://$IP:$LOW/?action=snapshot"
+  del_webcam "Creality Cam"
+  reg "guppycam (Apps)"        "mjpegstreamer-adaptive" "/webcam/?action=stream"   "/webcam/?action=snapshot"
+  reg "guppycam Remote (low)"  "mjpegstreamer-adaptive" "/webcam2/?action=stream"  "/webcam2/?action=snapshot"
+  reg "guppycam Local (H264)"  "jmuxer-stream"          "/webcam-h264/"            "/webcam/?action=snapshot"
   status
-  echo "NOTE: the jmuxer (H264) webcam service string may need confirming in Mainsail's"
-  echo "      webcam settings (select 'Raw H264 (jmuxer)', URL ws://$IP:$WS/)."
 }
 
 revert() {
