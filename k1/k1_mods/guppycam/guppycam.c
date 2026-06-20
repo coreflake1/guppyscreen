@@ -577,6 +577,7 @@ static void* ws_client(void* arg) {
     return NULL;
   }
   unsigned last = 0;
+  int got_key = 0; /* don't send anything until a keyframe so jmuxer can init MSE */
   while (g_run) {
     pthread_mutex_lock(&g_h264_lock);
     while (g_h264_seq == last && g_run) pthread_cond_wait(&g_h264_cond, &g_h264_lock);
@@ -586,6 +587,13 @@ static void* ws_client(void* arg) {
     last = g_h264_seq;
     pthread_mutex_unlock(&g_h264_lock);
     if (!tmp) break;
+    if (!got_key) {
+      /* keyframe = Annex-B AU whose first NAL is SPS(7) or IDR(5) */
+      int key = len > 4 && tmp[0] == 0 && tmp[1] == 0 && tmp[2] == 0 && tmp[3] == 1 &&
+                ((tmp[4] & 0x1f) == 7 || (tmp[4] & 0x1f) == 5);
+      if (!key) { free(tmp); continue; }
+      got_key = 1;
+    }
     int bad = ws_send(fd, tmp, len);
     free(tmp);
     if (bad) break;
@@ -1468,8 +1476,10 @@ int main(int argc, char** argv) {
     }
     cap_release(&cap, idx);
 
-    /* low/remote MJPEG: lazy - only downscale+JPEG-encode when a viewer is connected */
-    if (have_jlow && g_mout_low.clients > 0) {
+    /* low/remote MJPEG: keep the latest 640x360 JPEG fresh so snapshot-polling
+     * clients (Mainsail "adaptive") always get a current frame, not a stale one.
+     * (Was gated on clients>0, which left the buffer stale for snapshot pollers.) */
+    if (have_jlow) {
       nv12_downscale(nv12, w, h, low_scale, 640, 360);
       void* jl;
       size_t jll;
