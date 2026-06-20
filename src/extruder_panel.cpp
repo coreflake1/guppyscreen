@@ -17,14 +17,18 @@ static const uint32_t HEAT_TIMEOUT_MS = 5 * 60 * 1000;
 // response. Long enough for a 50mm slow load; trips only if the ws dies.
 static const uint32_t ACTION_TIMEOUT_MS = 5 * 60 * 1000;
 
-// Chunked load: total filament fed and the size of each individually-issued
-// step. The stock LOAD_MATERIAL macro feeds 150mm as one G1 E150 move that
-// can't be interrupted; we feed the same total in LOAD_CHUNK_MM steps so the
-// user can stop between chunks. LOAD_FEED is the per-chunk feedrate (mm/min);
-// 300 = 5 mm/s, so a chunk takes ~2s = the worst-case stop latency.
-static const int LOAD_TOTAL_MM = 150;
-static const int LOAD_CHUNK_MM = 10;
-static const int LOAD_FEED = 300;
+// Chunked load (stoppable): the stock _GUPPY_LOAD_MATERIAL is one uninterruptible
+// G1 move, so we feed in small steps issued one at a time and the user can Stop
+// between chunks. To match the stock load's quality (and actually seat the
+// filament) we feed in two phases: a quick "approach" to get filament down to the
+// hotend, then a slow "purge" through the melt zone. Feeds are mm/min (F-value);
+// a 10mm chunk is the worst-case stop latency (~1s fast, ~3s slow).
+static const int LOAD_CHUNK_MM  = 10;
+static const int LOAD_FAST_MM   = 80;    // approach: quick feed toward the nozzle
+static const int LOAD_FAST_FEED = 600;   // 10 mm/s
+static const int LOAD_SLOW_MM   = 50;    // purge: slow feed through the melt zone
+static const int LOAD_SLOW_FEED = 180;   // 3 mm/s (matches the stock load macro)
+static const int LOAD_TOTAL_MM  = LOAD_FAST_MM + LOAD_SLOW_MM;  // 130
 
 LV_IMG_DECLARE(back);
 LV_IMG_DECLARE(spoolman_img);
@@ -518,7 +522,12 @@ void ExtruderPanel::maybe_auto_cooldown() {
   }
   auto_cool_after = false;  // clear first so the cooldown action can't re-trigger
   action_name = "Cooldown";
-  send_action(cooldown_macro);
+  // Wait for all queued extruder moves to FINISH before dropping the heater.
+  // Moonraker's gcode.script "done" fires when commands are queued, not when the
+  // motion completes -- and _GUPPY_QUIT_MATERIAL has no trailing M400 -- so without
+  // this the heater starts cooling mid load/unload and the filament jams half in/out
+  // (the "not completely loaded/unloaded" report). M400 blocks until motion is done.
+  send_action("M400\n" + cooldown_macro);
 }
 
 void ExtruderPanel::clear_pending() {
@@ -562,13 +571,16 @@ void ExtruderPanel::send_load_chunk() {
     return;
   }
   int chunk = std::min(LOAD_CHUNK_MM, load_remaining_mm);
+  int fed_before = LOAD_TOTAL_MM - load_remaining_mm;  // mm fed before this chunk
   load_remaining_mm -= chunk;
+  // Two-phase: fast until the approach length is fed, then slow to purge.
+  int feed = (fed_before < LOAD_FAST_MM) ? LOAD_FAST_FEED : LOAD_SLOW_FEED;
   update_busy_caption();
   // Per-chunk watchdog: if the response never arrives (ws died), stop feeding
   // rather than hang. The next chunk is only sent from the response callback,
   // so the feed naturally halts the moment load_stop is set.
   arm_safety_timer(ACTION_TIMEOUT_MS);
-  ws.gcode_script(fmt::format("M83\nG1 E{} F{}", chunk, LOAD_FEED),
+  ws.gcode_script(fmt::format("M83\nG1 E{} F{}", chunk, feed),
     [this](json &) {
       std::lock_guard<std::mutex> lock(lv_lock);
       cancel_safety_timer();
