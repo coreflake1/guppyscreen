@@ -19,9 +19,22 @@ MJPGARGS="-i input_memfd.so -t 0 -o output_http.so -w /usr/share/mjpg-streamer/w
 gcpid() { p=$(pidof guppycam); [ -z "$p" ] && p=$(pidof guppycam_test); echo "$p"; }
 ip() { ip route get 1.1.1.1 2>/dev/null | grep -oE 'src [0-9.]+' | awk '{print $2}' | head -1; }
 
-reg() { # name service streamurl snapurl
-  curl -s -X POST "$MOON/server/webcams/item" -H "Content-Type: application/json" \
-    -d "{\"name\":\"$1\",\"service\":\"$2\",\"target_fps\":15,\"stream_url\":\"$3\",\"snapshot_url\":\"$4\"}" >/dev/null 2>&1
+reg() { # name service streamurl snapurl  (busybox curl rejects -s/-X/-d, so use python3)
+  python3 - "$1" "$2" "$3" "$4" 2>/dev/null <<'PY'
+import sys, json, urllib.request
+n, s, st, sn = sys.argv[1:5]
+b = json.dumps({"name": n, "service": s, "target_fps": 15, "aspect_ratio": "16:9",
+                "stream_url": st, "snapshot_url": sn}).encode()
+try:
+    urllib.request.urlopen(urllib.request.Request(
+        "http://localhost:7125/server/webcams/item", data=b,
+        headers={"Content-Type": "application/json"}, method="POST"), timeout=5)
+except Exception as e:
+    print("reg err", n, e)
+PY
+}
+del_webcam() { # name
+  python3 -c "import urllib.request,urllib.parse; urllib.request.urlopen(urllib.request.Request('http://localhost:7125/server/webcams/item?name='+urllib.parse.quote('$1'),method='DELETE'),timeout=5)" 2>/dev/null
 }
 
 start() {
@@ -39,7 +52,7 @@ start() {
   IP=$(ip)
   echo "registering Moonraker webcams (IP=$IP)..."
   # remove the old WebRTC cam (guppy-webrtc is gone)
-  curl -s -X DELETE "$MOON/server/webcams/item?name=Nebula%20WebRTC" >/dev/null 2>&1
+  del_webcam "Nebula WebRTC"
   reg "guppycam Local (H264)"  "jmuxer-stream"          "ws://$IP:$WS/"                          "http://$IP:$MID/?action=snapshot"
   reg "guppycam (Apps)"        "mjpegstreamer-adaptive" "http://$IP:$MID/?action=stream"         "http://$IP:$MID/?action=snapshot"
   reg "guppycam Remote (low)"  "mjpegstreamer-adaptive" "http://$IP:$LOW/?action=stream"         "http://$IP:$LOW/?action=snapshot"
