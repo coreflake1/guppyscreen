@@ -70,7 +70,7 @@ What's on offer:
 | **Axis Twist Compensation** | left/right first-layer fix | [guide](KAMP-and-Axis-Twist-Compensation) |
 | **TMC Autotune** | quieter, cooler steppers | [guide](TMC-Autotune) |
 | **Skew Correction** | square parts | [guide](Skew-Correction) |
-| **Creality Nebula camera** | image tuning that **sticks across reboots** + a hardware **H.264** stream | [image](Camera-Image-Tuning) · [H.264](Camera-H264-Stream) |
+| **Creality Nebula camera** | image tuning that **sticks across reboots** | [guide](Camera-Image-Tuning) |
 | **Creality macros** | M600 filament change, **Save Z-Offset** (persists z-offset), useful macros (backup/PID/bed-level), Exclude Object | — |
 | **Pause/Resume layer-shift fix** | stops the bed crashing into the rail on resume (`y_park` 222→220) | [guide](Pause-Park-Layer-Shift-Fix) |
 

@@ -185,7 +185,7 @@ rm -rf /root/.cache
 wget -q --no-check-certificate https://raw.githubusercontent.com/ballaswag/k1-discovery/main/bin/curl -O /tmp/curl
 chmod +x /tmp/curl
 
-PINNED_RELEASE="v1.1.0-OpenKE"
+PINNED_RELEASE="v1.2.0-OpenKE"
 ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_RELEASE}/$ASSET_NAME.tar.gz"
 
 printf "${green} Downloading asset: $ASSET_NAME.tar.gz ${white}\n"
@@ -327,7 +327,7 @@ ln -sf $K1_GUPPY_DIR/k1_mods/respawn/librc.so.1 /lib/librc.so.1
 ## ============================================================================
 ## OpenKE optional features — install all / skip all / choose each:
 ##   print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew),
-##   Creality Nebula camera (persistent image tuning + H.264 stream),
+##   Creality Nebula camera (persistent image tuning),
 ##   Pause/Resume layer-shift fix (PAUSE y_park 222 -> 220).
 ## KAMP/Skew/ATC/camera config install via the existing [include GuppyScreen/*.cfg]
 ## glob (no printer.cfg section edits); only Axis Twist touches Klipper core
@@ -416,9 +416,33 @@ install_cfg_guarded() {   # $1 = src path, $2 = dest filename, $3 = label
     fi
 }
 
+# --- Migration: remove the deprecated H.264 camera stream (go2rtc), if present. ---
+# Runs unconditionally on every install/upgrade (not an opt-in). The go2rtc+ffmpeg
+# stack is the memory-pressure / OOM driver on the 197 MB box; v1.2.0 drops it and
+# reverts to the stock camera. main's h264cam never disabled the stock camera, so
+# simply removing it leaves the stock feed intact. (Mirrors the old
+# k1_mods/h264cam/install.sh `uninstall`, inlined since that mod is gone now.)
+if [ -f /etc/init.d/S96h264cam ] || [ -d /usr/data/h264cam ]; then
+    printf "${yellow}Removing the deprecated H.264 camera stream (go2rtc) -> stock camera...${white}\n"
+    [ -f /etc/init.d/S96h264cam ] && /etc/init.d/S96h264cam stop 2>/dev/null
+    for p in $(pidof go2rtc) $(pidof memfd_h264_dump); do kill "$p" 2>/dev/null; done
+    rm -f /etc/init.d/S96h264cam
+    rm -rf /usr/data/h264cam
+    # Remove the "Nebula H264" Moonraker webcam via python3 — the device's busybox
+    # curl rejects -X DELETE, so the old curl-based uninstall left this entry behind.
+    python3 - <<'PY' >/dev/null 2>&1
+import urllib.request
+try:
+    urllib.request.urlopen(urllib.request.Request(
+        "http://localhost:7125/server/webcams/item?name=Nebula%20H264", method="DELETE"), timeout=5)
+except Exception:
+    pass
+PY
+fi
+
 printf "${white}=== OpenKE optional features ===\n"
 printf "${green}  Print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew Correction),\n"
-printf "${green}  the Creality Nebula camera (persistent image tuning + H.264 stream), Creality macros\n"
+printf "${green}  the Creality Nebula camera (persistent image tuning), Creality macros\n"
 printf "${green}  (M600, Save Z-Offset, useful macros, Exclude Object), and the layer-shift fix.${white}\n\n"
 printf "${white}  [Y] install all     [n] skip all     [o] choose each one${white}\n"
 printf "Choice (Y/n/o): "
@@ -491,8 +515,9 @@ else
         fi
     fi
 
-    # --- Creality Nebula camera: persistent image tuning + H.264 stream ---
-    if want "Creality Nebula camera (persistent image tuning + H.264 stream)"; then
+    # --- Creality Nebula camera: persistent image tuning ---
+    # (The H.264 go2rtc stream was removed in v1.2.0 — see the migration step above.)
+    if want "Creality Nebula camera (persistent image tuning)"; then
         if [ -f "$MODS_DIR/nebula_camera/nebula_camera.cfg" ]; then
             if section_defined_elsewhere "[gcode_macro APPLY_CAM_SETTINGS]"; then
                 printf "${yellow}  Camera persist macros already present — leaving yours.${white}\n"
@@ -500,10 +525,6 @@ else
                 printf "${green}  Installing Nebula camera persist macros${white}\n"
                 cp "$MODS_DIR/nebula_camera/nebula_camera.cfg" "$GUPPY_CFG_DIR/nebula_camera.cfg"
             fi
-        fi
-        if [ -f "$K1_GUPPY_DIR/k1_mods/h264cam/install.sh" ]; then
-            printf "${green}  Installing H.264 camera stream (go2rtc)${white}\n"
-            sh "$K1_GUPPY_DIR/k1_mods/h264cam/install.sh"
         fi
     fi
 

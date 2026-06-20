@@ -3,6 +3,20 @@
 Already running an older **GuppyKE** (or plain GuppyScreen) on your KE? Here's what changed and exactly
 what to do. **Short version: updating is safe and your calibrations are kept.**
 
+## v1.2.0 — the hardware H.264 camera stream was removed (auto-handled)
+
+`v1.2.0-OpenKE` **removes the optional H.264 camera stream** (the go2rtc add-on). On the KE's tiny
+197 MB box, the go2rtc + ffmpeg stack (~44 MB) is the main driver of memory-pressure freezes — the
+"screen goes dark, SSH dies, only a power-cycle recovers" symptom. Dropping it and going back to the
+stock camera is the reliable fix.
+
+**You don't have to do anything.** When you update to v1.2.0 (on-screen **Update Guppy**, or re-running
+the installer), it **automatically removes go2rtc** if it's installed — stops the service, deletes
+`/usr/data/h264cam/` and `/etc/init.d/S96h264cam`, and removes the "Nebula H264" webcam from Mainsail.
+Your **stock camera and persistent image tuning are untouched** (the stock feed was never modified by the
+H.264 add-on). After it's gone you'll have ~44 MB more free RAM. If you relied on the H.264 stream in an
+external app (Frigate, Home Assistant, Obico…), point that app at the stock camera instead.
+
 ## First, the name: GuppyKE → OpenKE
 
 Same project, new name. Older releases were tagged `vX.Y-GuppyKE`; new ones are `vX.Y-OpenKE`. You'll
@@ -34,7 +48,7 @@ that, the on-screen **Update Guppy** button works for every future release.
 
 Recent OpenKE folds what used to be manual add-ons into the installer, under a prompt
 (**install all / skip all / choose each**): KAMP, Axis Twist Compensation, TMC Autotune, Skew Correction,
-the Creality Nebula camera (persistent image tuning + H.264 stream), the Pause/Resume layer-shift fix,
+the Creality Nebula camera (persistent image tuning), the Pause/Resume layer-shift fix,
 and the Creality macros (M600, Save Z-Offset, useful macros, Exclude Object). See
 [Installation](Installation) for the full list.
 

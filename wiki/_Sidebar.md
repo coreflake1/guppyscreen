@@ -18,7 +18,7 @@
 - [Beeps & songs (buzzer)](Buzzer-and-Sounds)
 - [Fix layer shift after pause](Pause-Park-Layer-Shift-Fix)
 - [Camera: better image](Camera-Image-Tuning)
-- [Camera: H.264 stream](Camera-H264-Stream)
+- [Camera: H.264 stream (removed v1.2.0)](Camera-H264-Stream)
 - [Troubleshooting](Troubleshooting)
 
 ---

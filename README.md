@@ -50,7 +50,7 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 > Use `installer.sh` — **not** `installer-deb.sh` (that one is for aarch64/Debian and refuses to run on the KE).
 
 **It also offers the print-quality extras** (install all / skip all / choose each): KAMP, Axis Twist
-Compensation, TMC Autotune, Skew Correction, the Creality Nebula camera (image tuning + H.264 stream), the
+Compensation, TMC Autotune, Skew Correction, the Creality Nebula camera (image tuning), the
 Pause/Resume layer-shift fix, and the Creality macros (M600, Save Z-Offset, useful macros, Exclude Object).
 Already set some up by hand or via the **Creality Helper Script**? It detects and **skips** those — safe to
 run on an existing setup, and it **never rewrites your saved calibrations**.
