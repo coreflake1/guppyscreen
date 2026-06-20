@@ -1,0 +1,35 @@
+#!/bin/sh
+# Boot hook: make guppycam the live camera (3 streams) and register the webcams with
+# the CURRENT IP - the jmuxer/H264 stream needs an absolute ws://IP that changes with
+# DHCP. Runs in the background so it never blocks boot, waits for Moonraker, then calls
+# integrate.sh. If guppycam fails to come up, it falls back to the stock camera stack so
+# the camera is never left dead.
+#
+# Install: copy guppycam + integrate.sh to /usr/data/guppycam/, this to /etc/init.d/.
+# Disable: rename to DISABLED_S99guppycam (then reboot, or run integrate.sh revert).
+DIR=/usr/data/guppycam
+[ -x "$DIR/guppycam" ] || exit 0
+
+case "$1" in
+  start)
+    (
+      i=0
+      while [ $i -lt 90 ]; do
+        wget -q -O /dev/null http://localhost:7125/server/info 2>/dev/null && break
+        i=$((i + 1)); sleep 2
+      done
+      sh "$DIR/integrate.sh" start >/tmp/guppycam-boot.log 2>&1
+      sleep 3
+      if ! pidof guppycam >/dev/null 2>&1; then
+        echo "guppycam did not start -> reverting to stock camera stack" >>/tmp/guppycam-boot.log
+        sh "$DIR/integrate.sh" revert >>/tmp/guppycam-boot.log 2>&1
+      fi
+    ) &
+    ;;
+  stop)
+    sh "$DIR/integrate.sh" revert
+    ;;
+  *)
+    echo "usage: $0 {start|stop}"
+    ;;
+esac

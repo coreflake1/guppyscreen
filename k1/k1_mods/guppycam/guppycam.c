@@ -174,6 +174,44 @@ static int set_ctrl(int fd, uint32_t id, int32_t val) {
   return 0;
 }
 
+/* ----------------------------------------------------------------------------- */
+/* Camera image tuning (UVC controls on the CAPTURE device).                      */
+/* guppycam is the sole owner of /dev/video4, so it applies these on its own fd   */
+/* instead of a separate v4l2-ctl process - which would open a 2nd handle and     */
+/* collide on the UVC control bus (the boot-time wedge). Single attempt, never    */
+/* spins: a failed UVC transaction logs and returns, so it can't IRQ-storm.       */
+/* Friendly names match the Camera-Image-Tuning macros (CAM_BRIGHTNESS, ...).     */
+static uint32_t cam_ctrl_cid(const char* name) {
+  if (!strcmp(name, "brightness")) return V4L2_CID_BRIGHTNESS;
+  if (!strcmp(name, "contrast")) return V4L2_CID_CONTRAST;
+  if (!strcmp(name, "saturation")) return V4L2_CID_SATURATION;
+  if (!strcmp(name, "hue")) return V4L2_CID_HUE;
+  if (!strcmp(name, "white_balance_temperature_auto") || !strcmp(name, "wb_auto"))
+    return V4L2_CID_AUTO_WHITE_BALANCE;
+  return 0;
+}
+
+static int cam_set_named(int fd, const char* name, int val) {
+  uint32_t cid = cam_ctrl_cid(name);
+  if (!cid) { logmsg("cam: unknown control '%s'", name); return -1; }
+  if (set_ctrl(fd, cid, val) == 0) { logmsg("cam: %s = %d", name, val); return 0; }
+  return -1;
+}
+
+/* Apply a comma-separated "name=value,name=value" list (the saved tuning). */
+static void cam_apply_list(int fd, const char* spec) {
+  if (!spec || !*spec || fd < 0) return;
+  char buf[256];
+  snprintf(buf, sizeof(buf), "%s", spec);
+  char* save = NULL;
+  for (char* tok = strtok_r(buf, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
+    char* eq = strchr(tok, '=');
+    if (!eq) continue;
+    *eq = 0;
+    cam_set_named(fd, tok, atoi(eq + 1));
+  }
+}
+
 static uint64_t now_ms(void) {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -1086,6 +1124,8 @@ typedef struct {
 /* Control commands (newline/space text, sent to the unix dgram socket):
  *   bitrate <bps>     - set primary target bitrate directly
  *   loss <percent>    - report packet loss; AIMD adjusts bitrate
+ *   cam <name> <val>  - set a camera image control (brightness/contrast/
+ *                       saturation/hue/white_balance_temperature_auto) live
  *   idr               - force a keyframe now
  *   snapshot <path>   - (handled by caller) capture current frame as JPEG
  *   stats             - log current stats
@@ -1143,6 +1183,7 @@ static void usage(const char* p) {
           "     --stream WxH@bps[:file]  add a simulcast stream (repeatable)\n"
           "     --zerocopy <m>  auto|on|off (dmabuf decode->encode, default auto)\n"
           "     --control <sock> unix control socket    (default off)\n"
+          "     --cam-ctrl <list> camera image tuning, e.g. brightness=115,contrast=100\n"
           "     --memfd        stream0 H.264 -> a cam_app-layout memfd (feed guppy-webrtc)\n"
           "     --mjpeg <port> serve MJPEG (native passthrough @ master res) on <port>\n"
           "     --mjpeg-low <port> serve a downscaled 640x360 HW-JPEG MJPEG on <port>\n"
@@ -1189,6 +1230,7 @@ int main(int argc, char** argv) {
   const char* outpath = NULL;
   const char* snappath = NULL;
   const char* ctrlpath = NULL;
+  const char* cam_ctrl = NULL; /* "brightness=115,contrast=100,..." applied to the camera */
   int force_input = -1;
   int zerocopy = 1; /* auto */
   int use_memfd = 0;
@@ -1218,6 +1260,7 @@ int main(int argc, char** argv) {
     else if (!strcmp(a, "-o") || !strcmp(a, "--out")) outpath = NEXT();
     else if (!strcmp(a, "--zerocopy")) { const char* m = NEXT(); zerocopy = !strcmp(m, "off") ? 0 : !strcmp(m, "on") ? 2 : 1; }
     else if (!strcmp(a, "--control")) ctrlpath = NEXT();
+    else if (!strcmp(a, "--cam-ctrl")) cam_ctrl = NEXT();
     else if (!strcmp(a, "--memfd")) use_memfd = 1;
     else if (!strcmp(a, "--mjpeg")) mjpeg_port = atoi(NEXT());
     else if (!strcmp(a, "--mjpeg-low")) mjpeg_low_port = atoi(NEXT());
@@ -1276,6 +1319,7 @@ int main(int argc, char** argv) {
   /* ---- open camera (auto-format) ---- */
   Capture cap;
   if (cap_open(&cap, cam_dev, w, h, fps, force_input) < 0) return 1;
+  cam_apply_list(cap.fd, cam_ctrl); /* apply saved image tuning on our own fd */
   w = cap.w;
   h = cap.h;
 
@@ -1290,9 +1334,15 @@ int main(int argc, char** argv) {
     if (memfd_sink_open(&sink, "main_memfd") < 0) { logmsg("memfd sink open failed: %s", strerror(errno)); return 1; }
     logmsg("guppycam: stream0 H.264 -> memfd (fd %d, name main_memfd)", sink.fd);
   }
+  /* stream0 H.264 goes to memfd/WS clients, or an explicit --out file. It must
+   * NEVER default to stdout when running as a server daemon: integrate.sh
+   * redirects stdout to /tmp/guppycam.log on tmpfs, so a stdout dump would fill
+   * RAM (~22 MB/min @3 Mbps). Only fall back to stdout for true CLI piping
+   * (no servers, no memfd, no --out). */
+  int server_mode = use_memfd || ws_port || mjpeg_port || mjpeg_low_port;
   for (int i = 0; i < total_streams; i++) {
     Stream* s = &streams[i];
-    if (i == 0 && (use_memfd || ws_port)) { s->fp = NULL; continue; }  /* stream0 -> memfd/ws */
+    if (i == 0 && !s->outpath && server_mode) { s->fp = NULL; continue; }  /* stream0 -> memfd/ws */
     s->fp = s->outpath ? fopen(s->outpath, "wb") : (i == 0 ? stdout : NULL);
     if (!s->fp) { logmsg("stream %d: cannot open output '%s'", i, s->outpath ? s->outpath : "(none)"); return 1; }
   }
@@ -1419,6 +1469,11 @@ int main(int argc, char** argv) {
             logmsg("ctrl: loss %.1f%% -> bitrate %d (was %d)", loss, b, streams[0].cur_bitrate);
             streams[0].cur_bitrate = b;
           }
+        } else if (!strncmp(cmd, "cam", 3)) {
+          /* cam <name> <value> - live image tuning on our own capture fd */
+          char name[64]; int val;
+          if (sscanf(cmd + 3, "%63s %d", name, &val) == 2) cam_set_named(cap.fd, name, val);
+          else logmsg("ctrl: bad cam cmd '%s' (want: cam <name> <value>)", cmd);
         } else if (!strncmp(cmd, "idr", 3)) {
           g_force_idr = 1;
         } else if (!strncmp(cmd, "stats", 5)) {
@@ -1439,6 +1494,7 @@ int main(int argc, char** argv) {
         struct timespec ts = {1, 0};
         nanosleep(&ts, NULL);
       }
+      cam_apply_list(cap.fd, cam_ctrl); /* re-apply tuning after reconnect */
       continue;
     }
 
