@@ -28,7 +28,7 @@ It bundles three things people usually hunt down separately:
 - 🟦 **Interactive 3D bed mesh** — rotate / zoom / pan colour height map (plus a table view)
 - 🎯 **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset baby-stepping, input-shaper & belt graphs
 - 🎚️ **Fine-tune mid-print** — speed, flow, Z-offset, pressure advance, firmware retraction
-- 📷 **Camera** — persistent image tuning, plus an optional low-bandwidth hardware **H.264** stream
+- 📷 **Camera** — persistent image tuning (contrast/saturation) on the stock camera
 - 🔔 **Buzzer beeps & songs** — real-pitch `M300`, `PLAY_TUNE` jingles (editable `songs.conf`), soft touchscreen click
 - 🔌 **Power-loss recovery**, **WiFi low-latency** toggle, on-screen notifications
 - 🔒 **Print-state safety locks** — anything that could ruin a running job is blocked or asks first
@@ -94,7 +94,7 @@ Full documentation lives on the **[GitHub Wiki](https://github.com/coreflake1/gu
 - [Installation](https://github.com/coreflake1/guppyscreen/wiki/Installation) · [Upgrading from an older version](https://github.com/coreflake1/guppyscreen/wiki/Upgrading)
 - [Perfect first layer (KAMP + Axis Twist)](https://github.com/coreflake1/guppyscreen/wiki/KAMP-and-Axis-Twist-Compensation) · [Skew Correction](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction) · [TMC Autotune](https://github.com/coreflake1/guppyscreen/wiki/TMC-Autotune)
 - [Auto Z-offset: the load-sensor caveat](https://github.com/coreflake1/guppyscreen/wiki/Auto-Z-Offset)
-- [Camera tuning](https://github.com/coreflake1/guppyscreen/wiki/Camera-Image-Tuning) · [H.264 stream](https://github.com/coreflake1/guppyscreen/wiki/Camera-H264-Stream) · [Layer-shift fix](https://github.com/coreflake1/guppyscreen/wiki/Pause-Park-Layer-Shift-Fix)
+- [Camera tuning](https://github.com/coreflake1/guppyscreen/wiki/Camera-Image-Tuning) · [Why the H.264 stream was removed (v1.2.0)](https://github.com/coreflake1/guppyscreen/wiki/Camera-H264-Stream) · [Layer-shift fix](https://github.com/coreflake1/guppyscreen/wiki/Pause-Park-Layer-Shift-Fix)
 - [Troubleshooting](https://github.com/coreflake1/guppyscreen/wiki/Troubleshooting) · developer docs: [Building from Source](https://github.com/coreflake1/guppyscreen/wiki/Building-from-Source), [Architecture](https://github.com/coreflake1/guppyscreen/wiki/Architecture)
 
 > The wiki pages are also maintained as Markdown in [`wiki/`](wiki/) in this repo and auto-published to the Wiki tab.
