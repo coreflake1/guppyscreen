@@ -1,8 +1,9 @@
 # Hardware H.264 Camera Stream (Nebula) — removed in v1.2.0
 
 > **This feature has been removed.** Starting in **`v1.2.0-OpenKE`**, OpenKE no longer ships or installs
-> the hardware H.264 camera stream (the [go2rtc](https://github.com/AlexxIT/go2rtc) add-on). Upgrading
-> **automatically removes it** if you had it. The stock camera and the persistent
+> the hardware H.264 camera stream (the [go2rtc](https://github.com/AlexxIT/go2rtc) add-on). If you had it,
+> **re-run the installer** and it removes it automatically (the on-screen Update Guppy button only swaps
+> the binary — it won't remove go2rtc). The stock camera and the persistent
 > [image tuning](Camera-Image-Tuning) are unaffected.
 
 ## Why it was removed
@@ -17,12 +18,16 @@ stock MJPEG is actually higher per-frame). On this box that trade-off isn't wort
 
 ## What happens when you upgrade
 
-Nothing to do — updating to v1.2.0 (on-screen **Update Guppy**, or re-running the
-[installer](Installation)) detects an existing go2rtc install and removes it automatically:
+**Re-run the [installer](Installation) once** — the removal lives in the installer, so it runs there (not
+via the on-screen **Update Guppy** button, which only swaps the screen binary). When you re-run the
+installer it detects an existing go2rtc install and removes it automatically:
 
 - stops `/etc/init.d/S96h264cam` and kills `go2rtc` / `memfd_h264_dump`,
 - deletes `/etc/init.d/S96h264cam` and `/usr/data/h264cam/`,
 - removes the **"Nebula H264"** webcam from Mainsail/Moonraker.
+
+> ⚠️ Updating through the screen alone will **not** free the memory — it leaves go2rtc running. Re-run the
+> installer to actually fix the freeze. (If you never installed the H.264 stream, there's nothing to do.)
 
 Your **stock camera** ("Creality Cam", MJPEG) and the persistent image-tuning macros are left exactly as
 they were. You'll get back ~44 MB of free RAM.

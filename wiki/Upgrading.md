@@ -10,12 +10,20 @@ what to do. **Short version: updating is safe and your calibrations are kept.**
 "screen goes dark, SSH dies, only a power-cycle recovers" symptom. Dropping it and going back to the
 stock camera is the reliable fix.
 
-**You don't have to do anything.** When you update to v1.2.0 (on-screen **Update Guppy**, or re-running
-the installer), it **automatically removes go2rtc** if it's installed — stops the service, deletes
-`/usr/data/h264cam/` and `/etc/init.d/S96h264cam`, and removes the "Nebula H264" webcam from Mainsail.
-Your **stock camera and persistent image tuning are untouched** (the stock feed was never modified by the
-H.264 add-on). After it's gone you'll have ~44 MB more free RAM. If you relied on the H.264 stream in an
-external app (Frigate, Home Assistant, Obico…), point that app at the stock camera instead.
+**If you had the H.264 stream installed, re-run the installer once.** The go2rtc removal lives in the
+installer, so it only runs when you **re-run the installer** — it **automatically removes go2rtc**: stops
+the service, deletes `/usr/data/h264cam/` and `/etc/init.d/S96h264cam`, and removes the "Nebula H264"
+webcam from Mainsail. After it's gone you'll have ~44 MB more free RAM, which is what actually fixes the
+freeze.
+
+> ⚠️ **The on-screen Update Guppy button is not enough by itself.** It only swaps the screen binary — it
+> does **not** run the installer, so it leaves go2rtc (and the memory pressure) in place. To get the fix,
+> re-run the installer. If you never installed the H.264 stream, there's nothing to remove and either
+> method is fine.
+
+Your **stock camera and persistent image tuning are untouched** either way (the stock feed was never
+modified by the H.264 add-on). If you relied on the H.264 stream in an external app (Frigate, Home
+Assistant, Obico…), point that app at the stock camera instead.
 
 ## First, the name: GuppyKE → OpenKE
 
