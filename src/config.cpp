@@ -113,6 +113,19 @@ void Config::init(std::string config_path, const std::string thumbdir) {
       if (!default_macros.contains("cooldown")) {
         default_macros.merge_patch(cooldown_conf);
       }
+      // Migrate dead filament macro names shipped in older configs. The KE has
+      // no LOAD_MATERIAL / UNLOAD_MATERIAL command (Klipper rejects them as
+      // "Unknown command"), so Unload silently no-ops and, with auto-cooldown,
+      // just heats to target-5 then cools. The real macros are the _GUPPY_*
+      // ones. Rewrite in place; the config is re-saved at the end of init().
+      if (default_macros.contains("load_filament")
+          && default_macros["load_filament"] == "LOAD_MATERIAL") {
+        default_macros["load_filament"] = "_GUPPY_LOAD_MATERIAL";
+      }
+      if (default_macros.contains("unload_filament")
+          && default_macros["unload_filament"] == "UNLOAD_MATERIAL") {
+        default_macros["unload_filament"] = "_GUPPY_QUIT_MATERIAL";
+      }
     }
 
     auto &guppy_init = data["/guppy_init_script"_json_pointer];
