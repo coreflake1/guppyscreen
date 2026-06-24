@@ -4,6 +4,9 @@
 |---|---|
 | Klipper shuts down after a restart with `serialqueue … NoneType` / "Unhandled exception during run" | Known KE host-MCU reconnect race — **not** a config problem. Just restart Klipper again; a full **Restart Klipper** (Mainsail → *Restart* → host, or the installer's service restart) is more reliable than a bare `FIRMWARE_RESTART`, and a cold boot always clears it. It can need **more than one** restart. |
 | Screen upside-down or 90° wrong | Set `display_rotate: 2` in `guppyconfig.json` (KE default). `0` = upside-down, `1` = wrong axis. See [Configuration](Configuration). |
+| Touch targets shifted after changing `display_rotate` | The saved calibration coefficients are tied to the old rotation. Reset: open `/usr/data/guppyscreen/guppyconfig.json`, remove `touch_calibration_coeff`, set `touch_calibrated` to `false`, restart GuppyScreen. See [Configuration](Configuration#display-rotation-ke-specific). |
+| Installer prints `tar: can't remove old file ./guppyscreen/debian: Is a directory` | Harmless — tar is trying to replace a directory with a non-directory entry (or vice versa) during extraction. Nothing failed; installation continues normally. |
+| Installer prints `Skipping Save Z-Offset`, `Skipping M600 filament-change support`, or `Skipping Exclude Object` | The installer detected that your `printer.cfg` already defines those sections (e.g. from a previous install or CrealityHelper). It skips adding duplicates. No action needed — your existing config is used as-is. |
 | White screen after wake from sleep | Fixed on `main`; if a stuck framebuffer state remains, a full reboot clears it. |
 | Simulator crashes on startup with `spdlog_ex: Failed opening file` | The directory in `log_path` doesn't exist — create it. |
 | `Found arch mips / Terminating` during install | You ran `installer-deb.sh` on the KE; use `installer.sh` instead. |

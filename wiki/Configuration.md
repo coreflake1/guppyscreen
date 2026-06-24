@@ -45,6 +45,13 @@ The KE screen is physically mounted upside-down. The kernel display driver rotat
 - `display_rotate: 1` → 90° off (wrong axis)
 - `display_rotate: 2` → **correct** (KE default)
 
+> **Changed `display_rotate`? Reset touch calibration.** The calibration coefficients are stored for a
+> specific rotation. If you change `display_rotate`, the saved calibration will be wrong and taps will
+> register in the wrong place. To force a fresh calibration: open
+> `/usr/data/guppyscreen/guppyconfig.json`, remove the `touch_calibration_coeff` key, set
+> `touch_calibrated` to `false`, then restart GuppyScreen — it will run the calibration sequence
+> automatically on startup.
+
 ## Build-time options (environment variables)
 
 These are read by the `Makefile` at build time, not at runtime:
