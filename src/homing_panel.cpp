@@ -113,6 +113,24 @@ lv_obj_t *HomingPanel::get_container() {
 }
 
 void HomingPanel::foreground() {
+  bool invert_z = false;
+  auto invert_z_json = Config::get_instance()->get_json("/invert_z_direction");
+  if (invert_z_json.is_boolean()) { invert_z = invert_z_json.get<bool>(); }
+
+  bool invert_y = false;
+  auto invert_y_json = Config::get_instance()->get_json("/invert_y_direction");
+  if (invert_y_json.is_boolean()) { invert_y = invert_y_json.get<bool>(); }
+
+  y_up_btn.set_image(invert_y ? &arrow_up : &arrow_down);
+  y_down_btn.set_image(invert_y ? &arrow_down : &arrow_up);
+  lv_label_set_text(y_up_btn.get_label(),   invert_y ? "Y-" : "Y+");
+  lv_label_set_text(y_down_btn.get_label(), invert_y ? "Y+" : "Y-");
+
+  z_up_btn.set_image(invert_z ? &z_closer : &z_farther);
+  z_down_btn.set_image(invert_z ? &z_farther : &z_closer);
+  lv_label_set_text(z_up_btn.get_label(),   invert_z ? "Z-" : "Z+");
+  lv_label_set_text(z_down_btn.get_label(), invert_z ? "Z+" : "Z-");
+
   auto v = State::get_instance()
     ->get_data("/printer_state/toolhead/homed_axes"_json_pointer);
   if (!v.is_null()) {
@@ -132,10 +150,6 @@ void HomingPanel::foreground() {
       y_up_btn.disable();
       y_down_btn.disable();
     }
-
-    //Set the Z axis buttons
-    z_up_btn.set_image(&z_farther);
-    z_down_btn.set_image(&z_closer);
 
     if (homed_axes.find("z") != std::string::npos) {
       z_up_btn.enable();

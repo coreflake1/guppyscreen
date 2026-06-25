@@ -170,7 +170,12 @@ void Config::init(std::string config_path, const std::string thumbdir) {
   if (default_ext_temp.is_null()) {
     data["/default_extruder_temp"_json_pointer] = 240;
   }
-  
+
+  auto &invert_y = data["/invert_y_direction"_json_pointer];
+  if (invert_y.is_null()) {
+    data["/invert_y_direction"_json_pointer] = true;
+  }
+
   std::ofstream o(config_path);
   o << std::setw(2) << data << std::endl;
 }
