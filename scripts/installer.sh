@@ -515,6 +515,26 @@ else
         fi
     fi
 
+    # --- Firmware Retraction ---
+    if [ -d "$MODS_DIR/firmware_retraction" ] && want "Firmware Retraction (enable G10/G11 retract commands)"; then
+        if section_defined_elsewhere "[firmware_retraction]"; then
+            printf "${yellow}  [firmware_retraction] already in your config — leaving it untouched.${white}\n"
+        else
+            printf "${green}  Enabling Firmware Retraction${white}\n"
+            cp "$MODS_DIR/firmware_retraction/firmware_retraction.cfg" "$GUPPY_CFG_DIR/firmware_retraction.cfg"
+        fi
+    fi
+
+    # --- Screws Tilt Adjust ---
+    if [ -d "$MODS_DIR/screws_tilt_adjust" ] && want "Screws Tilt Adjust (SCREWS_TILT_CALCULATE bed levelling)"; then
+        if section_defined_elsewhere "[screws_tilt_adjust]"; then
+            printf "${yellow}  [screws_tilt_adjust] already in your config — leaving it untouched.${white}\n"
+        else
+            printf "${green}  Installing Screws Tilt Adjust${white}\n"
+            cp "$MODS_DIR/screws_tilt_adjust/screws_tilt_adjust.cfg" "$GUPPY_CFG_DIR/screws_tilt_adjust.cfg"
+        fi
+    fi
+
     # --- Creality Nebula camera: persistent image tuning ---
     # (The H.264 go2rtc stream was removed in v1.2.0 — see the migration step above.)
     if want "Creality Nebula camera (persistent image tuning)"; then
