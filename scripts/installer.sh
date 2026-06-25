@@ -566,12 +566,29 @@ else
         install_cfg_guarded "$CM/useful-macros.cfg"  "useful-macros.cfg"  "useful macros (backup/restore, PID, bed-level, warmup)"
         install_cfg_guarded "$CM/save-zoffset.cfg"   "save-zoffset.cfg"   "Save Z-Offset (persists z-offset across reboots)"
         if section_defined_elsewhere "[gcode_macro M600]" || section_defined_elsewhere "[filament_switch_sensor filament_sensor]"; then
-            printf "${yellow}  Skipping M600 — Creality's built-in M600 or filament sensor is already present in your config.${white}\n"
-            printf "${yellow}  The Creality version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).${white}\n"
-            printf "${yellow}  To get the full OpenKE M600 experience, comment out these sections and re-run the installer:\n"
-            printf "${yellow}    [gcode_macro M600]                       — likely in $K1_CONFIG_DIR/gcode_macro.cfg\n"
-            printf "${yellow}    [filament_switch_sensor filament_sensor] — likely in $K1_CONFIG_DIR/printer.cfg\n"
-            printf "${yellow}  See the OpenKE wiki for step-by-step instructions.${white}\n"
+            printf "${yellow}  Creality's built-in M600 or filament sensor is already present in your config.\n"
+            printf "  The Creality version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).\n"
+            printf "  Comment out the conflicting sections automatically and install OpenKE M600? (y/N): ${white}"
+            read _m600_fix
+            if [ "$_m600_fix" = "y" ] || [ "$_m600_fix" = "Y" ]; then
+                for _sec in "[gcode_macro M600]" "[filament_switch_sensor filament_sensor]"; do
+                    _pat=$(printf '%s' "$_sec" | sed 's/[][]/\\&/g')
+                    active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _f; do
+                        [ -f "$_f" ] || continue
+                        if grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null; then
+                            cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-m600-$(date +%Y%m%d-%H%M%S)"
+                            awk -v sec="$_sec" '/^\[/{in_sec=($0==sec)?1:0} {print (in_sec?"#":"") $0}' "$_f" > "/tmp/.ke_m600.$$" && mv "/tmp/.ke_m600.$$" "$_f"
+                            printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
+                        fi
+                    done
+                done
+                install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
+            else
+                printf "${yellow}  Skipped. To do it manually, comment out:\n"
+                printf "    [gcode_macro M600]                       — likely in $K1_CONFIG_DIR/gcode_macro.cfg\n"
+                printf "    [filament_switch_sensor filament_sensor] — likely in $K1_CONFIG_DIR/printer.cfg\n"
+                printf "  Then re-run the installer. See the OpenKE wiki for details.${white}\n"
+            fi
         else
             install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
         fi
