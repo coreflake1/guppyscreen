@@ -566,9 +566,12 @@ else
         install_cfg_guarded "$CM/useful-macros.cfg"  "useful-macros.cfg"  "useful macros (backup/restore, PID, bed-level, warmup)"
         install_cfg_guarded "$CM/save-zoffset.cfg"   "save-zoffset.cfg"   "Save Z-Offset (persists z-offset across reboots)"
         if section_defined_elsewhere "[gcode_macro M600]" || section_defined_elsewhere "[filament_switch_sensor filament_sensor]"; then
-            printf "${yellow}  Creality's built-in M600 or filament sensor is already present in your config.\n"
-            printf "  The Creality version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).\n"
-            printf "  Comment out the conflicting sections automatically and install OpenKE M600? (y/N): ${white}"
+            printf "${yellow}  Skipping M600 — Creality's built-in M600 or filament sensor is already present in your config.${white}\n"
+            printf "${yellow}  The Creality version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).${white}\n"
+            printf "${yellow}  To get the full OpenKE M600 experience these sections need to be commented out:\n"
+            printf "${yellow}    [gcode_macro M600]                       — likely in $K1_CONFIG_DIR/gcode_macro.cfg\n"
+            printf "${yellow}    [filament_switch_sensor filament_sensor] — likely in $K1_CONFIG_DIR/printer.cfg${white}\n"
+            printf "  Comment out the conflicting sections automatically and install OpenKE M600? (y/N): "
             read _m600_fix
             if [ "$_m600_fix" = "y" ] || [ "$_m600_fix" = "Y" ]; then
                 for _sec in "[gcode_macro M600]" "[filament_switch_sensor filament_sensor]"; do
@@ -584,10 +587,7 @@ else
                 done
                 install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
             else
-                printf "${yellow}  Skipped. To do it manually, comment out:\n"
-                printf "    [gcode_macro M600]                       — likely in $K1_CONFIG_DIR/gcode_macro.cfg\n"
-                printf "    [filament_switch_sensor filament_sensor] — likely in $K1_CONFIG_DIR/printer.cfg\n"
-                printf "  Then re-run the installer. See the OpenKE wiki for details.${white}\n"
+                printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
             fi
         else
             install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
