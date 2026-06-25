@@ -565,7 +565,16 @@ else
         CM="$MODS_DIR/creality_macros"
         install_cfg_guarded "$CM/useful-macros.cfg"  "useful-macros.cfg"  "useful macros (backup/restore, PID, bed-level, warmup)"
         install_cfg_guarded "$CM/save-zoffset.cfg"   "save-zoffset.cfg"   "Save Z-Offset (persists z-offset across reboots)"
-        install_cfg_guarded "$CM/M600-support.cfg"   "M600-support.cfg"   "M600 filament-change support"
+        if section_defined_elsewhere "[gcode_macro M600]" || section_defined_elsewhere "[filament_switch_sensor filament_sensor]"; then
+            printf "${yellow}  Skipping M600 — Creality's built-in M600 or filament sensor is already present in your config.${white}\n"
+            printf "${yellow}  The Creality version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).${white}\n"
+            printf "${yellow}  To get the full OpenKE M600 experience, comment out these sections and re-run the installer:\n"
+            printf "${yellow}    [gcode_macro M600]                       — likely in $K1_CONFIG_DIR/gcode_macro.cfg\n"
+            printf "${yellow}    [filament_switch_sensor filament_sensor] — likely in $K1_CONFIG_DIR/printer.cfg\n"
+            printf "${yellow}  See the OpenKE wiki for step-by-step instructions.${white}\n"
+        else
+            install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
+        fi
         install_cfg_guarded "$CM/exclude_object.cfg" "exclude_object.cfg" "Exclude Object"
         # moonraker: object processing (needed by Exclude Object + KAMP). Add only if safe.
         MK_CONF="$K1_CONFIG_DIR/moonraker.conf"
