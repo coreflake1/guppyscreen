@@ -95,17 +95,10 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
   size_t raw_thumb_w = thumb_result.second.first;
   size_t raw_thumb_h = thumb_result.second.second;
 
-  lv_label_set_text(detail_label, detail.c_str());
-
   if (!fullpath.empty()) {
-    // Hide before lv_refr_now so the stale zoom/position doesn't flash for one frame.
-    lv_obj_set_style_opa(thumbnail, LV_OPA_TRANSP, 0);
     lv_img_set_src(thumbnail, ("A:" + fullpath).c_str());
+    lv_label_set_text(detail_label, detail.c_str());
 
-    // lv_refr_now is the only reliable way to resolve thumbnail_container's
-    // flex-grown height: lv_obj_update_layout scoped to file_cont or lv_scr_act()
-    // both fail because file_cont is LV_PCT(100) and the parent chain isn't
-    // resolved in a layout-only pass without a full render tick.
     lv_refr_now(NULL);
 
     lv_coord_t cont_w = lv_obj_get_width(thumbnail_container);
@@ -114,11 +107,11 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
     float scale_w = raw_thumb_w ? (float)cont_w / raw_thumb_w : 1.0f;
     float scale_h = raw_thumb_h ? (float)cont_h / raw_thumb_h : 1.0f;
     float scale = std::min(scale_w, scale_h);
-    lv_img_set_zoom(thumbnail, (uint16_t)(scale * 320));
+    lv_img_set_zoom(thumbnail, scale * 320);
     lv_obj_align_to(thumbnail, thumbnail_container, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_opa(thumbnail, LV_OPA_COVER, 0);
   } else {
-    lv_obj_set_style_opa(thumbnail, LV_OPA_TRANSP, 0);
+    lv_img_set_src(thumbnail, NULL);
+    ((lv_img_t *)thumbnail)->src_type = LV_IMG_SRC_SYMBOL;
   }
 }
 
