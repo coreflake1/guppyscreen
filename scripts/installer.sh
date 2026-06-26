@@ -95,6 +95,18 @@ uninstall_guppy() {
 
     printf "${yellow}NOTE: calibrate_shaper_config.py and gcode_shell_command.py NOT removed (may be shared with Klipper).${white}\n"
 
+    # Moonraker / Nginx / Mainsail — intentionally left in place.
+    # They are general Klipper infrastructure; removing them would break web access and Mainsail.
+    # Print a note so the user knows what is still installed.
+    if [ -d "/usr/data/moonraker" ] || [ -d "/usr/data/nginx" ] || [ -d "/usr/data/mainsail" ]; then
+        printf "${yellow}NOTE: Moonraker, Nginx and Mainsail were left in place — they are general Klipper${white}\n"
+        printf "${yellow}      infrastructure and are not GuppyScreen-specific. To remove them manually:${white}\n"
+        [ -f /etc/init.d/S56moonraker_service ] && printf "${yellow}        /etc/init.d/S56moonraker_service stop && rm -rf /usr/data/moonraker${white}\n"
+        [ -f /etc/init.d/S50nginx ]             && printf "${yellow}        /etc/init.d/S50nginx stop && rm -rf /usr/data/nginx /usr/data/mainsail${white}\n"
+        printf "${yellow}      Compat wrappers (supervisorctl, systemctl, sudo) in /usr/bin/ are also left in${white}\n"
+        printf "${yellow}      place — Moonraker requires them.${white}\n"
+    fi
+
     # Re-enable Monitor / display-server if install renamed them to .disable.
     # Guard: only restore when the .disable exists and the original isn't already back.
     for bin in Monitor display-server; do
