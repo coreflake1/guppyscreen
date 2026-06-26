@@ -428,7 +428,7 @@ void PrintStatusPanel::handle_metadata(const std::string &gcode_file, json &j) {
     double scale_y = (double)available_h / (double)thumb_h;
     double scale = std::min(scale_x, scale_y);
 
-    uint32_t lv_zoom = static_cast<uint32_t>(scale * 320.0);
+    uint32_t lv_zoom = static_cast<uint32_t>(scale * 256.0);
     lv_img_set_pivot(thumbnail, thumb_w / 2, thumb_h);
     lv_img_set_zoom(thumbnail, lv_zoom);
     mini_print_status.update_img(img_path, thumb_detail.second.first);
