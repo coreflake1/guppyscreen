@@ -95,6 +95,18 @@ uninstall_guppy() {
 
     printf "${yellow}NOTE: calibrate_shaper_config.py and gcode_shell_command.py NOT removed (may be shared with Klipper).${white}\n"
 
+    # Moonraker / Nginx / Mainsail — intentionally left in place.
+    # They are general Klipper infrastructure; removing them would break web access and Mainsail.
+    # Print a note so the user knows what is still installed.
+    if [ -d "/usr/data/moonraker" ] || [ -d "/usr/data/nginx" ] || [ -d "/usr/data/mainsail" ]; then
+        printf "${yellow}NOTE: Moonraker, Nginx and Mainsail were left in place — they are general Klipper${white}\n"
+        printf "${yellow}      infrastructure and are not GuppyScreen-specific. To remove them manually:${white}\n"
+        [ -f /etc/init.d/S56moonraker_service ] && printf "${yellow}        /etc/init.d/S56moonraker_service stop && rm -rf /usr/data/moonraker${white}\n"
+        [ -f /etc/init.d/S50nginx ]             && printf "${yellow}        /etc/init.d/S50nginx stop && rm -rf /usr/data/nginx /usr/data/mainsail${white}\n"
+        printf "${yellow}      Compat wrappers (supervisorctl, systemctl, sudo) in /usr/bin/ are also left in${white}\n"
+        printf "${yellow}      place — Moonraker requires them.${white}\n"
+    fi
+
     # Re-enable Monitor / display-server if install renamed them to .disable.
     # Guard: only restore when the .disable exists and the original isn't already back.
     for bin in Monitor display-server; do
@@ -134,27 +146,392 @@ else
     exit 1
 fi
 
-printf "${green}=== Installing Guppy Screen === ${white}\n"
+printf "${green}=== Installing GuppyScreen OpenKE === ${white}\n"
+printf "${green}Backups of modified files will be saved to: $BACKUP_DIR ${white}\n"
+printf "${yellow}Your calibration values (Z-offset, bed mesh, input shaper, skew) are stored in\n"
+printf "${yellow}printer.cfg's SAVE_CONFIG block and will NOT be changed by this installer.${white}\n\n"
 
 # check ld.so version
 if [ ! -f /lib/ld-2.29.so ]; then
-    printf "${red}ld.so is not the expected version. Make sure you're running 1.3.x.y firmware versions ${white}\n"
+    printf "${red}ld.so is not the expected version. This installer requires Ender-3 V3 KE firmware 1.3.x.x.\n"
+    printf "${red}Check your firmware version in the printer menu before re-running.${white}\n"
     exit 1
 fi
 
-echo "Checking for a working Moonraker"
-MRK_KPY_OK=`curl localhost:7125/server/info 2> /dev/null | jq .result.klippy_connected`
-if [ "$MRK_KPY_OK" != "true" ]; then
-    printf "${yellow}Moonraker is not properly setup at port 7125. Continue anyways? (y/n) ${white}\n"
-    read confirm
-    echo
+## ============================================================================
+## PREREQUISITE: Moonraker (required for GuppyScreen)
+## ============================================================================
+echo "Checking for Moonraker"
+MOONRAKER_INSTALL_DIR=/usr/data/moonraker
+MOONRAKER_INIT=/etc/init.d/S56moonraker_service
 
-    if [ "$confirm" = "y" -o "$confirm" = "Y" ]; then
-	    echo "Continuing to install GuppyScreen"
-    else
-        echo "Please fix Moonraker and restart this script."
+if [ ! -d "$MOONRAKER_INSTALL_DIR" ] || [ ! -f "$MOONRAKER_INIT" ]; then
+    printf "${yellow}[MISSING] Moonraker not found${white}\n"
+    printf "Moonraker is required for GuppyScreen to connect to Klipper.\n"
+    printf "Install Moonraker now? [Y/n]: "
+    read confirm_moonraker
+    echo
+    if [ "$confirm_moonraker" = "n" ] || [ "$confirm_moonraker" = "N" ]; then
+        printf "${red}Moonraker is required. Please install it and re-run this script.${white}\n"
         exit 1
     fi
+
+    printf "${green}  Downloading Moonraker...${white}\n"
+    wget -q --no-check-certificate \
+        "https://raw.githubusercontent.com/Guilouz/Creality-Helper-Script/main/files/moonraker/moonraker.tar.gz" \
+        -O /tmp/moonraker.tar.gz
+    printf "${green}  Installing Moonraker...${white}\n"
+    tar xf /tmp/moonraker.tar.gz -C /usr/data/
+    rm -f /tmp/moonraker.tar.gz
+
+    printf "${green}  Installing compat wrappers (sudo/systemctl/supervisorctl)...${white}\n"
+    if [ ! -f /usr/bin/supervisorctl ]; then
+        cat > /usr/bin/supervisorctl << 'SUPERVISORCTL_EOF'
+#!/bin/sh
+# supervisorctl shim - by destinal
+# provides just enough for Moonraker to list/start/stop services via init scripts
+if [ -t 1 ]; then
+  GREEN='\033[32m'
+  RED='\033[31m'
+  ENDCOLOR='\033[0m'
+fi
+get_services() {
+  moonraker_pid="$(cat /var/run/moonraker.pid)"
+  if [ -f /var/run/moonraker.pid ] && [ -d /proc/"$moonraker_pid" ] ; then
+    services=$(ls -1 /etc/init.d/S*|sed 's/.*\/S..//;s/_service$//')
+    echo $services
+  else
+    echo "Error: Invalid or missing PID file /var/run/moonraker.pid" >&2
+    exit 1
+  fi
+}
+get_pid_file() {
+  service="$1"
+  [ $service = "klipper" ] && service="klippy"
+  echo "/var/run/$service.pid"
+}
+is_running() {
+  pid_file="$(get_pid_file "$1")"
+  if [ -f "$pid_file" ] && [ -d "/proc/$(cat $pid_file)" ]; then return 0; fi
+  if pidof "$1" >/dev/null 2>&1; then return 0; fi
+  return 1
+}
+print_process_status() {
+  if is_running "$service"; then
+    printf "%-33s${GREEN}RUNNING${ENDCOLOR}\n" "$service"
+  else
+    printf "%-33s${RED}STOPPED${ENDCOLOR}\n" "$service"
+  fi
+}
+get_script_path() {
+  ls -1 /etc/init.d/S[0-9][0-9]${1}_service /etc/init.d/S[0-9][0-9]${1}* 2>/dev/null | head -1
+}
+stop()    { script="$(get_script_path $1)"; [ -f "$script" ] && "$script" stop; }
+start()   { script="$(get_script_path $1)"; [ -f "$script" ] && "$script" start; }
+restart() { script="$(get_script_path $1)"; [ -f "$script" ] && "$script" restart; }
+main() {
+  action="$1"; shift
+  case "$action" in
+    status)
+      if [ "$#" -lt 1 ]; then
+        for service in $(get_services); do print_process_status $service; done
+      else
+        for service in "$@"; do print_process_status $service; done
+      fi ;;
+    start)   start "$1" ;;
+    stop)    stop "$1" ;;
+    restart) restart "$1" ;;
+    *) echo "Usage: $0 {status|start|stop|restart}"; exit 1 ;;
+  esac
+}
+main "$@"
+SUPERVISORCTL_EOF
+        chmod +x /usr/bin/supervisorctl
+    fi
+
+    if [ ! -f /usr/bin/systemctl ]; then
+        cat > /usr/bin/systemctl << 'SYSTEMCTL_EOF'
+#!/bin/sh
+if [ "$1" = "reboot" ]; then
+  /sbin/reboot
+elif [ "$1" = "poweroff" ]; then
+  /sbin/poweroff
+fi
+SYSTEMCTL_EOF
+        chmod +x /usr/bin/systemctl
+    fi
+
+    if [ ! -f /usr/bin/sudo ]; then
+        printf '#!/bin/sh\nexec $*\n' > /usr/bin/sudo
+        chmod +x /usr/bin/sudo
+    fi
+
+    printf "${green}  Installing Moonraker service...${white}\n"
+    cat > /etc/init.d/S56moonraker_service << 'MOONRAKER_SVC_EOF'
+#!/bin/sh
+#
+# Moonraker Service
+#
+USER_DATA=/usr/data
+PROG=$USER_DATA/moonraker/moonraker-env/bin/python
+PY_SCRIPT=$USER_DATA/moonraker/moonraker/moonraker/moonraker.py
+MOONRAKER_TMP_DIR=$USER_DATA/moonraker/tmp
+PRINTER_DATA_DIR=$USER_DATA/printer_data
+PRINTER_CONFIG_DIR=$PRINTER_DATA_DIR/config
+PRINTER_LOGS_DIR=$PRINTER_DATA_DIR/logs
+PID_FILE=/var/run/moonraker.pid
+start() {
+        [ -d $PRINTER_DATA_DIR ] || mkdir -p $PRINTER_DATA_DIR
+        [ -d $PRINTER_CONFIG_DIR ] || mkdir -p $PRINTER_CONFIG_DIR
+        [ -d $PRINTER_LOGS_DIR ] || mkdir -p $PRINTER_LOGS_DIR
+        rm -rf $MOONRAKER_TMP_DIR && mkdir -p $MOONRAKER_TMP_DIR
+        export TMPDIR=$MOONRAKER_TMP_DIR
+        HOME=/root start-stop-daemon -S -q -b -m -p $PID_FILE \
+          --exec $PROG -- $PY_SCRIPT -d $PRINTER_DATA_DIR
+}
+stop()    { start-stop-daemon -K -q -p $PID_FILE; }
+restart() { stop; sleep 1; start; }
+case "$1" in
+  start)   start ;;
+  stop)    stop ;;
+  restart|reload) restart ;;
+  *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
+esac
+exit $?
+MOONRAKER_SVC_EOF
+    chmod +x /etc/init.d/S56moonraker_service
+
+    # Create minimal moonraker.conf if not already present
+    MK_FRESH_CONF=/usr/data/printer_data/config/moonraker.conf
+    mkdir -p /usr/data/printer_data/config
+    if [ ! -f "$MK_FRESH_CONF" ]; then
+        printf "${green}  Creating moonraker.conf...${white}\n"
+        cat > "$MK_FRESH_CONF" << 'MOONRAKER_CONF_EOF'
+[server]
+host: 0.0.0.0
+port: 7125
+klippy_uds_address: /tmp/klippy_uds
+max_upload_size: 2048
+
+[file_manager]
+queue_gcode_uploads: False
+
+[database]
+
+[data_store]
+temperature_store_size: 600
+gcode_store_size: 1000
+
+[machine]
+provider: supervisord_cli
+validate_service: False
+validate_config: False
+
+[authorization]
+force_logins: False
+cors_domains:
+  *.lan
+  *.local
+  *://localhost
+  *://localhost:*
+  *://my.mainsail.xyz
+
+trusted_clients:
+  10.0.0.0/8
+  127.0.0.0/8
+  169.254.0.0/16
+  172.16.0.0/12
+  192.168.0.0/16
+  FE80::/10
+  ::1/128
+
+[octoprint_compat]
+
+[history]
+
+[update_manager]
+enable_auto_refresh: True
+refresh_interval: 24
+enable_system_updates: False
+MOONRAKER_CONF_EOF
+    fi
+
+    printf "${green}  Starting Moonraker...${white}\n"
+    /etc/init.d/S56moonraker_service start
+    sleep 3
+    printf "${green}  [OK] Moonraker installed and started${white}\n"
+else
+    printf "${green}  [OK] Moonraker detected${white}\n"
+fi
+
+## ============================================================================
+## OPTIONAL: Mainsail + Nginx (browser UI — not required for GuppyScreen)
+## ============================================================================
+NGINX_INIT=/etc/init.d/S50nginx
+MAINSAIL_IDX=/usr/data/mainsail/index.html
+
+_nginx_ok=1; _mainsail_ok=1
+[ ! -f "$NGINX_INIT" ] && _nginx_ok=0
+[ ! -f "$MAINSAIL_IDX" ] && _mainsail_ok=0
+
+if [ "$_nginx_ok" -eq 0 ] || [ "$_mainsail_ok" -eq 0 ]; then
+    _missing_web=""
+    [ "$_nginx_ok" -eq 0 ] && _missing_web="Nginx"
+    [ "$_mainsail_ok" -eq 0 ] && _missing_web="${_missing_web:+${_missing_web} + }Mainsail"
+    printf "${yellow}[MISSING] ${_missing_web} not found${white}\n"
+    printf "Mainsail is a browser UI for your printer (not required for GuppyScreen).\n"
+    printf "Install Mainsail + Nginx now? [Y/n]: "
+    read confirm_mainsail
+    echo
+    if [ "$confirm_mainsail" != "n" ] && [ "$confirm_mainsail" != "N" ]; then
+        if [ "$_nginx_ok" -eq 0 ]; then
+            printf "${green}  Downloading Nginx...${white}\n"
+            wget -q --no-check-certificate \
+                "https://raw.githubusercontent.com/Guilouz/Creality-Helper-Script/main/files/moonraker/nginx.tar.gz" \
+                -O /tmp/nginx.tar.gz
+            printf "${green}  Installing Nginx...${white}\n"
+            tar xf /tmp/nginx.tar.gz -C /usr/data/
+            rm -f /tmp/nginx.tar.gz
+
+            cat > /etc/init.d/S50nginx << 'NGINX_INIT_EOF'
+#!/bin/sh
+#
+# Nginx Service
+#
+NGINX="/usr/data/nginx/sbin/nginx"
+PIDFILE="/var/run/nginx.pid"
+NGINX_ARGS="-c /usr/data/nginx/nginx/nginx.conf"
+case "$1" in
+  start)
+    echo "Starting nginx..."
+    mkdir -p /var/log/nginx /var/tmp/nginx
+    start-stop-daemon -S -p "$PIDFILE" --exec "$NGINX" -- $NGINX_ARGS ;;
+  stop)
+    echo "Stopping nginx..."
+    start-stop-daemon -K -x "$NGINX" -p "$PIDFILE" -o ;;
+  reload|force-reload)
+    echo "Reloading nginx..."
+    "$NGINX" -s reload ;;
+  restart)
+    "$0" stop; sleep 1; "$0" start ;;
+  *) echo "Usage: $0 {start|stop|restart|reload|force-reload}"; exit 1 ;;
+esac
+NGINX_INIT_EOF
+            chmod +x /etc/init.d/S50nginx
+
+            cat > /usr/data/nginx/nginx/nginx.conf << 'NGINX_CONF_EOF'
+worker_processes  1;
+events { worker_connections 1024; }
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile        on;
+    keepalive_timeout  65;
+    proxy_connect_timeout 1600;
+    proxy_send_timeout 1600;
+    proxy_read_timeout 1600;
+    send_timeout 1600;
+
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+    upstream apiserver {
+        ip_hash;
+        server 127.0.0.1:7125;
+    }
+    upstream mjpgstreamer1 { ip_hash; server 127.0.0.1:8080; }
+    upstream mjpgstreamer2 { ip_hash; server 127.0.0.1:8081; }
+    upstream mjpgstreamer3 { ip_hash; server 127.0.0.1:8082; }
+    upstream mjpgstreamer4 { ip_hash; server 127.0.0.1:8083; }
+
+    server {
+        listen 4409 default_server;
+        root /usr/data/mainsail;
+        index index.html;
+        server_name _;
+        client_max_body_size 0;
+        proxy_request_buffering off;
+        access_log off;
+        error_log off;
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 4;
+        gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml;
+
+        location / { try_files $uri $uri/ /index.html; }
+        location = /index.html { add_header Cache-Control "no-store, no-cache, must-revalidate"; }
+
+        location /websocket {
+            proxy_pass http://apiserver/websocket;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_read_timeout 86400;
+        }
+        location ~ ^/(printer|api|access|machine|server)/ {
+            proxy_pass http://apiserver$request_uri;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Scheme $scheme;
+        }
+        location /webcam/ {
+            postpone_output 0;
+            proxy_buffering off;
+            proxy_ignore_headers X-Accel-Buffering;
+            access_log off; error_log off;
+            proxy_pass http://mjpgstreamer1/;
+        }
+        location /webcam2/ {
+            postpone_output 0; proxy_buffering off;
+            proxy_ignore_headers X-Accel-Buffering;
+            access_log off; error_log off;
+            proxy_pass http://mjpgstreamer2/;
+        }
+        location /webcam3/ {
+            postpone_output 0; proxy_buffering off;
+            proxy_ignore_headers X-Accel-Buffering;
+            access_log off; error_log off;
+            proxy_pass http://mjpgstreamer3/;
+        }
+        location /webcam4/ {
+            postpone_output 0; proxy_buffering off;
+            proxy_ignore_headers X-Accel-Buffering;
+            access_log off; error_log off;
+            proxy_pass http://mjpgstreamer4/;
+        }
+    }
+}
+NGINX_CONF_EOF
+        fi
+
+        if [ "$_mainsail_ok" -eq 0 ]; then
+            printf "${green}  Downloading Mainsail...${white}\n"
+            mkdir -p /usr/data/mainsail
+            wget -q --no-check-certificate \
+                "https://github.com/mainsail-crew/mainsail/releases/latest/download/mainsail.zip" \
+                -O /tmp/mainsail.zip
+            printf "${green}  Installing Mainsail...${white}\n"
+            python3 -c "import zipfile; zipfile.ZipFile('/tmp/mainsail.zip').extractall('/usr/data/mainsail/')"
+            rm -f /tmp/mainsail.zip
+        fi
+
+        printf "${green}  Starting Nginx...${white}\n"
+        /etc/init.d/S50nginx start
+        _ip=$(ip route get 1 2>/dev/null | awk 'NR==1{for(i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')
+        printf "${green}  [OK] Mainsail at http://${_ip}:4409/${white}\n"
+    else
+        printf "${green}  Skipping Mainsail + Nginx${white}\n"
+    fi
+else
+    printf "${green}  [OK] Nginx + Mainsail detected${white}\n"
 fi
 
 KLIPPER_PATH=`curl localhost:7125/printer/info 2> /dev/null | jq -r .result.klipper_path`
@@ -185,7 +562,7 @@ rm -rf /root/.cache
 wget -q --no-check-certificate https://raw.githubusercontent.com/ballaswag/k1-discovery/main/bin/curl -O /tmp/curl
 chmod +x /tmp/curl
 
-PINNED_RELEASE="v1.2.1-OpenKE"
+PINNED_RELEASE="v1.2.2-OpenKE"
 ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_RELEASE}/$ASSET_NAME.tar.gz"
 
 printf "${green} Downloading asset: $ASSET_NAME.tar.gz ${white}\n"
@@ -207,8 +584,8 @@ if [ ! -f "$K1_GUPPY_DIR/guppyscreen" ]; then
     exit 1
 fi
 
-#### let's see if guppyscreen starts before doing anything more
-printf "${green} Test starting Guppy Screen ${white}\n"
+#### verify the binary runs on this firmware before touching anything else
+printf "${green}Verifying GuppyScreen binary is compatible with this firmware...${white}\n"
 [ -f /etc/init.d/S99guppyscreen ] && /etc/init.d/S99guppyscreen stop &> /dev/null
 killall -q guppyscreen
 $K1_GUPPY_DIR/guppyscreen &> /dev/null &
@@ -219,10 +596,11 @@ sleep 1
 ps auxw | grep guppyscreen | grep -v sh | grep -v grep
 
 if [ $? -eq 0 ]; then
-    printf "${green} Guppy Screen started sucessfully, continuing with installation ${white}\n"
+    printf "${green}  [OK] Binary verified, continuing with installation${white}\n"
     killall -q guppyscreen
 else
-    printf "${red} Guppy Screen FAILED to start, aborting ${white}\n"
+    printf "${red}GuppyScreen binary failed to start — aborting before any system changes.${white}\n"
+    printf "${red}This usually means a firmware mismatch. Check you are on firmware 1.3.x.x.${white}\n"
     exit 1
 fi
 
@@ -249,8 +627,9 @@ fi
 mkdir -p $BACKUP_DIR
 if [ ! -f "$BACKUP_DIR/printer.cfg.bak" ]; then
     cp "$K1_CONFIG_DIR/printer.cfg" "$BACKUP_DIR/printer.cfg.bak" 2>/dev/null || true
-    printf "${green}Backed up printer.cfg to $BACKUP_DIR/printer.cfg.bak ${white}\n"
+    printf "${green}Backed up printer.cfg to $BACKUP_DIR/printer.cfg.bak${white}\n"
 fi
+printf "${green}  Note: SAVE_CONFIG block (Z-offset, mesh, shaper, skew) is untouched.${white}\n"
 
 ## include guppyscreen *.cfg in printer.cfg
 if grep -q "include GuppyScreen" $K1_CONFIG_DIR/printer.cfg ; then
@@ -281,7 +660,9 @@ if [ ! -f $BACKUP_DIR/ft2font.cpython-38-mipsel-linux-gnu.so ]; then
     mv /usr/lib/python3.8/site-packages/matplotlib/ft2font.cpython-38-mipsel-linux-gnu.so $BACKUP_DIR
 fi
 
-## dropbear early to ensure ssh is started with display-server
+## Replace dropbear init script so SSH starts reliably alongside GuppyScreen
+## (stock S50dropbear has a race with display-server on boot; our version fixes it)
+printf "${green}Updating SSH init script (ensures SSH is available at every boot)${white}\n"
 cp $K1_GUPPY_DIR/k1_mods/S50dropbear /etc/init.d/S50dropbear
 
 printf "${white}=== Do you want to disable all Creality services (revertible) with GuppyScreen installation? ===\n"
@@ -515,6 +896,26 @@ else
         fi
     fi
 
+    # --- Firmware Retraction ---
+    if [ -d "$MODS_DIR/firmware_retraction" ] && want "Firmware Retraction (enable G10/G11 retract commands)"; then
+        if section_defined_elsewhere "[firmware_retraction]"; then
+            printf "${yellow}  [firmware_retraction] already in your config — leaving it untouched.${white}\n"
+        else
+            printf "${green}  Enabling Firmware Retraction${white}\n"
+            cp "$MODS_DIR/firmware_retraction/firmware_retraction.cfg" "$GUPPY_CFG_DIR/firmware_retraction.cfg"
+        fi
+    fi
+
+    # --- Screws Tilt Adjust ---
+    if [ -d "$MODS_DIR/screws_tilt_adjust" ] && want "Screws Tilt Adjust (SCREWS_TILT_CALCULATE bed levelling)"; then
+        if section_defined_elsewhere "[screws_tilt_adjust]"; then
+            printf "${yellow}  [screws_tilt_adjust] already in your config — leaving it untouched.${white}\n"
+        else
+            printf "${green}  Installing Screws Tilt Adjust${white}\n"
+            cp "$MODS_DIR/screws_tilt_adjust/screws_tilt_adjust.cfg" "$GUPPY_CFG_DIR/screws_tilt_adjust.cfg"
+        fi
+    fi
+
     # --- Creality Nebula camera: persistent image tuning ---
     # (The H.264 go2rtc stream was removed in v1.2.0 — see the migration step above.)
     if want "Creality Nebula camera (persistent image tuning)"; then
@@ -545,7 +946,33 @@ else
         CM="$MODS_DIR/creality_macros"
         install_cfg_guarded "$CM/useful-macros.cfg"  "useful-macros.cfg"  "useful macros (backup/restore, PID, bed-level, warmup)"
         install_cfg_guarded "$CM/save-zoffset.cfg"   "save-zoffset.cfg"   "Save Z-Offset (persists z-offset across reboots)"
-        install_cfg_guarded "$CM/M600-support.cfg"   "M600-support.cfg"   "M600 filament-change support"
+        if section_defined_elsewhere "[gcode_macro M600]" || section_defined_elsewhere "[filament_switch_sensor filament_sensor]"; then
+            printf "${yellow}  Skipping M600 — Creality's built-in M600 or filament sensor is already present in your config.${white}\n"
+            printf "${yellow}  The Creality version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).${white}\n"
+            printf "${yellow}  To get the full OpenKE M600 experience these sections need to be commented out:\n"
+            printf "${yellow}    [gcode_macro M600]                       — likely in $K1_CONFIG_DIR/gcode_macro.cfg\n"
+            printf "${yellow}    [filament_switch_sensor filament_sensor] — likely in $K1_CONFIG_DIR/printer.cfg${white}\n"
+            printf "  Comment out the conflicting sections automatically and install OpenKE M600? (y/N): "
+            read _m600_fix
+            if [ "$_m600_fix" = "y" ] || [ "$_m600_fix" = "Y" ]; then
+                for _sec in "[gcode_macro M600]" "[filament_switch_sensor filament_sensor]"; do
+                    _pat=$(printf '%s' "$_sec" | sed 's/[][]/\\&/g')
+                    active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _f; do
+                        [ -f "$_f" ] || continue
+                        if grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null; then
+                            cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-m600-$(date +%Y%m%d-%H%M%S)"
+                            awk -v sec="$_sec" '/^\[/{in_sec=($0==sec)?1:0} {print (in_sec?"#":"") $0}' "$_f" > "/tmp/.ke_m600.$$" && mv "/tmp/.ke_m600.$$" "$_f"
+                            printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
+                        fi
+                    done
+                done
+                install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
+            else
+                printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
+            fi
+        else
+            install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
+        fi
         install_cfg_guarded "$CM/exclude_object.cfg" "exclude_object.cfg" "Exclude Object"
         # moonraker: object processing (needed by Exclude Object + KAMP). Add only if safe.
         MK_CONF="$K1_CONFIG_DIR/moonraker.conf"
@@ -617,9 +1044,16 @@ sleep 1
 ps auxw | grep guppyscreen | grep -v sh | grep -v grep
 
 if [ $? -eq 0 ]; then
-    printf "${green} Successfully installed Guppy Screen. Enjoy! ${white}\n"
+    _ip=$(ip route get 1 2>/dev/null | awk 'NR==1{for(i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')
+    printf "${green}\n=== GuppyScreen installed successfully ===\n${white}"
+    printf "${green}  GuppyScreen is running on the printer screen.\n${white}"
+    if [ -f /etc/init.d/S50nginx ] && [ -f /usr/data/mainsail/index.html ]; then
+        printf "${green}  Mainsail web UI:  http://${_ip}:4409/\n${white}"
+    fi
+    printf "${green}  Backups saved to: $BACKUP_DIR\n${white}"
+    printf "${yellow}  Next steps and calibration guide: https://github.com/coreflake1/guppyscreen/wiki\n${white}"
 else
-    printf "${red} Guppy Screen FAILED to install. Rolling back... ${white}\n"
+    printf "${red}GuppyScreen failed to start. Rolling back...${white}\n"
     cp $BACKUP_DIR/S99start_app /etc/init.d/S99start_app
     rm /etc/init.d/S99guppyscreen
 

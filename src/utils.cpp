@@ -172,7 +172,7 @@ namespace KUtils {
     // Left-align the body so multi-line messages wrap to a clean left margin
     // instead of ragged centered lines.
     lv_label_set_long_mode(txt, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(txt, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_text_align(txt, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(txt, LV_PCT(100));
     lv_obj_set_width(mbox, LV_PCT(70));
     lv_obj_set_height(mbox, LV_SIZE_CONTENT);
@@ -303,8 +303,6 @@ namespace KUtils {
       auto scaled_width = scale * 300;
       spdlog::debug("using thumb at scaled width {}", scaled_width);
       uint32_t closest_index = 0;
-      size_t thumb_width = 0;
-      size_t thumb_height = 0;
 
       auto width = thumbs.at(0)["width"].is_number()
         ? thumbs.at(0)["width"].template get<int>()
@@ -313,6 +311,10 @@ namespace KUtils {
       auto height = thumbs.at(0)["height"].is_number()
         ? thumbs.at(0)["height"].template get<int>()
         : std::stoi(thumbs.at(0)["height"].template get<std::string>());
+
+      // Seed with index-0 dimensions so they're always valid even if no closer entry is found
+      size_t thumb_width = width;
+      size_t thumb_height = height;
 
       int closest = std::abs(scaled_width - width);
       for (int i = 0; i < thumbs.size(); i++) {

@@ -32,10 +32,15 @@ FilePanel::FilePanel(lv_obj_t *parent)
   lv_obj_clear_flag(thumbnail_container, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(thumbnail_container, 0, 0);
   lv_obj_set_flex_grow(thumbnail_container, 1);
+  // Prevent the container's own background/border from showing through when there is no thumbnail
+  lv_obj_set_style_bg_opa(thumbnail_container, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_opa(thumbnail_container, LV_OPA_TRANSP, 0);
 
   // Now set thumbnail parent to container and setup
   lv_obj_clear_flag(thumbnail, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(thumbnail, 0, 0);
+  // Start invisible; revealed by refresh_view once positioned correctly
+  lv_obj_set_style_opa(thumbnail, LV_OPA_TRANSP, 0);
 
   // Setup filename label
   lv_label_set_long_mode(fname_label, LV_LABEL_LONG_SCROLL);
@@ -73,7 +78,10 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
   int fweight = v.is_null() ? -1 : v.template get<int>();
 
   auto filename = fs::path(gcode_path).filename();
-  lv_label_set_text(fname_label, filename.string().c_str());
+  // Only set when text changes to avoid restarting the scroll animation mid-scroll
+  if (filename.string() != lv_label_get_text(fname_label)) {
+    lv_label_set_text(fname_label, filename.string().c_str());
+  }
 
   std::string detail = fmt::format("Filament Weight: {} g\nPrint Time: {}\nSize: {} MB\nModified: {}",
     fweight > 0 ? std::to_string(fweight) : "(unknown)",
@@ -87,11 +95,11 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
   size_t raw_thumb_w = thumb_result.second.first;
   size_t raw_thumb_h = thumb_result.second.second;
 
-  if (!fullpath.empty()) {
-    lv_img_set_src(thumbnail, ("A:" + fullpath).c_str());
-    lv_label_set_text(detail_label, detail.c_str());
+  lv_label_set_text(detail_label, detail.c_str());
 
-    // Force layout pass so thumbnail container gets correct dimensions
+  if (!fullpath.empty()) {
+    lv_obj_set_style_opa(thumbnail, LV_OPA_TRANSP, 0);
+    lv_img_set_src(thumbnail, ("A:" + fullpath).c_str());
     lv_refr_now(NULL);
 
     lv_coord_t cont_w = lv_obj_get_width(thumbnail_container);
@@ -100,17 +108,26 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
     float scale_w = raw_thumb_w ? (float)cont_w / raw_thumb_w : 1.0f;
     float scale_h = raw_thumb_h ? (float)cont_h / raw_thumb_h : 1.0f;
     float scale = std::min(scale_w, scale_h);
-
-    lv_img_set_zoom(thumbnail, scale * 320);
+    lv_img_set_zoom(thumbnail, (uint16_t)(scale * 320));
     lv_obj_align_to(thumbnail, thumbnail_container, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_opa(thumbnail, LV_OPA_COVER, 0);
   } else {
-    lv_img_set_src(thumbnail, NULL);
-    ((lv_img_t *)thumbnail)->src_type = LV_IMG_SRC_SYMBOL;
+    lv_obj_set_style_opa(thumbnail, LV_OPA_TRANSP, 0);
   }
 }
 
 void FilePanel::foreground() {
   lv_obj_move_foreground(file_cont);
+}
+
+void FilePanel::show_loading(const std::string &gcode_path) {
+  auto filename = fs::path(gcode_path).filename();
+  if (filename.string() != lv_label_get_text(fname_label)) {
+    lv_label_set_text(fname_label, filename.string().c_str());
+  }
+  lv_label_set_text(detail_label, "Loading...");
+  // Keep the previous thumbnail visible while metadata loads — refresh_view will
+  // replace it once the RPC completes, avoiding a blank flash between files.
 }
 
 lv_obj_t *FilePanel::get_container() {

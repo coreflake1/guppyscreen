@@ -27,7 +27,6 @@ public:
   void subscribe();
   void foreground();
   void handle_callback(lv_event_t *event);
-  void handle_metadata(Tree *, json &data);
   void handle_back_btn(lv_event_t *event);
   void handle_print_callback(lv_event_t *event);
   void handle_status_btn(lv_event_t *event);
@@ -66,7 +65,7 @@ public:
 
 
 private:
-  void show_dir(Tree *dir, uint32_t sort_type);
+  void show_dir(Tree *dir);
   void show_file_detail(Tree *f);
   void show_filament_dialog();
   void start_pending_print();
@@ -74,13 +73,6 @@ private:
   KWebSocketClient &ws;
   SpoolmanPanel &sm;
   lv_obj_t *files_cont;
-
-  // prompt
-  lv_obj_t *prompt_cont;
-  lv_obj_t *msgbox;
-  lv_obj_t *job_btn;
-  lv_obj_t *cancel_btn;
-  lv_obj_t *queue_btn;
 
   // spoolman "use the same filament?" confirm dialog
   lv_obj_t *filament_cont;
@@ -111,7 +103,8 @@ private:
   Tree *cur_file;
   FilePanel file_panel;
   PrintStatusPanel &print_status;
-  uint32_t sorted_by;
+  uint32_t sort_mode;
+  bool sort_reversed;
 
   bool spoolman_enabled = false;
   std::string pending_print_path;
