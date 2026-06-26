@@ -89,9 +89,7 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
     KUtils::bytes_to_mb(j["result"]["size"].template get<size_t>()),
     time_stream.str());
 
-  // Target ~300px thumbnails (scale=1.0) so slicers that embed a 256/400px
-  // thumbnail get picked over the tiny 96px one the old 800-divisor chose.
-  auto width_scale = (double)lv_disp_get_physical_hor_res(NULL) / 480.0;
+  auto width_scale = (double)lv_disp_get_physical_hor_res(NULL) / 800.0;
   auto thumb_result = KUtils::get_thumbnail(gcode_path, j, width_scale);
   std::string fullpath = thumb_result.first;
   size_t raw_thumb_w = thumb_result.second.first;
@@ -116,7 +114,7 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
     float scale_w = raw_thumb_w ? (float)cont_w / raw_thumb_w : 1.0f;
     float scale_h = raw_thumb_h ? (float)cont_h / raw_thumb_h : 1.0f;
     float scale = std::min(scale_w, scale_h);
-    lv_img_set_zoom(thumbnail, (uint16_t)(scale * 256));
+    lv_img_set_zoom(thumbnail, (uint16_t)(scale * 320));
     lv_obj_align_to(thumbnail, thumbnail_container, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_opa(thumbnail, LV_OPA_COVER, 0);
   } else {
