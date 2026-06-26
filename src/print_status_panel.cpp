@@ -409,7 +409,10 @@ void PrintStatusPanel::handle_metadata(const std::string &gcode_file, json &j) {
 
   current_file = j["/result"_json_pointer];
 
-  auto width_scale = (double)lv_disp_get_physical_hor_res(NULL) / 800.0;
+  // Target ~300px thumbnails so a 256px embedded thumbnail is picked over the
+  // tiny 96px one. The container is ~213px wide so downscaling from 256 is
+  // sharper than upscaling from 96.
+  auto width_scale = (double)lv_disp_get_physical_hor_res(NULL) / 480.0;
   auto thumb_detail = KUtils::get_thumbnail(gcode_file, j, width_scale);
   std::string fullpath = thumb_detail.first;
   if (fullpath.length() > 0) {
