@@ -172,7 +172,7 @@ namespace KUtils {
     // Left-align the body so multi-line messages wrap to a clean left margin
     // instead of ragged centered lines.
     lv_label_set_long_mode(txt, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_align(txt, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_text_align(txt, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(txt, LV_PCT(100));
     lv_obj_set_width(mbox, LV_PCT(70));
     lv_obj_set_height(mbox, LV_SIZE_CONTENT);
