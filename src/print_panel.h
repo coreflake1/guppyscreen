@@ -74,13 +74,6 @@ private:
   SpoolmanPanel &sm;
   lv_obj_t *files_cont;
 
-  // prompt
-  lv_obj_t *prompt_cont;
-  lv_obj_t *msgbox;
-  lv_obj_t *job_btn;
-  lv_obj_t *cancel_btn;
-  lv_obj_t *queue_btn;
-
   // spoolman "use the same filament?" confirm dialog
   lv_obj_t *filament_cont;
   lv_obj_t *filament_box;

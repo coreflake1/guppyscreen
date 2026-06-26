@@ -21,11 +21,6 @@ PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatu
   , ws(websocket)
   , sm(spool)
   , files_cont(lv_obj_create(lv_scr_act()))
-  , prompt_cont(lv_obj_create(lv_scr_act()))
-  , msgbox(lv_obj_create(prompt_cont))
-  , job_btn(lv_btn_create(msgbox))
-  , cancel_btn(lv_btn_create(msgbox))
-  , queue_btn(lv_btn_create(msgbox))
   , filament_cont(lv_obj_create(lv_scr_act()))
   , filament_box(lv_obj_create(filament_cont))
   , filament_content_cont(lv_obj_create(filament_box))
@@ -129,39 +124,6 @@ PrintPanel::PrintPanel(KWebSocketClient &websocket, std::mutex &lock, PrintStatu
   lv_obj_move_foreground(print_btn.get_container());
   lv_obj_move_foreground(status_btn.get_container());
 
-  // "printing in progress" prompt (shared dialog look)
-  KUtils::style_dialog_overlay(prompt_cont);
-  lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-
-  KUtils::style_dialog_box(msgbox);
-  lv_obj_set_size(msgbox, LV_PCT(70), LV_PCT(42));
-  lv_obj_align(msgbox, LV_ALIGN_CENTER, 0, 0);
-
-  lv_obj_add_event_cb(job_btn, &PrintPanel::_handle_btns, LV_EVENT_CLICKED, this);
-  lv_obj_align(job_btn, LV_ALIGN_BOTTOM_MID, 0, 0);
-
-  lv_obj_add_event_cb(cancel_btn, &PrintPanel::_handle_btns, LV_EVENT_CLICKED, this);
-  lv_obj_align(cancel_btn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
-
-  lv_obj_add_event_cb(queue_btn, &PrintPanel::_handle_btns, LV_EVENT_CLICKED, this);
-  lv_obj_align(queue_btn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-
-  label = lv_label_create(job_btn);
-  lv_label_set_text(label, "View Job");
-  lv_obj_center(label);
-
-  label = lv_label_create(cancel_btn);
-  lv_label_set_text(label, "Cancel");
-  lv_obj_center(label);
-
-  label = lv_label_create(queue_btn);
-  lv_label_set_text(label, "Queue Job");
-  lv_obj_center(label);
-
-  label = lv_label_create(msgbox);
-  lv_label_set_text(label, "Printing in progress...");
-  KUtils::style_dialog_title(label);
-
   // spoolman "use the same filament?" confirm dialog (shared dialog look)
   KUtils::style_dialog_overlay(filament_cont);
   lv_obj_add_flag(filament_cont, LV_OBJ_FLAG_HIDDEN);
@@ -233,10 +195,6 @@ PrintPanel::~PrintPanel() {
     files_cont = NULL;
   }
 
-  if (prompt_cont != NULL) {
-    lv_obj_del(prompt_cont);
-    prompt_cont = NULL;
-  }
 }
 
 void PrintPanel::populate_files(json &j) {
@@ -467,8 +425,7 @@ void PrintPanel::handle_print_callback(lv_event_t *event) {
       }
 
     } else {
-      lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_move_foreground(prompt_cont);
+      KUtils::notify_toast("A print is already in progress.", 2500);
     }
   }
 }
@@ -591,23 +548,6 @@ void PrintPanel::handle_btns(lv_event_t *event) {
   lv_event_code_t code = lv_event_get_code(event);
   if (code == LV_EVENT_CLICKED) {
     lv_obj_t *btn = lv_event_get_current_target(event);
-    if (cur_file != NULL) {
-      spdlog::trace("status prompt clicked");
-      if (btn == queue_btn) {
-        spdlog::trace("status prompt queue clicked");
-      }
-
-      if (btn == job_btn) {
-        spdlog::trace("status prompt job clicked");
-      }
-
-      if (btn == cancel_btn) {
-        spdlog::trace("status prompt cancel clicked");
-        lv_obj_move_background(prompt_cont);
-        lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-      }
-    }
-
     if (btn == refresh_btn) {
       subscribe();
 
