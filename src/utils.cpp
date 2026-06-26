@@ -303,8 +303,6 @@ namespace KUtils {
       auto scaled_width = scale * 300;
       spdlog::debug("using thumb at scaled width {}", scaled_width);
       uint32_t closest_index = 0;
-      size_t thumb_width = 0;
-      size_t thumb_height = 0;
 
       auto width = thumbs.at(0)["width"].is_number()
         ? thumbs.at(0)["width"].template get<int>()
@@ -313,6 +311,10 @@ namespace KUtils {
       auto height = thumbs.at(0)["height"].is_number()
         ? thumbs.at(0)["height"].template get<int>()
         : std::stoi(thumbs.at(0)["height"].template get<std::string>());
+
+      // Seed with index-0 dimensions so they're always valid even if no closer entry is found
+      size_t thumb_width = width;
+      size_t thumb_height = height;
 
       int closest = std::abs(scaled_width - width);
       for (int i = 0; i < thumbs.size(); i++) {
