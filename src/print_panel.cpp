@@ -229,7 +229,6 @@ void PrintPanel::consume(json &j) {
 void PrintPanel::subscribe() {
   refreshing_files = true;
   refresh_pending = false;
-  lv_obj_clear_flag(file_table, LV_OBJ_FLAG_CLICKABLE);
   ws.send_jsonrpc("server.files.list", R"({"root":"gcodes"})"_json, [this](json &d) {
     std::lock_guard<std::mutex> lock(lv_lock);
     std::string cur_path = cur_dir->full_path;
@@ -247,7 +246,6 @@ void PrintPanel::subscribe() {
     cur_dir = dir;
     this->populate_files(d);
     refreshing_files = false;
-    lv_obj_add_flag(file_table, LV_OBJ_FLAG_CLICKABLE);
     if (refresh_pending) {
       refresh_pending = false;
       subscribe();
