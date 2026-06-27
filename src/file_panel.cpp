@@ -129,6 +129,13 @@ void FilePanel::show_loading(const std::string &gcode_path) {
   // replace it once the RPC completes, avoiding a blank flash between files.
 }
 
+void FilePanel::show_no_metadata() {
+  // fname_label already set by show_loading — only update the detail.
+  // Hide the thumbnail so we don't show a stale image from a previous file.
+  lv_obj_set_style_opa(thumbnail, LV_OPA_TRANSP, 0);
+  lv_label_set_text(detail_label, "No metadata available");
+}
+
 lv_obj_t *FilePanel::get_container() {
   return file_cont;
 }

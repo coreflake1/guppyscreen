@@ -382,7 +382,7 @@ void PrintPanel::show_file_detail(Tree *f) {
           file_panel.refresh_view(cur_file->metadata, cur_file->full_path);
         } else {
           spdlog::warn("metadata fetch failed for {}", path);
-          file_panel.show_loading("(metadata unavailable)");
+          file_panel.show_no_metadata();
         }
       });
   }
