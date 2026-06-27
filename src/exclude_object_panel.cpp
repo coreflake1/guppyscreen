@@ -9,6 +9,22 @@
 
 LV_IMG_DECLARE(back);
 
+static bool point_in_polygon(lv_coord_t x, lv_coord_t y, const std::vector<lv_point_t> &poly) {
+  if (poly.size() < 3) return false;
+  bool inside = false;
+  size_t j = poly.size() - 1;
+  for (size_t i = 0; i < poly.size(); j = i++) {
+    const lv_point_t &pi = poly[i];
+    const lv_point_t &pj = poly[j];
+    if ((pi.y > y) != (pj.y > y)) {
+      double xi = static_cast<double>(pj.x - pi.x) * static_cast<double>(y - pi.y)
+                  / static_cast<double>(pj.y - pi.y) + static_cast<double>(pi.x);
+      if (static_cast<double>(x) < xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
 // Square canvas for the bed map; the bed is square on the KE (220x220) so a
 // square keeps the aspect ratio without letterboxing.
 static const lv_coord_t CANVAS_DIM = 250;
@@ -203,15 +219,7 @@ void ExcludeObjectPanel::redraw() {
       x0 = std::min(x0, p.x); y0 = std::min(y0, p.y);
       x1 = std::max(x1, p.x); y1 = std::max(y1, p.y);
     }
-    obj_boxes.push_back({name, x0, y0, x1, y1, excl});
-
-    lv_draw_rect_dsc_t fill;
-    lv_draw_rect_dsc_init(&fill);
-    fill.bg_color = color;
-    fill.bg_opa = excl ? LV_OPA_20 : LV_OPA_40;
-    fill.radius = 2;
-    lv_canvas_draw_rect(canvas, x0, y0, std::max<lv_coord_t>(x1 - x0, 1),
-                        std::max<lv_coord_t>(y1 - y0, 1), &fill);
+    obj_boxes.push_back({name, x0, y0, x1, y1, excl, pts});
 
     // Polygon outline.
     lv_draw_line_dsc_t line;
@@ -274,7 +282,7 @@ void ExcludeObjectPanel::handle_canvas_click(lv_event_t *e) {
   long best_area = 0;
   for (auto &b : obj_boxes) {
     if (b.excluded) continue;
-    if (cx >= b.x0 && cx <= b.x1 && cy >= b.y0 && cy <= b.y1) {
+    if (point_in_polygon(cx, cy, b.polygon)) {
       long area = (long)(b.x1 - b.x0) * (b.y1 - b.y0);
       if (hit == nullptr || area < best_area) { hit = &b; best_area = area; }
     }

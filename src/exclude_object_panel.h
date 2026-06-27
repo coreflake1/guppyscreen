@@ -31,11 +31,12 @@ class ExcludeObjectPanel : public NotifyConsumer {
   }
 
  private:
-  // One drawn object: its on-canvas bounding box (for tap hit-testing) and state.
+  // One drawn object: bounding box, polygon (for point_in_polygon hit-test), and state.
   struct ObjBox {
     std::string name;
     lv_coord_t x0, y0, x1, y1;
     bool excluded;
+    std::vector<lv_point_t> polygon;
   };
 
   KWebSocketClient &ws;
