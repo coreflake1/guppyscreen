@@ -107,6 +107,8 @@ private:
   bool sort_reversed;
 
   bool spoolman_enabled = false;
+  bool refreshing_files = false;   // an RPC is in-flight
+  bool refresh_pending = false;    // another notify arrived while in-flight
   std::string pending_print_path;
   // filament required by the pending print (from gcode metadata); <0 = unknown
   double pending_needed_g = -1;
