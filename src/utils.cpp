@@ -364,7 +364,6 @@ namespace KUtils {
     return std::make_pair("", std::make_pair(0, 0));
   }
 
-
   std::string download_file(const std::string &root,
     const std::string &fname,
     const std::string &dest) {

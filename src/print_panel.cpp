@@ -381,8 +381,23 @@ void PrintPanel::show_file_detail(Tree *f) {
           cur_file->set_metadata(d);
           file_panel.refresh_view(cur_file->metadata, cur_file->full_path);
         } else {
-          spdlog::warn("metadata fetch failed for {}", path);
-          file_panel.show_no_metadata();
+          // File not in Moonraker's metadata DB (normal for USB files).
+          // metascan forces a parse + thumbnail extraction and returns
+          // the same data shape as metadata — pipe it straight through.
+          spdlog::info("metadata not cached for {}, requesting metascan", path);
+          ws.send_jsonrpc("server.files.metascan",
+            json{{"filename", path}},
+            [path, this](json &d2) {
+              std::lock_guard<std::mutex> lock(lv_lock);
+              if (cur_file == nullptr || cur_file->full_path != path) return;
+              if (d2.contains("result")) {
+                cur_file->set_metadata(d2);
+                file_panel.refresh_view(cur_file->metadata, cur_file->full_path);
+              } else {
+                spdlog::warn("metascan failed for {}", path);
+                file_panel.show_no_metadata();
+              }
+            });
         }
       });
   }

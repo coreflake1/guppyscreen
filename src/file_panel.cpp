@@ -136,6 +136,7 @@ void FilePanel::show_no_metadata() {
   lv_label_set_text(detail_label, "No metadata available");
 }
 
+
 lv_obj_t *FilePanel::get_container() {
   return file_cont;
 }
