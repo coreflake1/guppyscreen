@@ -232,10 +232,16 @@ void ExcludeObjectPanel::redraw() {
       lv_canvas_draw_line(canvas, seg, 2, &line);
     }
 
-    // Cross out excluded objects.
+    // Cross out excluded objects: centred × whose arm length = half the
+    // shorter bbox dimension, so it always fits inside the polygon outline.
     if (excl) {
-      lv_point_t d1[2] = {{x0, y0}, {x1, y1}};
-      lv_point_t d2[2] = {{x0, y1}, {x1, y0}};
+      lv_coord_t cx = (x0 + x1) / 2;
+      lv_coord_t cy = (y0 + y1) / 2;
+      lv_coord_t arm = std::max<lv_coord_t>(std::min((x1 - x0), (y1 - y0)) / 2, 4);
+      lv_point_t d1[2] = {{(lv_coord_t)(cx - arm), (lv_coord_t)(cy - arm)},
+                           {(lv_coord_t)(cx + arm), (lv_coord_t)(cy + arm)}};
+      lv_point_t d2[2] = {{(lv_coord_t)(cx - arm), (lv_coord_t)(cy + arm)},
+                           {(lv_coord_t)(cx + arm), (lv_coord_t)(cy - arm)}};
       lv_canvas_draw_line(canvas, d1, 2, &line);
       lv_canvas_draw_line(canvas, d2, 2, &line);
     }
