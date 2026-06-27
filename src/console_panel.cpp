@@ -12,6 +12,18 @@ LV_IMG_DECLARE(arrow_up);
 LV_IMG_DECLARE(arrow_down);
 
 static const int POOL_SIZE = 60;
+static const int MAX_CONSOLE_LINES = 100;
+
+// Klipper sends "ok T:234.5/235.0 B:59.8/60.0 @:80 B@:40" every second during
+// temperature waits. These are pure status pings — the temps are already visible
+// on the main screen — so we drop them to keep the console readable and avoid
+// growing the textarea buffer unboundedly on long prints.
+static bool is_klipper_temp_report(const std::string &line) {
+  return line.size() > 5 &&
+    line[0] == 'o' && line[1] == 'k' && line[2] == ' ' &&
+    line[3] == 'T' && line[4] == ':' &&
+    (std::isdigit((unsigned char)line[5]) || line[5] == '-');
+}
 
 // Keyword-driven command categories for the drill-down menu. Order = priority:
 // each command lands in the FIRST group whose any keyword is a substring, so the
@@ -352,7 +364,9 @@ void ConsolePanel::handle_macro_response(json &j) {
   if (j.contains("params")) {
     std::lock_guard<std::mutex> lock(lv_lock);
     for (auto &l : j["params"]) {
-      append_output(l.template get<std::string>());
+      std::string line = l.template get<std::string>();
+      if (is_klipper_temp_report(line)) continue;
+      append_output(line);
     }
   }
 }
@@ -360,7 +374,30 @@ void ConsolePanel::handle_macro_response(json &j) {
 void ConsolePanel::append_output(const std::string &line) {
   lv_textarea_add_text(output, line.c_str());
   lv_textarea_add_text(output, "\n");
+  trim_output_lines();
   lv_textarea_set_cursor_pos(output, LV_TEXTAREA_CURSOR_LAST);  // auto-scroll to bottom
+}
+
+void ConsolePanel::trim_output_lines() {
+  const char *raw = lv_textarea_get_text(output);
+  if (raw == nullptr) return;
+
+  int newlines = 0;
+  for (const char *p = raw; *p; p++) {
+    if (*p == '\n') newlines++;
+  }
+  if (newlines <= MAX_CONSOLE_LINES) return;
+
+  // Copy before calling set_text — set_text invalidates the raw pointer.
+  std::string text(raw);
+  int to_skip = newlines - MAX_CONSOLE_LINES;
+  size_t pos = 0;
+  for (int i = 0; i < to_skip; i++) {
+    pos = text.find('\n', pos);
+    if (pos == std::string::npos) return;
+    pos++;
+  }
+  lv_textarea_set_text(output, text.c_str() + pos);
 }
 
 // -------- terminal --------
