@@ -128,7 +128,8 @@ void ButtonContainer::handle_callback(lv_event_t *e) {
 }
 
 void ButtonContainer::handle_prompt() {
-  static const char *btns[] = {"Confirm", "Cancel", ""};
+  // Safe action on the left, destructive on the right (red).
+  static const char *btns[] = {"Cancel", "Confirm", ""};
 
   lv_obj_t *mbox1 = lv_msgbox_create(NULL, NULL, prompt_text.c_str(), btns, false);
   KUtils::style_dialog_msgbox(mbox1);
@@ -148,16 +149,24 @@ void ButtonContainer::handle_prompt() {
   lv_obj_set_size(btnm, LV_PCT(90), 50 * hscale);
   lv_obj_set_size(mbox1, LV_PCT(50), LV_PCT(35));
 
+  // Draw the right (Confirm) button in red.
+  lv_obj_add_event_cb(btnm, [](lv_event_t *e) {
+    lv_obj_draw_part_dsc_t *dsc = lv_event_get_draw_part_dsc(e);
+    if (dsc->part == LV_PART_ITEMS && dsc->id == 1) {
+      dsc->rect_dsc->bg_color = lv_color_hex(0xC62828);
+      dsc->rect_dsc->bg_opa   = LV_OPA_COVER;
+      dsc->label_dsc->color   = lv_color_white();
+    }
+  }, LV_EVENT_DRAW_PART_BEGIN, NULL);
+
   lv_obj_add_event_cb(mbox1, [](lv_event_t *e) {
     lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
     uint32_t clicked_btn = lv_msgbox_get_active_btn(obj);
-    if (clicked_btn == 0) {
+    if (clicked_btn == 1) {
       ((ButtonContainer *)e->user_data)->run_callback();
     }
-
     lv_msgbox_close(obj);
-
-    }, LV_EVENT_VALUE_CHANGED, this);
+  }, LV_EVENT_VALUE_CHANGED, this);
 
   lv_obj_center(mbox1);
 }
