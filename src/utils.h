@@ -61,7 +61,7 @@ namespace KUtils {
   void style_lock_mbox(lv_obj_t *mbox, lv_coord_t btns_pct);
 
   // path, width
-  std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j, double scale);
+  std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j);
 
   std::string download_file(const std::string &root,
     const std::string &fname,

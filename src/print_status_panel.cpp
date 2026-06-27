@@ -409,8 +409,7 @@ void PrintStatusPanel::handle_metadata(const std::string &gcode_file, json &j) {
 
   current_file = j["/result"_json_pointer];
 
-  auto width_scale = (double)lv_disp_get_physical_hor_res(NULL) / 800.0;
-  auto thumb_detail = KUtils::get_thumbnail(gcode_file, j, width_scale);
+  auto thumb_detail = KUtils::get_thumbnail(gcode_file, j);
   std::string fullpath = thumb_detail.first;
   if (fullpath.length() > 0) {
     spdlog::trace("thumb path: {}", fullpath);

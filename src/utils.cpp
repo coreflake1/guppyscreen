@@ -297,11 +297,9 @@ namespace KUtils {
     return result;
   }
 
-  std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j, double scale) {
+  std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j) {
     auto &thumbs = j["/result/thumbnails"_json_pointer];
     if (!thumbs.is_null() && !thumbs.empty()) {
-      auto scaled_width = scale * 300;
-      spdlog::debug("using thumb at scaled width {}", scaled_width);
       uint32_t closest_index = 0;
 
       auto width = thumbs.at(0)["width"].is_number()
@@ -312,12 +310,11 @@ namespace KUtils {
         ? thumbs.at(0)["height"].template get<int>()
         : std::stoi(thumbs.at(0)["height"].template get<std::string>());
 
-      // Seed with index-0 dimensions so they're always valid even if no closer entry is found
       size_t thumb_width = width;
       size_t thumb_height = height;
+      int largest = width;
 
-      int closest = std::abs(scaled_width - width);
-      for (int i = 0; i < thumbs.size(); i++) {
+      for (int i = 1; i < thumbs.size(); i++) {
         width = thumbs.at(i)["width"].is_number()
           ? thumbs.at(i)["width"].template get<int>()
           : std::stoi(thumbs.at(i)["width"].template get<std::string>());
@@ -325,9 +322,8 @@ namespace KUtils {
           ? thumbs.at(i)["height"].template get<int>()
           : std::stoi(thumbs.at(i)["height"].template get<std::string>());
 
-        int cur_diff = std::abs(scaled_width - width);
-        if (cur_diff < closest) {
-          closest = cur_diff;
+        if (width > largest) {
+          largest = width;
           closest_index = i;
           thumb_width = width;
           thumb_height = height;

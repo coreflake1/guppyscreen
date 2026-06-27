@@ -89,8 +89,7 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
     KUtils::bytes_to_mb(j["result"]["size"].template get<size_t>()),
     time_stream.str());
 
-  auto width_scale = (double)lv_disp_get_physical_hor_res(NULL) / 800.0;
-  auto thumb_result = KUtils::get_thumbnail(gcode_path, j, width_scale);
+  auto thumb_result = KUtils::get_thumbnail(gcode_path, j);
   std::string fullpath = thumb_result.first;
   size_t raw_thumb_w = thumb_result.second.first;
   size_t raw_thumb_h = thumb_result.second.second;
