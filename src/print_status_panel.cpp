@@ -138,8 +138,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
 
   lv_obj_set_style_pad_all(pbar_cont, 0, 0);
   lv_obj_set_size(pbar_cont, LV_PCT(100), LV_SIZE_CONTENT);
-  // lv_obj_set_style_border_width(pbar_cont, 2, 0);
-  // lv_obj_set_style_border_width(thumbnail_cont, 2, 0);
+  lv_obj_clear_flag(pbar_cont, LV_OBJ_FLAG_SCROLLABLE);
 
   auto hscale = (double)lv_disp_get_physical_ver_res(NULL) / 480.0;
 
@@ -153,6 +152,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   lv_obj_set_flex_align(thumbnail_cont, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_size(thumbnail_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(thumbnail_cont, 0, 0);
+  lv_obj_clear_flag(thumbnail_cont, LV_OBJ_FLAG_SCROLLABLE);
 
   // Filename label: between thumbnail and progress bar. lv_label_create defaults
   // to no width, so set a percent width + DOT long-mode so a 60-char gcode name
