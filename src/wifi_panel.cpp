@@ -252,6 +252,8 @@ void WifiPanel::handle_callback(lv_event_t *e) {
 
     } else if (list_networks.count(selected_network)) {
       auto nid = list_networks.find(selected_network)->second;
+      lv_label_set_text(wifi_label, fmt::format("Connecting to {} ...", selected_network).c_str());
+      lv_obj_add_flag(password_input, LV_OBJ_FLAG_HIDDEN);
       wpa_event.send_command(fmt::format("SELECT_NETWORK {}", nid));
       wpa_event.send_command("SAVE_CONFIG");
     } else {
@@ -265,7 +267,6 @@ void WifiPanel::handle_callback(lv_event_t *e) {
 }
 
 void WifiPanel::handle_wpa_event(const std::string &event) {
-  lv_label_set_text(wifi_label, "Please select your wifi network");
   if (event.rfind("<3>CTRL-EVENT-SCAN-RESULTS", 0) == 0) {
     // result ready
     spdlog::trace("got scan result event");
@@ -274,10 +275,13 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
     wifi_name_db.clear();
     uint32_t index = 0;
 
-    find_current_network();
+    bool found = find_current_network();
     spdlog::trace("cur_network {}", cur_network);
 
     std::lock_guard<std::mutex> lock(lv_lock);
+    if (!found) {
+      lv_label_set_text(wifi_label, "Please select your wifi network");
+    }
     while (std::getline(f, line)) {
       if (line.rfind("bss", 0) == 0) {
         continue;
