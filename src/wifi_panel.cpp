@@ -8,6 +8,8 @@
 #include <vector>
 #include <utility>
 #include <algorithm>
+#include <thread>
+#include <chrono>
 
 LV_IMG_DECLARE(back);
 
@@ -214,7 +216,7 @@ void WifiPanel::handle_callback(lv_event_t *e) {
     uint16_t col;
 
     lv_table_get_selected_cell(wifi_table, &row, &col);
-    if (row > list_networks.size() || col > 1) {
+    if (row >= (uint16_t)wifi_name_db.size() || col > 1) {
       return;
     }
 
@@ -334,6 +336,10 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
     // truthful. Runs on the wpa monitor thread (no LVGL).
     auto pm = Config::get_instance()->get_json("/wifi_low_latency");
     if (!pm.is_null() && pm.template get<bool>()) {
+      // BCM4343 firmware resets PM to its NVRAM default after finalising
+      // association, which happens slightly after CONNECTED fires.  A short
+      // delay ensures our PM=0 lands after that reset.
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
       KUtils::set_wifi_low_latency(true);
     }
 
