@@ -2,6 +2,7 @@
 #include "state.h"
 #include "utils.h"
 #include "spdlog/spdlog.h"
+#include <algorithm>
 
 LV_IMG_DECLARE(cancel);
 LV_IMG_DECLARE(light_img);
@@ -22,7 +23,9 @@ LedPanel::LedPanel(KWebSocketClient &websocket_client, std::mutex &lock)
     lv_obj_center(leds_cont);
     lv_obj_set_size(leds_cont, lv_pct(80), lv_pct(100));
     lv_obj_set_flex_flow(leds_cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(leds_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+#ifdef GUPPY_SMALL_SCREEN
+    lv_obj_set_style_pad_bottom(leds_cont, 60, 0);
+#endif
 
     lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, -20);
 
@@ -72,19 +75,37 @@ void LedPanel::init(json &l) {
 
     lv_event_cb_t led_cb = &LedPanel::_handle_led_update;
     if (key.rfind("output_pin ", 0) != 0) {
-	// standard led
-	led_cb = &LedPanel::_handle_led_update_generic;
+      led_cb = &LedPanel::_handle_led_update_generic;
+    }
+
+    bool is_binary = false;
+    if (key.rfind("output_pin ", 0) == 0) {
+      std::string lower = key;
+      std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+      auto pwm = State::get_instance()->get_data(
+        json::json_pointer("/printer_state/configfile/settings/" + lower + "/pwm"));
+      is_binary = pwm.is_boolean() ? !pwm.template get<bool>() : true;
     }
 
     auto lptr = std::make_shared<SliderContainer>(leds_cont, display_name.c_str(), &cancel, "Off",
-						  &light_img, "Max", led_cb, this);
+      &light_img, is_binary ? "On" : "Max", led_cb, this);
+    if (is_binary) {
+      lptr->hide_slider();
+    }
     leds.insert({key, lptr});
   }
 
-  if (leds.size() > 3) {
+#ifdef GUPPY_SMALL_SCREEN
+  const size_t scroll_threshold = 2;
+#else
+  const size_t scroll_threshold = 3;
+#endif
+  if (leds.size() > scroll_threshold) {
+    lv_obj_set_flex_align(leds_cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_add_flag(leds_cont, LV_OBJ_FLAG_SCROLLABLE);
   } else {
-    lv_obj_clear_flag(leds_cont, LV_OBJ_FLAG_SCROLLABLE);    
+    lv_obj_set_flex_align(leds_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(leds_cont, LV_OBJ_FLAG_SCROLLABLE);
   }
 
   lv_obj_move_foreground(back_btn.get_container());
