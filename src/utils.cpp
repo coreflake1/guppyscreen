@@ -396,7 +396,10 @@ namespace KUtils {
     getifaddrs(&addrs);
     for (struct ifaddrs *addr = addrs; addr != nullptr; addr = addr->ifa_next) {
       if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_PACKET) {
-        ifaces.push_back(addr->ifa_name);
+        const std::string iface = addr->ifa_name;
+        if (!iface.empty() && (iface[0] == 'w' || iface[0] == 'e')) {
+          ifaces.push_back(iface);
+        }
       }
     }
 
