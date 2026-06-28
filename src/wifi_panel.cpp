@@ -257,6 +257,9 @@ void WifiPanel::handle_callback(lv_event_t *e) {
       lv_obj_add_flag(password_input, LV_OBJ_FLAG_HIDDEN);
       wpa_event.send_command(fmt::format("SELECT_NETWORK {}", nid));
       wpa_event.send_command("SAVE_CONFIG");
+      if (selected_network != cur_network) {
+        wpa_event.send_command("REASSOCIATE");
+      }
     } else {
       entering_password = true;
       lv_label_set_text(wifi_label, fmt::format("Enter password for {}", selected_network).c_str());
