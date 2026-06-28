@@ -402,7 +402,6 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     lv_label_set_text(wifi_label, "Please select your wifi network");
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(password_input, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_READY) {
     const char *password = lv_textarea_get_text(password_input);
     if (password == NULL || password[0] == 0) {
