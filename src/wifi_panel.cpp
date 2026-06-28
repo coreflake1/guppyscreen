@@ -100,6 +100,7 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_add_event_cb(password_input, &WifiPanel::_handle_kb_input, LV_EVENT_FOCUSED, this);
   lv_obj_add_event_cb(password_input, &WifiPanel::_handle_kb_input, LV_EVENT_DEFOCUSED, this);
   lv_obj_add_event_cb(password_input, &WifiPanel::_handle_kb_input, LV_EVENT_READY, this);
+  lv_obj_add_event_cb(password_input, &WifiPanel::_handle_kb_input, LV_EVENT_CANCEL, this);
 
   // allow clicks on non-clickables to hide the keyboard
   lv_obj_add_event_cb(prompt_cont, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
@@ -386,12 +387,13 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
   if (code == LV_EVENT_FOCUSED) {
     lv_keyboard_set_textarea(kb, password_input);
     lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
-  } else if (code == LV_EVENT_DEFOCUSED) {
+  } else if (code == LV_EVENT_DEFOCUSED || code == LV_EVENT_CANCEL) {
     entering_password = false;
     lv_keyboard_set_textarea(kb, NULL);
     lv_label_set_text(wifi_label, "Please select your wifi network");
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(password_input, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_READY) {
     const char *password = lv_textarea_get_text(password_input);
     if (password == NULL || password[0] == 0) {
