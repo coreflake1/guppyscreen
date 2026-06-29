@@ -1,6 +1,6 @@
 # Emergency Factory Reset
 
-OpenKE installs a `S58factoryreset` init service that gives you two ways to wipe the printer back to stock — even if the screen and SSH are unreachable.
+The OpenKE installer deploys a `S58factoryreset` init service (not present in stock Creality firmware) that gives you three ways to wipe the printer back to stock.
 
 > **⚠️ This is destructive.** A factory reset removes all mods, configuration, print files, and calibration data. WiFi credentials and the Creality cloud account are preserved. You will need to re-run the OpenKE installer afterwards.
 
@@ -20,7 +20,13 @@ This is the emergency path: works even if the screen is black, SSH is dead, or K
 
 ---
 
-## Method 2 — SSH (when you still have shell access)
+## Method 2 — GuppyScreen (Settings panel)
+
+Open the sysinfo panel → tap **Reset Options** → **Factory Reset Printer** → red Confirm button.
+
+---
+
+## Method 3 — SSH (when you still have shell access)
 
 If you can SSH in but want a clean slate:
 

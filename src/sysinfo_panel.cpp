@@ -557,10 +557,6 @@ void SysInfoPanel::show_reset_options() {
     "Wipes OpenKE, Klipper config, gcodes and\ncalibration. Reboots to stock Creality firmware."
   );
 
-  if (!fs::exists("/etc/init.d/S58factoryreset")) {
-    lv_obj_add_flag(btn2, LV_OBJ_FLAG_HIDDEN);
-  }
-
   lv_obj_t *close_btn = lv_btn_create(box);
   lv_obj_set_size(close_btn, LV_PCT(50), LV_SIZE_CONTENT);
   lv_obj_set_style_bg_color(close_btn, lv_palette_darken(LV_PALETTE_GREY, 1), 0);
