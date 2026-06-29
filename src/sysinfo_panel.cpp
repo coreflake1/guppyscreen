@@ -610,7 +610,8 @@ void SysInfoPanel::show_reset_options() {
       []() {
         spdlog::warn("Touch calibration reset requested.");
         Config *conf = Config::get_instance();
-        conf->set<bool>("/touch_calibrated", false);
+        conf->set<bool>("/touch_calibrated", true);
+        conf->set<json>("/touch_calibration_coeff", json());
         conf->save();
         exit(0);
       }
