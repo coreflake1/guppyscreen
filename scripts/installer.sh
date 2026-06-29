@@ -685,6 +685,11 @@ fi
 printf "${green}Setting up GuppyScreen ${white}\n"
 cp $K1_GUPPY_DIR/k1_mods/S99guppyscreen /etc/init.d/S99guppyscreen
 
+## Install USB emergency factory-reset service
+printf "${green}Installing factory reset service (USB emergency reset)${white}\n"
+cp $K1_GUPPY_DIR/k1_mods/S58factoryreset /etc/init.d/S58factoryreset
+chmod 777 /etc/init.d/S58factoryreset
+
 # backup existing calibrate_shaper_config.py before unconditional overwrite
 [ -f "$SHAPER_CONFIG" ] && [ ! -f "$BACKUP_DIR/calibrate_shaper_config.py.bak" ] && cp "$SHAPER_CONFIG" "$BACKUP_DIR/calibrate_shaper_config.py.bak"
 cp $K1_GUPPY_DIR/k1_mods/calibrate_shaper_config.py $SHAPER_CONFIG

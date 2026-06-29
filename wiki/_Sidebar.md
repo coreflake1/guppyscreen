@@ -19,6 +19,7 @@
 - [Fix layer shift after pause](Pause-Park-Layer-Shift-Fix)
 - [Camera: better image](Camera-Image-Tuning)
 - [Camera: H.264 stream (removed v1.2.0)](Camera-H264-Stream)
+- [Emergency factory reset](Emergency-Factory-Reset)
 - [Troubleshooting](Troubleshooting)
 
 ---
