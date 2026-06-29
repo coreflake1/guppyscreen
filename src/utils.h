@@ -70,6 +70,8 @@ namespace KUtils {
   std::vector<std::string> get_interfaces();
   std::string interface_ip(const std::string &interface);
   std::string get_wifi_interface();
+  std::string gateway_ip(const std::string &iface);
+  bool gateway_in_arp(const std::string &gw_ip);
 
   template <typename Out>
   void split(const std::string &s, char delim, Out result);

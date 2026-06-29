@@ -389,11 +389,9 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
           spdlog::trace("adding symbol with ok");
           lv_table_set_cell_value(wifi_table, index, 1, LV_SYMBOL_CLOSE);
           lv_table_set_cell_value(wifi_table, index, 2, LV_SYMBOL_WIFI);
-          auto ip = KUtils::interface_ip(KUtils::get_wifi_interface());
-          lv_label_set_text(wifi_label, fmt::format("Connected to network {}\nIP: {}",
-            cur_network,
-            ip).c_str());
-          lv_obj_add_flag(password_input, LV_OBJ_FLAG_HIDDEN);
+          lv_label_set_text(wifi_label,
+            fmt::format("Connected to {}\nGetting IP...", cur_network).c_str());
+          lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
           lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
         } else if (list_networks.count(wifi.first)) {
           lv_table_set_cell_value(wifi_table, index, 1, LV_SYMBOL_CLOSE);
@@ -409,6 +407,13 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
       lv_obj_scroll_to_y(wifi_table, 0, LV_ANIM_OFF);
       lv_obj_clear_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+
+      auto iface = KUtils::get_wifi_interface();
+      auto net = cur_network;
+      uint32_t gen = ++conn_gen;
+      std::thread([this, iface, net, gen]() {
+        wait_for_connectivity(iface, net, gen);
+      }).detach();
     }
   }
 }
@@ -454,6 +459,28 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
       lv_event_send(password_input, LV_EVENT_DEFOCUSED, NULL);
     }
   }
+}
+
+void WifiPanel::wait_for_connectivity(const std::string &iface,
+                                       const std::string &net,
+                                       uint32_t gen) {
+  std::string gw;
+  // Poll up to 10s (40 × 250ms): first wait for the default route to appear
+  // (signals DHCP completed), then for the gateway ARP entry to complete
+  // (signals layer-3 traffic can actually flow).
+  for (int i = 0; i < 40; i++) {
+    if (conn_gen.load() != gen) return;
+    if (gw.empty())
+      gw = KUtils::gateway_ip(iface);
+    if (!gw.empty() && KUtils::gateway_in_arp(gw))
+      break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+  }
+  if (conn_gen.load() != gen || entering_password) return;
+  auto ip = KUtils::interface_ip(iface);
+  std::lock_guard<std::mutex> lock(lv_lock);
+  lv_label_set_text(wifi_label,
+    fmt::format("Connected to {}\nIP: {}", net, ip).c_str());
 }
 
 void WifiPanel::handle_eye_btn(lv_event_t *e) {

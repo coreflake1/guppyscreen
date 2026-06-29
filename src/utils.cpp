@@ -434,6 +434,44 @@ namespace KUtils {
     return "";
   }
 
+  // Returns the default-route gateway IP for `iface`, or "" if none.
+  // /proc/net/route stores addresses as hex in host byte order.
+  std::string gateway_ip(const std::string &iface) {
+    std::ifstream f("/proc/net/route");
+    std::string line;
+    std::getline(f, line); // skip header
+    while (std::getline(f, line)) {
+      std::istringstream iss(line);
+      std::string dev, dest, gw;
+      iss >> dev >> dest >> gw;
+      if (dev != iface || dest != "00000000") continue;
+      uint32_t gw_val = 0;
+      sscanf(gw.c_str(), "%x", &gw_val);
+      if (gw_val == 0) continue;
+      struct in_addr addr;
+      addr.s_addr = htonl(gw_val);
+      return inet_ntoa(addr);
+    }
+    return "";
+  }
+
+  // Returns true once the gateway has a completed ARP entry in /proc/net/arp.
+  bool gateway_in_arp(const std::string &gw_ip) {
+    std::ifstream f("/proc/net/arp");
+    std::string line;
+    std::getline(f, line); // skip header
+    while (std::getline(f, line)) {
+      std::istringstream iss(line);
+      std::string ip, hw_type, flags;
+      iss >> ip >> hw_type >> flags;
+      if (ip != gw_ip) continue;
+      int flag_val = 0;
+      sscanf(flags.c_str(), "%x", &flag_val);
+      return (flag_val & 0x2) != 0; // ATF_COM: entry is complete
+    }
+    return false;
+  }
+
   template <typename Out>
   void split(const std::string &s, char delim, Out result) {
     std::istringstream iss(s);

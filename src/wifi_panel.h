@@ -6,6 +6,7 @@
 #include "lvgl/lvgl.h"
 #include <mutex>
 
+#include <atomic>
 #include <map>
 #include <set>
 #include <string>
@@ -24,6 +25,7 @@ public:
   void handle_wpa_event(const std::string &events);
   void handle_kb_input(lv_event_t *e);
   void handle_eye_btn(lv_event_t *e);
+  void wait_for_connectivity(const std::string &iface, const std::string &net, uint32_t gen);
   void connect(const char *);
   bool find_current_network();
 
@@ -77,6 +79,7 @@ private:
   std::map<std::string, int> wifi_name_db;
   bool entering_password = false;
   bool pw_visible = false;
+  std::atomic<uint32_t> conn_gen{0};
 
 };
 
