@@ -585,7 +585,7 @@ void SysInfoPanel::show_reset_options() {
         Config *conf = Config::get_instance();
         fs::remove(conf->get_path());
         spdlog::warn("GuppyScreen config reset.");
-        exit(0);
+        _exit(0);
       }
     );
   }, LV_EVENT_CLICKED, this);
@@ -613,7 +613,7 @@ void SysInfoPanel::show_reset_options() {
         conf->set<bool>("/touch_calibrated", true);
         conf->set<json>("/touch_calibration_coeff", json());
         conf->save();
-        exit(0);
+        _exit(0);
       }
     );
   }, LV_EVENT_CLICKED, this);
