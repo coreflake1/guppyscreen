@@ -189,7 +189,6 @@ static void lv_tc_indev_drv_read_cb(lv_indev_drv_t *indevDrv, lv_indev_data_t *d
             data->state = LV_INDEV_STATE_RELEASED;
             lv_point_t point = {0, 0};
             data->point = point;
-
             return;
         }
     }

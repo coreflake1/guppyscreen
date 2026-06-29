@@ -34,7 +34,6 @@ static void lv_tc_screen_process_input(lv_obj_t *screenObj, lv_point_t tchPoint)
 static void lv_tc_screen_step(lv_obj_t *screenObj, uint8_t step, lv_point_t tchPoint);
 static void lv_tc_screen_set_indicator_pos(lv_obj_t *screenObj, lv_point_t point, bool visible);
 
-static void lv_tc_screen_finish(lv_obj_t *screenObj);
 static void lv_tc_screen_ready(lv_obj_t *screenObj);
 
 static void lv_tc_screen_recalibrate_btn_click_cb(lv_event_t *event);
@@ -87,8 +86,9 @@ void lv_tc_screen_start_with_config(lv_obj_t* screenObj, lv_tc_start_delay_t sta
     lv_obj_add_flag(tCScreenObj->acceptBtnObj, LV_OBJ_FLAG_HIDDEN);
     
     lv_obj_align(tCScreenObj->msgLabelObj, LV_ALIGN_CENTER, 0, -50);
-    lv_obj_align_to(tCScreenObj->recalibrateBtnObj, tCScreenObj->msgLabelObj, LV_ALIGN_OUT_BOTTOM_MID, -140, 20);
-    lv_obj_align_to(tCScreenObj->acceptBtnObj, tCScreenObj->msgLabelObj, LV_ALIGN_OUT_BOTTOM_MID, 140, 20);
+    /* Do NOT use lv_obj_align_to here — it stores a persistent alignment that
+     * LVGL re-applies every layout pass, overriding any subsequent set_x calls
+     * in lv_tc_screen_finish.  Just hide the buttons; finish() will position them. */
 
 
     #if LV_TC_START_DELAY_MS
@@ -222,9 +222,46 @@ static void lv_tc_screen_step(lv_obj_t* screenObj, uint8_t step, lv_point_t tchP
         tCScreenObj->tchPoints[step - 2] = tchPoint;
     }
     if(step == STEP_FINISH) {
-        //Finish the calibration
-        lv_tc_compute_coeff(tCScreenObj->scrPoints, tCScreenObj->tchPoints, false);
-        lv_tc_screen_finish(screenObj);
+        /* Auto-accept: skip the test-phase button UI (Accept was untappable
+         * due to an LVGL persistent-alignment bug; raw mode can always be
+         * restored via Reset Touch Calibration if needed).
+         *
+         * The scrPoints are in LVGL logical coordinates, but tchPoints come
+         * from evdev BEFORE LVGL's indev_pointer_proc applies its sw_rotate
+         * correction.  Express scrPoints in that same evdev space so the
+         * calibration corrects only ADC imperfections — LVGL keeps handling
+         * the display orientation itself. */
+        lv_point_t evdevScrPoints[3];
+        lv_disp_t *calib_disp = lv_disp_get_default();
+        if(calib_disp && calib_disp->driver->sw_rotate) {
+            lv_coord_t hor = calib_disp->driver->hor_res;
+            lv_coord_t ver = calib_disp->driver->ver_res;
+            for(int ci = 0; ci < 3; ci++) {
+                lv_coord_t lx = tCScreenObj->scrPoints[ci].x;
+                lv_coord_t ly = tCScreenObj->scrPoints[ci].y;
+                switch(calib_disp->driver->rotated) {
+                    case LV_DISP_ROT_90:
+                        evdevScrPoints[ci].x = ly;
+                        evdevScrPoints[ci].y = ver - lx - 1;
+                        break;
+                    case LV_DISP_ROT_180:
+                        evdevScrPoints[ci].x = hor - lx - 1;
+                        evdevScrPoints[ci].y = ver - ly - 1;
+                        break;
+                    case LV_DISP_ROT_270:
+                        evdevScrPoints[ci].x = hor - ly - 1;
+                        evdevScrPoints[ci].y = lx;
+                        break;
+                    default:
+                        evdevScrPoints[ci] = tCScreenObj->scrPoints[ci];
+                        break;
+                }
+            }
+        } else {
+            for(int ci = 0; ci < 3; ci++) evdevScrPoints[ci] = tCScreenObj->scrPoints[ci];
+        }
+        lv_tc_compute_coeff(evdevScrPoints, tCScreenObj->tchPoints, false);
+        lv_tc_screen_ready(screenObj);
         return;
     }
 
@@ -243,29 +280,6 @@ static void lv_tc_screen_set_indicator_pos(lv_obj_t* screenObj, lv_point_t point
     }
 }
 
-static void lv_tc_screen_finish(lv_obj_t *screenObj) {
-    lv_tc_screen_t *tCScreenObj = (lv_tc_screen_t*)screenObj;
-
-    //Update the UI
-    lv_label_set_text_static(tCScreenObj->msgLabelObj, LV_TC_READY_MSG);
-    lv_obj_clear_flag(tCScreenObj->recalibrateBtnObj, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(tCScreenObj->acceptBtnObj, LV_OBJ_FLAG_HIDDEN);
-    
-    lv_obj_align(tCScreenObj->msgLabelObj, LV_ALIGN_CENTER, 0, -50);
-    lv_obj_align_to(tCScreenObj->recalibrateBtnObj, tCScreenObj->msgLabelObj, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
-    lv_obj_set_x(tCScreenObj->recalibrateBtnObj, lv_pct(12));
-    lv_obj_align_to(tCScreenObj->acceptBtnObj, tCScreenObj->msgLabelObj, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
-    lv_obj_set_x(tCScreenObj->acceptBtnObj, lv_pct(53));
-
-
-    //Start the recalibration timeout
-    #if LV_TC_RECALIB_TIMEOUT_S
-        lv_label_set_text_fmt(lv_obj_get_child(tCScreenObj->recalibrateBtnObj, 0), LV_TC_RECALIBRATE_TXT LV_TC_RECALIBRATE_TIMEOUT_FORMAT, (int)LV_TC_RECALIB_TIMEOUT_S);
-
-        tCScreenObj->recalibrateTimer = lv_timer_create(lv_tc_screen_recalibrate_timer, 1000, screenObj);
-        lv_timer_set_repeat_count(tCScreenObj->recalibrateTimer, LV_TC_RECALIB_TIMEOUT_S);
-    #endif
-}
 
 static void lv_tc_screen_ready(lv_obj_t *screenObj) {
     lv_tc_screen_t *tCScreenObj = (lv_tc_screen_t*)screenObj;
