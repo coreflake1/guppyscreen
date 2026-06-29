@@ -194,6 +194,7 @@ void WifiPanel::foreground() {
   spdlog::trace("wifi panel fg");
   lv_obj_move_foreground(cont);
   lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+  rescan_pending = true;
   std::string resp = wpa_event.send_command("SCAN");
   if (resp.empty() || resp.find("FAIL") != std::string::npos) {
     lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
@@ -353,6 +354,10 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
     lv_obj_scroll_to_y(wifi_table, 0, LV_ANIM_OFF);
     lv_obj_clear_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+    if (rescan_pending) {
+      rescan_pending = false;
+      wpa_event.send_command("SCAN");
+    }
   } else if (event.rfind("<3>CTRL-EVENT-CONNECTED", 0) == 0) {
     // The driver resets the WiFi low-latency knobs (PM/mpc/roam_off) to their
     // defaults on every link-up (reconnect or network switch), silently

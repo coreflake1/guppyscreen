@@ -79,6 +79,7 @@ private:
   std::map<std::string, int> wifi_name_db;
   bool entering_password = false;
   bool pw_visible = false;
+  bool rescan_pending = false;
   std::atomic<uint32_t> conn_gen{0};
 
 };
