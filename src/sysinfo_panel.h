@@ -5,6 +5,7 @@
 #include "selector.h"
 #include "lvgl/lvgl.h"
 
+#include <functional>
 #include <vector>
 #include <string>
 
@@ -15,6 +16,9 @@ class SysInfoPanel {
 
   void foreground();
   void handle_callback(lv_event_t *event);
+  void show_reset_options();
+  void show_reset_confirm(const char *title, const char *detail,
+                          const std::function<void()> &cb);
 
   static void _handle_callback(lv_event_t *event) {
     SysInfoPanel *panel = (SysInfoPanel*)event->user_data;
@@ -57,7 +61,7 @@ class SysInfoPanel {
   lv_obj_t *touch_beep_cont;
   lv_obj_t *touch_beep_toggle;
 
-  ButtonContainer factory_reset_btn;
+  ButtonContainer reset_options_btn;
   ButtonContainer back_btn;
 
   static std::vector<std::string> log_levels;

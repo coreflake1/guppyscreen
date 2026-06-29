@@ -110,12 +110,7 @@ SysInfoPanel::SysInfoPanel()
   , touch_beep_cont(lv_obj_create(right_cont))
   , touch_beep_toggle(lv_switch_create(touch_beep_cont))
 
-  , factory_reset_btn(cont, &cancel, "Factory\nReset", &SysInfoPanel::_handle_callback, this, "Reset GuppyScreen to default settings?", [](){
-      Config *conf = Config::get_instance();
-      fs::remove(conf->get_path());
-      spdlog::warn("Factory reset performed. Deleting config and exiting.");
-      exit(0);
-    })
+  , reset_options_btn(cont, &cancel, "Reset\nOptions", &SysInfoPanel::_handle_callback, this)
   , back_btn(cont, &back, "Back", &SysInfoPanel::_handle_callback, this)
 {
   lv_obj_move_background(cont);
@@ -363,31 +358,30 @@ SysInfoPanel::SysInfoPanel()
   lv_obj_add_event_cb(touch_beep_toggle, &SysInfoPanel::_handle_callback,
     LV_EVENT_VALUE_CHANGED, this);
 
-  // Factory Reset lives alone in the top-right corner - kept away from Back and
-  // the settings rows to avoid accidental presses.
-  lv_obj_add_flag(factory_reset_btn.get_container(), LV_OBJ_FLAG_FLOATING);
-  lv_obj_align(factory_reset_btn.get_container(), LV_ALIGN_TOP_RIGHT, 0, 0);
+  // Reset Options lives alone in the top-right corner, away from other controls.
+  lv_obj_add_flag(reset_options_btn.get_container(), LV_OBJ_FLAG_FLOATING);
+  lv_obj_align(reset_options_btn.get_container(), LV_ALIGN_TOP_RIGHT, 0, 0);
 
   lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_FLOATING);
   lv_obj_align(back_btn.get_container(), LV_ALIGN_BOTTOM_RIGHT, 0, 0);
 
-  // The network/version text is left-aligned and the Factory Reset button is
+  // The network/version text is left-aligned and the Reset Options button is
   // narrow and pinned to the right, so they don't overlap. Reserve only the
   // button's width on the right so a very long interface line can't slide under
   // it - full vertical height stays available so the version never clips.
   lv_obj_update_layout(cont);
   lv_obj_set_width(network_label,
     lv_obj_get_width(right_cont)
-      - lv_obj_get_width(factory_reset_btn.get_container()) - 4);
+      - lv_obj_get_width(reset_options_btn.get_container()) - 4);
   lv_label_set_long_mode(network_label, LV_LABEL_LONG_WRAP);
 
   // The Theme/Def-Temp rows now share the right column with the network text.
   // A long network list (e.g. many interfaces) can push these rows down into
   // the Back button's band, so reserve clearance for the WIDER of the two
-  // floating corner buttons (Factory Reset top-right, Back bottom-right) plus a
+  // floating corner buttons (Reset Options top-right, Back bottom-right) plus a
   // comfortable margin, otherwise a right-aligned dropdown tucks under a button.
   lv_coord_t corner_btn_w = std::max(
-      lv_obj_get_width(factory_reset_btn.get_container()),
+      lv_obj_get_width(reset_options_btn.get_container()),
       lv_obj_get_width(back_btn.get_container()));
   lv_coord_t right_row_w = lv_obj_get_width(right_cont) - corner_btn_w - 12;
   lv_obj_set_width(theme_cont, right_row_w);
@@ -421,9 +415,10 @@ void SysInfoPanel::handle_callback(lv_event_t *e)
   if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
     lv_obj_t *btn = lv_event_get_current_target(e);
 
-    if (btn == back_btn.get_container())
-    {
+    if (btn == back_btn.get_container()) {
       lv_obj_move_background(cont);
+    } else if (btn == reset_options_btn.get_container()) {
+      show_reset_options();
     }
   } else if (lv_event_get_code(e) == LV_EVENT_VALUE_CHANGED) {
     lv_obj_t *obj = lv_event_get_target(e);
@@ -503,4 +498,152 @@ void SysInfoPanel::handle_callback(lv_event_t *e)
       }
     }
   }
+}
+
+void SysInfoPanel::show_reset_options() {
+  lv_obj_t *overlay = lv_obj_create(lv_scr_act());
+  lv_obj_set_size(overlay, LV_PCT(100), LV_PCT(100));
+  lv_obj_set_style_bg_color(overlay, lv_color_black(), 0);
+  lv_obj_set_style_bg_opa(overlay, LV_OPA_50, 0);
+  lv_obj_clear_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_border_width(overlay, 0, 0);
+  lv_obj_set_style_pad_all(overlay, 0, 0);
+
+  lv_obj_t *box = lv_obj_create(overlay);
+  KUtils::style_dialog_box(box);
+  lv_obj_set_size(box, LV_PCT(92), LV_SIZE_CONTENT);
+  lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_row(box, 8, 0);
+  lv_obj_set_style_pad_all(box, 10, 0);
+  lv_obj_center(box);
+
+  lv_obj_t *title = lv_label_create(box);
+  KUtils::style_dialog_title(title);
+  lv_label_set_text(title, "Reset Options");
+  lv_obj_set_width(title, LV_PCT(100));
+
+  auto make_opt_btn = [&](const char *lbl_text, const char *desc_text) -> lv_obj_t * {
+    lv_obj_t *btn = lv_btn_create(box);
+    lv_obj_set_size(btn, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(btn, lv_palette_darken(LV_PALETTE_GREY, 2), 0);
+    lv_obj_set_style_pad_all(btn, 8, 0);
+    lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_row(btn, 3, 0);
+
+    lv_obj_t *lbl = lv_label_create(btn);
+    lv_label_set_text(lbl, lbl_text);
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_12, 0);
+    lv_obj_set_width(lbl, LV_PCT(100));
+
+    lv_obj_t *desc = lv_label_create(btn);
+    lv_label_set_text(desc, desc_text);
+    lv_obj_set_style_text_font(desc, &lv_font_montserrat_10, 0);
+    lv_obj_set_width(desc, LV_PCT(100));
+    lv_label_set_long_mode(desc, LV_LABEL_LONG_WRAP);
+
+    return btn;
+  };
+
+  lv_obj_t *btn1 = make_opt_btn(
+    "Reset GuppyScreen settings",
+    "Deletes display config and sensor layout.\nGuppyScreen restarts with defaults."
+  );
+
+  lv_obj_t *btn2 = make_opt_btn(
+    "Factory Reset Printer",
+    "Wipes OpenKE, Klipper config, gcodes and\ncalibration. Reboots to stock Creality firmware."
+  );
+
+  if (!fs::exists("/etc/init.d/S58factoryreset")) {
+    lv_obj_add_flag(btn2, LV_OBJ_FLAG_HIDDEN);
+  }
+
+  lv_obj_t *close_btn = lv_btn_create(box);
+  lv_obj_set_size(close_btn, LV_PCT(50), LV_SIZE_CONTENT);
+  lv_obj_set_style_bg_color(close_btn, lv_palette_darken(LV_PALETTE_GREY, 1), 0);
+  lv_obj_t *close_lbl = lv_label_create(close_btn);
+  lv_label_set_text(close_lbl, "Close");
+  lv_obj_center(close_lbl);
+
+  lv_obj_add_event_cb(close_btn, [](lv_event_t *e) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+      // close_btn -> box -> overlay
+      lv_obj_del_async(lv_obj_get_parent(lv_obj_get_parent(lv_event_get_current_target(e))));
+    }
+  }, LV_EVENT_CLICKED, NULL);
+
+  lv_obj_add_event_cb(btn1, [](lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    ((SysInfoPanel *)e->user_data)->show_reset_confirm(
+      "Reset GuppyScreen settings?",
+      "Deletes guppyconfig.json and restarts.\nKlipper keeps running.\n\nThis cannot be undone.",
+      []() {
+        Config *conf = Config::get_instance();
+        fs::remove(conf->get_path());
+        spdlog::warn("GuppyScreen config reset.");
+        exit(0);
+      }
+    );
+  }, LV_EVENT_CLICKED, this);
+
+  lv_obj_add_event_cb(btn2, [](lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    ((SysInfoPanel *)e->user_data)->show_reset_confirm(
+      "Factory Reset Printer?",
+      "Wipes OpenKE, Klipper config, gcodes\nand calibration. Reboots to stock.\n\nThis cannot be undone.",
+      []() {
+        spdlog::warn("Factory reset printer: executing S58factoryreset reset");
+        system("/etc/init.d/S58factoryreset reset");
+      }
+    );
+  }, LV_EVENT_CLICKED, this);
+}
+
+void SysInfoPanel::show_reset_confirm(const char *title, const char *detail,
+                                       const std::function<void()> &cb) {
+  static const char *btns[] = {"Cancel", "Confirm", ""};
+
+  lv_obj_t *mbox = lv_msgbox_create(NULL, NULL,
+    fmt::format("{}\n\n{}", title, detail).c_str(), btns, false);
+  KUtils::style_dialog_msgbox(mbox);
+
+  lv_obj_t *msg = ((lv_msgbox_t *)mbox)->text;
+  lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_width(msg, LV_PCT(100));
+  lv_obj_center(msg);
+
+  lv_obj_t *btnm = lv_msgbox_get_btns(mbox);
+  lv_btnmatrix_set_btn_ctrl(btnm, 0, LV_BTNMATRIX_CTRL_CHECKED);
+  lv_btnmatrix_set_btn_ctrl(btnm, 1, LV_BTNMATRIX_CTRL_CHECKED);
+  lv_obj_add_flag(btnm, LV_OBJ_FLAG_FLOATING);
+  lv_obj_align(btnm, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+  auto hscale = (double)lv_disp_get_physical_ver_res(NULL) / 480.0;
+  lv_obj_set_size(btnm, LV_PCT(90), 50 * hscale);
+  lv_obj_set_size(mbox, LV_PCT(75), LV_PCT(55));
+
+  lv_obj_add_event_cb(btnm, [](lv_event_t *e) {
+    lv_obj_draw_part_dsc_t *dsc = lv_event_get_draw_part_dsc(e);
+    if (dsc->part == LV_PART_ITEMS && dsc->id == 1) {
+      dsc->rect_dsc->bg_color = lv_color_hex(0xC62828);
+      dsc->rect_dsc->bg_opa   = LV_OPA_COVER;
+      dsc->label_dsc->color   = lv_color_white();
+    }
+  }, LV_EVENT_DRAW_PART_BEGIN, NULL);
+
+  auto *pcb = new std::function<void()>(cb);
+  lv_obj_add_event_cb(mbox, [](lv_event_t *e) {
+    lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(e));
+    auto *pcb = (std::function<void()> *)e->user_data;
+    if (lv_msgbox_get_active_btn(obj) == 1) {
+      (*pcb)();
+    }
+    delete pcb;
+    lv_msgbox_close(obj);
+  }, LV_EVENT_VALUE_CHANGED, pcb);
+
+  lv_obj_center(mbox);
 }
