@@ -266,6 +266,7 @@ void WifiPanel::handle_callback(lv_event_t *e) {
       entering_password = true;
       lv_label_set_text(wifi_label, fmt::format("Enter password for {}", selected_network).c_str());
       lv_obj_clear_flag(password_input, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_add_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
       lv_event_send(password_input, LV_EVENT_FOCUSED, NULL);
     }
 
@@ -402,6 +403,7 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     lv_label_set_text(wifi_label, "Please select your wifi network");
     lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(password_input, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_READY) {
     const char *password = lv_textarea_get_text(password_input);
     if (password == NULL || password[0] == 0) {
@@ -416,6 +418,7 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     lv_label_set_text(wifi_label, fmt::format("Connecting to {} ...", selected_network).c_str());
     lv_obj_clear_state(password_input, LV_STATE_FOCUSED);
     lv_obj_add_flag(password_input, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_CLICKED) {
     lv_obj_t *target = lv_event_get_target(e);
     if (target != kb && target != password_input) {
