@@ -557,6 +557,11 @@ void SysInfoPanel::show_reset_options() {
     "Wipes OpenKE, Klipper config, gcodes and\ncalibration. Reboots to stock Creality firmware."
   );
 
+  lv_obj_t *btn3 = make_opt_btn(
+    "Reset Touch Calibration",
+    "Clears saved calibration coefficients.\nGuppyScreen restarts and asks you to recalibrate."
+  );
+
   lv_obj_t *close_btn = lv_btn_create(box);
   lv_obj_set_size(close_btn, LV_PCT(50), LV_SIZE_CONTENT);
   lv_obj_set_style_bg_color(close_btn, lv_palette_darken(LV_PALETTE_GREY, 1), 0);
@@ -593,6 +598,21 @@ void SysInfoPanel::show_reset_options() {
       []() {
         spdlog::warn("Factory reset printer: executing S58factoryreset reset");
         system("/etc/init.d/S58factoryreset reset");
+      }
+    );
+  }, LV_EVENT_CLICKED, this);
+
+  lv_obj_add_event_cb(btn3, [](lv_event_t *e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    ((SysInfoPanel *)e->user_data)->show_reset_confirm(
+      "Reset Touch Calibration?",
+      "Clears saved calibration. GuppyScreen\nwill restart and ask you to recalibrate.",
+      []() {
+        spdlog::warn("Touch calibration reset requested.");
+        Config *conf = Config::get_instance();
+        conf->set<bool>("/touch_calibrated", false);
+        conf->save();
+        exit(0);
       }
     );
   }, LV_EVENT_CLICKED, this);
