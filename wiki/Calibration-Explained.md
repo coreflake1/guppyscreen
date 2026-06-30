@@ -1,30 +1,80 @@
 # Calibrate your KE — start to finish
 
-This is the full run, in order, from a fresh printer to clean prints. Do it **top to bottom** and stop
-when your prints look the way you want — you don't always need every step. Each one says *what it fixes*,
-*how to run it* (mostly from the screen's **Tune** tab), and *how to know it worked*.
+The full run, in the order that actually matters. Do it **top to bottom** and stop when your prints look
+the way you want — you don't need every step.
 
-> **Golden rule: change one thing, then print a test.** If you tweak five things and the next print is
+> **Golden rule: change one thing, then print a test.** If you tweak five settings and the next print is
 > worse, you won't know which one did it.
-
-> **You won't "reset" anything.** Re-running a calibration just overwrites the old value — there's no
-> separate reset step. (More on that in [After a hardware change](#after-a-hardware-change) at the end.)
 
 ---
 
-## 0. Mechanics first (no software)
+## The order that matters
+
+Calibrate from the **machine outward** — mechanical first, then the first layer, then motion quality,
+then slicer. Doing it out of order means redoing work.
+
+| Step | Fixes |
+|---|---|
+| 0. Touch calibration | Tap targets are off on a fresh install |
+| 1. Mechanics | Loose hardware that no software can fix |
+| 2. Temperature (PID) | Inconsistent extrusion from wobbly heater temps |
+| 3. Axis Twist | First layer uneven left-to-right |
+| 4. Bed mesh + Z-offset | First layer height everywhere |
+| 5. Input shaper | Ghosting/ringing on fast prints |
+| 6. Pressure advance, flow, temp | Corner bulges, stringing, over/under-extrusion |
+| 7. Skew correction | Parts that aren't square |
+| 8. TMC Autotune | Loud or hot motors (optional) |
+
+**"Which one fixes my problem?"**
+
+| What you see | Most likely fix |
+|---|---|
+| Tap targets off / need to press slightly away from what you mean | Step 0 — touch calibration |
+| First layer uneven left↔right, bed mesh didn't help | Step 3 — Axis Twist |
+| First layer uneven all over / patchy adhesion | Step 4 — Bed mesh |
+| First layer too high or too low everywhere | Step 4 — Z-offset |
+| Ghosting/echoes after sharp corners | Step 5 — Input shaper |
+| Bulging corners, blobs, gaps | Step 6 — Pressure advance + flow |
+| Parts not square / parallelogram | Step 7 — Skew correction |
+| Loud or hot motors | Step 8 — TMC Autotune |
+| Layer shift right after pause/resume | See [Troubleshooting](Troubleshooting) |
+
+---
+
+## Step 0 — Touch calibration (do this first on a fresh install)
+
+A fresh install has no touch calibration data, so taps are uncompensated raw coordinates. Run the
+9-tap wizard once and the touchscreen becomes accurate.
+
+**Screen:** Settings → System Info → **Reset Touch Calibration**
+
+The screen shows three crosshairs in turn — tap the centre of each **three times** (lift your finger
+between taps; the screen averages the three for accuracy). Takes about 30 seconds. The calibration is
+saved automatically and survives reboots.
+
+> Redo this any time tap targets feel noticeably off, or if you change `display_rotate` — the
+> calibration coefficients are rotation-specific.
+
+---
+
+## Step 1 — Mechanics first (no software)
 
 Software can't fix loose hardware — it can only paper over it.
 
-- Belts firm (a plucked belt should "thunk," not flap), no slack in the gantry, bed not rocking.
-- Nozzle clean (no plastic blob), bed clean (IPA), V-wheels/rails snug but not binding.
+- **Belts:** firm. A plucked belt should "thunk", not flap. Slack belts cause layer shift and ringing.
+- **Gantry:** square. The X bar should be parallel to the bed, not tilted.
+- **Bed:** not rocking. Gently push each corner — no play.
+- **V-wheels/rails:** snug but not binding. Should spin with light finger pressure.
+- **Nozzle:** clean, no plastic blob.
 
 **Done when:** nothing wobbles when you nudge it. Five minutes here saves hours later.
 
-## 1. Stable temperatures (PID)
+---
 
-Wobbling hotend/bed temperature = inconsistent extrusion. If your temp graph swings more than ~±1 °C at
-target, PID-tune. In the **Klipper console**:
+## Step 2 — Stable temperatures (PID)
+
+Wobbling hotend or bed temperature = inconsistent extrusion. If your temp graph swings more than
+~±1 °C at target, PID-tune. In the **Klipper console** (Mainsail or the Console tab on screen):
 
 ```
 PID_CALIBRATE HEATER=extruder TARGET=230
@@ -32,108 +82,138 @@ PID_CALIBRATE HEATER=heater_bed TARGET=60
 SAVE_CONFIG
 ```
 
-(If you installed the Creality macros, `PID_HOTEND` / `PID_BED` do the same.) **Done when:** the temp
-holds flat at target on the screen's graph.
+If you installed the Creality macros, `PID_HOTEND` / `PID_BED` do the same.
 
-## 2. Bed mesh (even first layer across the whole plate)
+**Done when:** the temperature holds flat at target on the graph (< ±1 °C).
 
-The bed is never perfectly flat. A mesh maps its hills and valleys so Z follows them. From the console:
+---
 
+## Step 3 — Axis Twist Compensation
+
+Skip this if your first layer is consistently even from left to right. Do it if you see the classic
+KE symptom: first layer is fine in the middle but squished on one side and lifting on the other — and
+bed mesh hasn't fixed it.
+
+**Full guide with instructions:** [Axis Twist Compensation](Axis-Twist-Compensation)
+
+In short: **Tune → Axis Twist** on the screen runs a 5-point guided paper test across the X axis. The
+result corrects the probe readings so the bed mesh is accurate. Takes ~15 minutes, done once.
+
+---
+
+## Step 4 — Bed mesh + Z-offset (the big one)
+
+This is 80% of whether prints "look good." Do both.
+
+### 4a. Bed mesh
+
+Maps the bed's hills and valleys so Z follows them everywhere, not just the centre.
+
+From the console:
 ```
 BED_MESH_CALIBRATE
 SAVE_CONFIG
 ```
 
-(Your `G29` macro does this too. If you installed **KAMP**, it meshes just the print area automatically at
-the start of each print — see [Perfect first layer](KAMP-and-Axis-Twist-Compensation).) **Done when:** the
-mesh on the screen (3D or table view) looks like a smooth surface with no wild spikes — typically within a
-few tenths of a millimetre corner to corner.
+Or tap **Tune → Bed Mesh → Re-mesh** on the screen. Takes 2–3 minutes.
 
-## 3. Z-offset / first layer (the big one)
+If you installed KAMP (the installer default), use `ADAPTIVE_BED_MESH_CALIBRATE` in your slicer start
+G-code instead — it re-meshes just the print footprint automatically at the start of each print. See
+[Adaptive Meshing (KAMP)](Adaptive-Meshing-KAMP).
 
-This is most of what makes a print "look good." Set the nozzle-to-bed gap with the screen's **live
-Z-offset baby-stepping** (Tune tab, or tap the Z-offset readout while a first-layer test prints):
+**Done when:** the mesh surface (3D or table view) is smooth with no wild spikes.
 
-1. Start a first-layer test print (a single-layer square or patch).
-2. Nudge Z down/up in **0.01–0.05 mm** steps while watching the line go down.
-3. Aim for lines that are **squished together and fused** — not gappy/round (too high), not translucent
-   or smeared (too low).
+### 4b. Z-offset — the first layer
 
-It saves automatically (with Save Z-Offset installed). **Done when:** the first layer is uniform and the
-lines have no gaps between them.
+Set the nozzle-to-bed gap by watching the first layer go down:
 
-> **Why not let the printer auto-set it?** The KE *can* set Z-offset automatically with its nozzle-load
-> sensor, but it drifts run-to-run and isn't reliable enough for a consistent first layer — here's the
-> data and what to do instead: [Auto Z-offset: the load-sensor caveat](Auto-Z-Offset).
+1. Start a **first-layer test** (a single-layer square, available in many slicer model libraries).
+2. Tap the **Z-offset readout** on the print-status screen (or **Tune → Z Offset**) and nudge in
+   0.01–0.05 mm steps while watching:
+   - **Lines not fusing / gaps:** too high — lower (negative)
+   - **Lines translucent or flat:** too low — raise (positive)
+   - **Squished together and fused, no gaps:** correct
+3. The value saves automatically.
 
-## 4. Axis Twist Compensation (only if the first layer is uneven left↔right)
+> **Why not use the strain-sensor auto Z-offset?** The KE *can* auto-set Z-offset with its nozzle
+> load sensor, but it drifts run-to-run by up to ~0.08 mm (tested: range 83 µm, stddev 32 µm), where a
+> consistent first layer needs stability to ±0.01–0.02 mm. That's a hardware limitation of Creality's
+> sensor choice. The BLTouch you also have is there for exactly this reason — accurate probing. Use the
+> **manual baby-step** instead. It's the reliable path.
+>
+> One extra caveat: the auto routine saves immediately and can overwrite your saved bed mesh with a
+> temporary adaptive one — always check your saved mesh if you ever do run it.
 
-Classic symptom: first layer is perfect in the **middle** but squished on one side and lifting on the
-other, and bed mesh didn't fix it. That's a slightly twisted X gantry tilting the probe. Run the on-screen
-wizard: **Tune → Axis Twist** (a guided 5-point paper test). Full walkthrough:
-[Perfect first layer](KAMP-and-Axis-Twist-Compensation). **Done when:** the first layer is even edge to
-edge, not just in the centre.
+**Done when:** the first layer is uniform with no gaps, and it stays that way print after print.
 
-## 5. Input shaper (kill ringing / ghosting)
+---
 
-Those faint echoes after sharp corners are vibration. Input shaping cancels it so you can print **fast and
-clean**. The KE has an onboard accelerometer, so you measure and apply it from the screen's **Input
-Shaper** tool — it runs the resonance test, shows the graph, and recommends a shaper for each axis.
+## Step 5 — Input shaper (kill ringing/ghosting)
 
-> **Accelerometer placement (bed-slinger):** the sensor must be on **whatever moves** for that axis — the
-> **toolhead** for the **X** test, the **bed** for the **Y** test. You don't need a permanent bracket;
-> taping or zip-tying it on for the ~1-minute test is fine. X and Y are measured independently.
+Those faint echoes trailing sharp corners are vibration. Input shaping cancels them.
 
-**Done when:** a fast ringing-test print shows no echoes trailing the corners.
+**On the screen:** Tune → Input Shaper
 
-## 6. Pressure advance, flow & temperature (slicer side)
+1. Select **X**, tap **Run test** — the printer shakes at a frequency sweep (~1 minute).
+2. The graph shows resonant peaks; the panel recommends a shaper and frequency.
+3. Tap **Apply**.
+4. Repeat for **Y** (move the accelerometer to the **bed** for the Y measurement — the sensor must
+   be on whatever moves for that axis).
 
-The last 10%: corner bulges, blobs, gaps, over/under-extrusion. These are tuned in your **slicer** (flow,
-temperature) and with **pressure advance**. Don't start here — it only pays off once the first layer and
-motion are solid.
+**Done when:** a fast corner-test print shows no echoes. If it does, try a different shaper type.
 
-## 7. Skew correction (only if parts aren't square)
+---
 
-If functional parts come out as slight parallelograms, square them up: **Tune → Skew** — print a
-calibration square, measure three lengths with calipers, type them in. Full guide:
-[Skew Correction](Skew-Correction). **Done when:** a measured test square is square on both diagonals.
+## Step 6 — Pressure advance, flow & temperature (slicer side)
 
-## 8. Quieter motors (optional)
+The last 10%. These fix corner bulges, blobs, gaps, stringing, and over/under-extrusion — but only
+after the first layer and motion quality are solid. Tuning these first wastes time.
 
-**Tune → TMC Autotune** computes better stepper-driver settings from your motor type — quieter, cooler,
-sometimes smoother. It doesn't change dimensions, so it's pure quality-of-life. See
-[TMC Autotune](TMC-Autotune).
+- **Flow:** start with 0.98 (a modest under-extrusion offset that reduces over-fill) and adjust from
+  your first real print.
+- **Pressure advance:** print a PA tower or line, find the cleanest corners, dial it in. The on-screen
+  **Tune → Fine Tune** lets you adjust PA live while printing.
+- **Temperature:** print a temperature tower from your slicer's test model library and pick the layer
+  that looks cleanest.
+
+---
+
+## Step 7 — Skew correction (only if parts aren't square)
+
+If functional parts come out as slight parallelograms, print a calibration square, measure three lengths
+with calipers, and enter them on the screen: **Tune → Skew**. Full guide: [Skew Correction](Skew-Correction).
+
+**Done when:** a measured test square matches the expected dimensions on both diagonals.
+
+---
+
+## Step 8 — TMC Autotune (optional)
+
+Quieter, cooler stepper motors. **Tune → TMC Autotune** — select your motor type, choose Performance or
+Silent, tap Apply. It tunes the stepper drivers and reapplies the settings every boot. Doesn't affect
+print quality or dimensions, just reduces noise and heat.
+
+See [TMC Autotune](TMC-Autotune) for the full guide and how to enable the greyed-out button.
 
 ---
 
 ## After a hardware change
 
-You don't have to redo everything when you change a part — just the calibrations that part affects.
+You don't have to redo everything — just the calibrations that the changed part affects.
 
-**The rule:** redoing a calibration **overwrites** the old value, so there's no "reset first" step. The
-only time *reset* matters is if you changed something you **can't re-measure right now** and the stale
-value would be harmful — then set it back to a safe default instead of trusting it.
-
-**How stale values hurt — two buckets:**
-
-- 🔴 **First-layer / safety** (Z-offset, bed mesh, Axis Twist, skew, PID): a stale value can wreck a print
-  or crash the nozzle. Redo these promptly after a relevant change.
-- 🟡 **Input shaper:** a stale shaper just under-corrects — worst case some ringing returns. It can't
-  damage anything, so it's the lowest-stakes one to leave for later.
-
-**What to redo when you change…**
+**The rule:** re-running a calibration overwrites the old value, no "reset first" step. The only time
+*reset* matters is if you changed something you can't re-measure right now and the stale value would
+be harmful — then set it back to a safe default.
 
 | You changed… | Redo |
 |---|---|
-| Nozzle / hotend | Z-offset (+ PID if you swapped the heater) |
-| Bed surface, springs, or anything affecting bed height/flatness | Z-offset, bed mesh |
-| X gantry / anything that could tilt the X axis | Axis Twist, then re-check the first layer |
-| The *moving* hardware on an axis (belts, carriage, bed rails — changes mass/stiffness) | Input shaper for **that axis only** (the other axis stays valid) |
+| Nozzle / hotend | Z-offset (+ PID if you swapped the heater too) |
+| Bed surface, springs, or anything affecting bed height | Z-offset, bed mesh |
+| X gantry / anything that could tilt the X axis | Axis Twist, then re-check first layer |
+| Moving mass on an axis (belts, carriage, bed rails) | Input shaper for **that axis only** |
 | Frame squareness | Skew |
-| A heater | PID |
+| A heater element | PID |
 
-**Reset commands (rarely needed):** skew → `SET_SKEW CLEAR=1`; active mesh → `BED_MESH_CLEAR`; disable a
-shaper axis → `shaper_freq_x: 0` (or `_y`). For everything else, just recalibrate — it overwrites.
-
-Not sure where your problem comes from? → [Perfect prints — start here](Perfect-Prints) has a
-symptom-to-fix table.
+**Reset commands (rarely needed):** skew → `SET_SKEW CLEAR=1`; active mesh → `BED_MESH_CLEAR`;
+disable a shaper axis → set `shaper_freq_x: 0` (or `_y`) in config. For everything else, just
+recalibrate — it overwrites.

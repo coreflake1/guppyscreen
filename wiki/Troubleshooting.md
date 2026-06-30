@@ -1,39 +1,93 @@
 # Troubleshooting
 
-| Symptom | Cause / fix |
+Quick-reference for the most common problems. If your symptom isn't here, check [Known limitations](#known-limitations) below, or open an issue on GitHub.
+
+---
+
+## Screen & display
+
+| Symptom | Fix |
 |---|---|
-| Klipper shuts down after a restart with `serialqueue … NoneType` / "Unhandled exception during run" | Known KE host-MCU reconnect race — **not** a config problem. Just restart Klipper again; a full **Restart Klipper** (Mainsail → *Restart* → host, or the installer's service restart) is more reliable than a bare `FIRMWARE_RESTART`, and a cold boot always clears it. It can need **more than one** restart. |
 | Screen upside-down or 90° wrong | Set `display_rotate: 2` in `guppyconfig.json` (KE default). `0` = upside-down, `1` = wrong axis. See [Configuration](Configuration). |
-| Touch targets shifted after changing `display_rotate` | Calibration coefficients are rotation-specific. Use **System Info → Reset Touch Calibration** to recompute them. See [Configuration](Configuration#touch-calibration-ke-specific). |
-| Touch feels inverted / wildly off after calibration | The calibration captured bad taps. Reset to raw mode via SSH and re-run: `python3 -c "import json; d=json.load(open('/usr/data/guppyscreen/guppyconfig.json')); d['touch_calibrated']=False; d.pop('touch_calibration_coeff',None); json.dump(d,open('/usr/data/guppyscreen/guppyconfig.json','w'),indent=2)"` then restart. See [Configuration](Configuration#touch-calibration-ke-specific). |
-| Installer prints `tar: can't remove old file ./guppyscreen/debian: Is a directory` | Harmless — tar is trying to replace a directory with a non-directory entry (or vice versa) during extraction. Nothing failed; installation continues normally. |
-| Installer prints `Skipping Save Z-Offset`, `Skipping M600 filament-change support`, or `Skipping Exclude Object` | The installer detected that your `printer.cfg` already defines those sections (e.g. from a previous install or CrealityHelper). It skips adding duplicates. No action needed — your existing config is used as-is. |
-| White screen after wake from sleep | Fixed on `main`; if a stuck framebuffer state remains, a full reboot clears it. |
+| Touch targets shifted after changing `display_rotate` | Calibration coefficients are rotation-specific. Redo: **Settings → System Info → Reset Touch Calibration**. See [Screen reference → Touch calibration](Using-GuppyKE#system-info). |
+| Touch feels inverted / wildly off after calibration | The calibration captured bad taps. Reset to raw mode via SSH then re-run the wizard: `python3 -c "import json; d=json.load(open('/usr/data/guppyscreen/guppyconfig.json')); d['touch_calibrated']=False; d.pop('touch_calibration_coeff',None); json.dump(d,open('/usr/data/guppyscreen/guppyconfig.json','w'),indent=2)"` then restart. |
+| White screen after waking from sleep | Fixed on current builds. If still stuck, a full reboot clears it. |
+| Wrong sensor names / label overlaps value | Your `guppyconfig.json` has stale `monitored_sensors` — usually from an on-screen update that only swapped the binary. Re-run the installer to fix. See [Sensor labels wrong](#sensor-labels-are-wrong--overlap-the-value) below. |
+
+---
+
+## Printing & first layer
+
+| Symptom | Fix |
+|---|---|
+| First layer uneven left↔right, bed mesh didn't help | [Axis Twist Compensation](Axis-Twist-Compensation) — the X gantry is slightly twisted, tilting the probe. |
+| First layer uneven all over | Re-run bed mesh: **Tune → Bed Mesh → Re-mesh**. Make sure the bed is clean (IPA) and nothing is loose. |
+| First layer too high or too low everywhere | Baby-step Z-offset: **Tune → Z Offset** or tap the Z readout while printing. |
+| Layer shift right after pause, then a "bang" sound | The Y park position was set too high and the bed hit the frame on resume. This is **auto-fixed** in the current installer — re-run the installer to get the fix. If you see it on an updated install, check that `y_park` in your `PAUSE` macro is `220` or lower. |
+| Parts not square / parallelogram | [Skew Correction](Skew-Correction). |
+| Ghosting / echoes after sharp corners at speed | [Input shaper](Calibration-Explained#step-5--input-shaper-kill-ringingghosting) — Tune → Input Shaper. |
+| Corner bulges, blobs, or gaps | Pressure advance and/or flow — [Calibration walkthrough](Calibration-Explained#step-6--pressure-advance-flow--temperature-slicer-side). |
+
+---
+
+## Klipper errors
+
+| Symptom | Fix |
+|---|---|
+| Klipper shuts down after a restart with `serialqueue … NoneType` / "Unhandled exception during run" | Known KE host-MCU reconnect race — **not** a config problem. Run `FIRMWARE_RESTART` once more, or a full **Restart Klipper** from Mainsail. A cold reboot always clears it. It can take more than one restart. |
+| Klipper shuts down with `Unable to connect` after installing mods | The same race condition — restart Klipper once more. If it persists, check for duplicate `[include]` lines in `printer.cfg`. |
+| `Skipping Save Z-Offset`, `Skipping M600`, or `Skipping Exclude Object` during install | The installer found those sections already in your `printer.cfg` (from a previous install or the Creality helper script) and skipped adding duplicates. Your existing config is used as-is — no action needed. |
+| `Found arch mips / Terminating` during install | You ran `installer-deb.sh` on the KE. Use `installer.sh` instead. |
+| Installer prints `tar: can't remove old file ./guppyscreen/debian: Is a directory` | Harmless — tar is replacing a directory entry. Installation continues normally. |
+
+---
+
+## WiFi & connectivity
+
+| Symptom | Fix |
+|---|---|
+| Mainsail feels laggy, camera stutters, screen takes a beat to respond | Enable **Low Latency** in Settings → Network. This disables WiFi power-save and Bluetooth (which share the same antenna on the KE). See [Screen reference → Network](Using-GuppyKE#network--wifi). |
+| Mainsail still laggy with Low Latency on | Check for nearby 2.4 GHz congestion (e.g. a neighbour's network or a HP WiFi-Direct device on channel 6). Move your router channel to 1 or 11. |
+| `guppyscreen` keeps restarting after you `kill` it | It's supervised by `supervise-daemon`. Stop it properly: `/etc/init.d/S99guppyscreen stop`. |
+
+---
+
+## Memory / freeze
+
+| Symptom | Fix |
+|---|---|
+| Screen goes dark, SSH stops responding, only a power-cycle recovers | Memory pressure causing eMMC swap-thrash (the KE has 197 MB RAM). Most common cause is the H.264 camera stream add-on (go2rtc + ffmpeg = ~44 MB). If you have it, re-run the installer — v1.2.0+ removes it automatically. If you're on a current install and still seeing this, check `free -m` over SSH while it's healthy and look for anything large consuming memory. |
+
+---
+
+## Simulator & developer issues
+
+| Symptom | Fix |
+|---|---|
 | Simulator crashes on startup with `spdlog_ex: Failed opening file` | The directory in `log_path` doesn't exist — create it. |
-| `Found arch mips / Terminating` during install | You ran `installer-deb.sh` on the KE; use `installer.sh` instead. |
-| Labels wrap / buttons truncated on the small screen | Build with `GUPPY_SMALL_SCREEN=1` (sets the default font to `montserrat_10`). |
-| Build fails on GCC 14+ in `lv_touch_calibration` | Add `-Wno-incompatible-pointer-types` to `CFLAGS` (see [Building from Source](Building-from-Source)). |
-| `guppyscreen` keeps restarting after you `kill` it | It is supervised by `supervise-daemon`; stop it with `/etc/init.d/S99guppyscreen stop`. |
 | Websocket reconnects every ~2 s in the simulator | Expected when no printer/Moonraker is connected. |
-| Wrong sensor names after an update, e.g. a row labelled **Temperature** overlapping its value, or `Heater Bed` instead of `Bed` | Your `guppyconfig.json` has an empty or old `monitored_sensors`, so Guppy falls back to auto-naming each sensor from its raw Klipper id (and the long name overlaps the reading). This happens when you update **through the screen** (which only swaps the binary) instead of re-running the installer. See [Sensor labels are wrong / overlap the value](#sensor-labels-are-wrong--overlap-the-value) below. |
-| aarch64 (`guppyscreen-arm.tar.gz`) won't run on the KE | The KE is MIPS; use the `guppyscreen-smallscreen.tar.gz` (MIPS) asset. |
-| Mainsail/screen laggy or webcam stutters, signal is fine | Turn on **Low Latency** in the WiFi panel (WiFi power-save / idle-sleep / roam-scans off + Bluetooth stopped, since WiFi and BT share one 2.4 GHz radio). Also fix the basics off-device: avoid 2.4 GHz channel congestion and strong nearby emitters (e.g. a printer's Wi-Fi-Direct). See [Using OpenKE](Using-GuppyKE#settings--system). |
+| Labels wrap / buttons truncated in the sim | Build with `GUPPY_SMALL_SCREEN=1` (sets the default font to `montserrat_10`). |
+| Build fails on GCC 14+ in `lv_touch_calibration` | Add `-Wno-incompatible-pointer-types` to `CFLAGS` — see [Building from Source](Building-from-Source). |
+| aarch64 asset (`guppyscreen-arm.tar.gz`) won't run on the KE | The KE is MIPS — use `guppyscreen-smallscreen.tar.gz`. |
+
+---
 
 ## Sensor labels are wrong / overlap the value
 
-If the home screen shows a sensor labelled **Temperature** (overlapping its reading), or `Heater Bed` instead of `Bed`, your `guppyconfig.json` has no usable `monitored_sensors`. Guppy then auto-names every sensor from its raw Klipper object id — those names are long and run into the value.
+If the home screen shows a sensor labelled **Temperature** (overlapping its reading), or `Heater Bed`
+instead of `Bed`, your `guppyconfig.json` has stale `monitored_sensors`. This happens when the printer
+was updated **from the screen** (Settings → Update), which only swaps the binary and leaves the existing
+config untouched. The correct defaults ship with the installer, not the binary.
 
-This is almost always because the printer was updated **from the screen** (Settings → update), which replaces only the `guppyscreen` binary and leaves the existing `guppyconfig.json` untouched. The correct sensor defaults ship *with the installer*, not with the binary.
-
-**Easiest fix — re-run the installer.** It rewrites `guppyconfig.json` to current defaults. SSH into the printer and run the same one-liner from [Installation](Installation):
-
+**Easiest fix — re-run the installer:**
 ```sh
 sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/main/scripts/installer.sh)"
 ```
 
-> ⚠️ The installer overwrites `guppyconfig.json`. If you have customised it (extra sensors, macros, host/port), copy it aside first and merge your changes back afterwards.
+> ⚠️ The installer rewrites `guppyconfig.json`. If you have custom sensors, copy it aside first and
+> merge your changes back.
 
-**Surgical fix — edit the config by hand.** SSH into the printer, open `/usr/data/guppyscreen/guppyconfig.json`, and set `monitored_sensors` for your active printer to:
+**Surgical fix — edit by hand.** Open `/usr/data/guppyscreen/guppyconfig.json` and set `monitored_sensors` to:
 
 ```json
 "monitored_sensors": [
@@ -43,14 +97,21 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 ]
 ```
 
-Then restart Guppy: `/etc/init.d/S99guppyscreen restart`. Match each `id` to a real Klipper object — `display_name` is only the label, so keep it short to avoid overlap.
+Then restart: `/etc/init.d/S99guppyscreen restart`.
+
+---
 
 ## Logs
 
-- On device: `/usr/data/printer_data/logs/guppyscreen.log`
-- Raise verbosity with `log_level` (e.g. `debug`) in the active printer's config block.
+- On device: `/usr/data/printer_data/logs/guppyscreen.log` (rotating, up to 30 MB)
+- Raise verbosity: **Settings → Log Level** → `debug` to capture more detail, then back to `info`
 
-## Recovering after an install you want to undo
+---
 
-Run the uninstaller (see [Installation](Installation) → Uninstall). Anything not auto-restored has a
-copy in `/usr/data/guppyify-backup/`; restore those files manually and reboot.
+## Known limitations
+
+- **"View Job" / "Queue Job" buttons** in the "print already in progress" dialog are unimplemented stubs (Moonraker job-queue — low priority on a single-printer KE).
+- **No automated unit-test suite.** Verification is via the CI build, the simulator, and on-device testing — see [Development and Simulator](Development-and-Simulator).
+- **CI builds only the KE smallscreen target** (`guppyscreen-smallscreen`, MIPS). aarch64 and standard-screen MIPS can be built from source but aren't CI artifacts.
+- **`wget --no-check-certificate`** in the installer/updater — BusyBox wget on the KE has no CA bundle. Be mindful when installing over untrusted networks.
+- **Installer pins a release tag** — `PINNED_RELEASE` in `installer.sh` must be bumped at each release. The installer script itself is always fetched fresh from `main`, so the install command on the [Installation](Installation) page stays current.
