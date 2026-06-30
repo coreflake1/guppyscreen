@@ -11,7 +11,7 @@
       },
       "display_sleep_sec": 600,
       "fans": [],
-      "log_level": "debug",
+      "log_level": "info",
       "monitored_sensors": [
         { "id": "extruder", "display_name": "Extruder", "controllable": true, "color": "red" },
         { "id": "heater_bed", "display_name": "Bed", "controllable": true, "color": "purple" },

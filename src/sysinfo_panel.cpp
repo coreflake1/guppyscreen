@@ -26,7 +26,8 @@ LV_IMG_DECLARE(cancel);
 std::vector<std::string> SysInfoPanel::log_levels = {
   "trace",
   "debug",
-  "info"
+  "info",
+  "warn"
 };
 
 std::vector<std::string> SysInfoPanel::themes = {
