@@ -340,58 +340,77 @@ re-run it.
 
 ## Settings tab
 
-System-level settings for the printer and OpenKE itself.
+The Settings tab is a **grid of icon buttons** — each one opens a separate full-screen panel. Tap a
+button to go into that panel; a **Back** button returns you here.
 
-### Network / WiFi
+| Button | What's inside |
+|---|---|
+| **Restart Klipper** | Immediately sends a Klipper restart (same as clicking Restart in Mainsail). |
+| **Restart Firmware** | Sends `FIRMWARE_RESTART` — resets the MCU connection without rebooting the Pi. Use this after a config change. |
+| **Restart Guppy** | Restarts the OpenKE screen app without rebooting the printer. Useful after a software update. |
+| **Update Guppy** | Downloads and installs the latest OpenKE screen binary. **Note:** this only swaps the binary — if you also need to update Klipper mods or config defaults, re-run the full installer instead. |
+| **WiFi** | Connect to a network, see your IP, toggle Low Latency mode. See below. |
+| **Printers** | Switch between printer profiles (if you have multiple configured in `guppyconfig.json`). |
+| **Spoolman** | Filament spool inventory and usage tracking. See below. |
+| **System** | All other settings — display, log level, toggles, theme, network info. See below. |
+
+---
+
+### WiFi panel
 
 | Setting | What it does |
 |---|---|
-| **WiFi networks list** | Scans and shows available networks. Tap one to connect (prompts for password). |
-| **IP address** | Your printer's current local IP — handy for typing into Mainsail on a new device. |
-| **Low Latency mode** | Disables the WiFi radio's power-save, stops idle sleep, disables background network scans, and turns off Bluetooth. **Why Bluetooth?** The KE's WiFi and Bluetooth share a single 2.4 GHz radio and antenna. Leaving BT on (it's unused here) makes WiFi yield to it periodically, causing latency spikes and stuttering. Low Latency mode eliminates that. **Persists across reboots.** Turn it off to go back to stock (re-enables Bluetooth). |
+| **Network list** | Scans and shows available WiFi networks. Tap one to connect (prompts for password). An eye icon lets you show/hide the password while typing. |
+| **IP address** | Your printer's current local IP — handy for typing into Mainsail on a new device. Shown only once layer-3 is confirmed live (not just associated). |
+| **Low Latency** | Disables the WiFi radio's power-save, stops idle sleep, disables background network scans, and turns off Bluetooth. **Why Bluetooth?** The KE's WiFi and Bluetooth share a single 2.4 GHz radio and antenna — leaving BT on makes WiFi yield to it periodically, causing latency spikes and camera stutters. Low Latency eliminates that. Persists across reboots; turn it off to re-enable Bluetooth. |
 
-> If Mainsail feels laggy, the camera stutters, or you notice the screen taking a beat to respond to
-> commands — turn on **Low Latency** first. It fixes most WiFi-related sluggishness.
+> If Mainsail feels laggy, the camera stutters, or the screen is slow to respond — turn on **Low
+> Latency** first. It fixes most WiFi-related sluggishness.
 
-### System Info
+---
 
-Shows printer vitals — RAM, CPU load, disk usage, firmware version, Klipper version.
+### System panel
 
-Buttons:
+Two columns of settings, plus a **Reset Options** button (top-right corner) and a **Back** button.
 
-| Button | What it does |
+**Left column — behaviour settings:**
+
+| Setting | What it does |
 |---|---|
-| **Reset Touch Calibration** | Runs a fresh 9-tap touch calibration wizard (3 taps per crosshair, averaged for accuracy). Run this once after first install, and any time tap targets feel off or you've changed `display_rotate`. Takes about 30 seconds. |
-| **Reset Options → Factory Reset** | Wipes everything back to stock. See [Resetting & Uninstalling](Resetting-and-Uninstalling). |
-| **Update Guppy** | Downloads and installs the latest OpenKE release. **Note:** this only swaps the screen binary. If you want to also update Klipper mods, KAMP config, etc., re-run the full installer instead. |
+| **Display Sleep** | How long the screen stays on with no touch input before dimming. Options: 1 min, 5 min, 10 min, 30 min, 1 hour. |
+| **Brightness** | Screen backlight level (10% / 25% / 50% / 75% / Max). Hidden on devices without a controllable backlight. |
+| **Log Level** | How verbose the log file is. **info** (default) logs connections and state changes — enough for most diagnosis. **warn** is quieter for day-to-day use. **debug** logs everything but fills the log fast (~14h per 10 MB). **trace** is developer-only. Switch to **debug** before reproducing a bug to capture detail, then switch back. Log file: `/usr/data/printer_data/logs/guppyscreen.log` (up to 30 MB, 3 rotating files). |
+| **Prompt Emergency Stop** | When on: tapping Emergency Stop shows a confirmation dialog. When off: it fires immediately with no confirmation. Default is on — turn off only if you need one-tap emergency stop during a fire. |
+| **Invert Z Direction** | Flips the Z+ and Z− jog buttons in the movement panel. |
+| **Invert Y Direction** | Flips the Y+ and Y− jog buttons. Useful on a bed-slinger if the bed moves the opposite direction from what you expect. |
 
-### Spoolman
+**Right column — info and appearance:**
 
-Filament inventory integration (requires a [Spoolman](https://github.com/Donkie/Spoolman) server on
-your network — completely optional).
+| Setting | What it does |
+|---|---|
+| **Network** | Live read-out of your IP address(es) and GuppyScreen version. For reference — not editable here (network settings are in the WiFi panel). |
+| **Theme Color** | Changes the accent colour of the UI. Takes effect immediately. |
+| **Def. Temp** | Default nozzle temperature used when Load/Unload is triggered without a target already set. Options: 180–300 °C. |
+| **Touch Beep** | Plays a short click sound through the buzzer on every screen tap. Off by default. Requires the buzzer hardware (built-in on the KE). |
+
+**Reset Options button** (top-right corner of System panel):
+
+| Option | What it does |
+|---|---|
+| **Reset Touch Calibration** | Runs the 9-tap calibration wizard (3 taps per crosshair, averaged). Run once after first install, and any time taps feel off or you change `display_rotate`. Takes ~30 seconds. |
+| **Factory Reset Printer** | Wipes everything back to stock — see [Resetting & Uninstalling](Resetting-and-Uninstalling). |
+
+---
+
+### Spoolman panel
+
+Filament inventory integration. Requires a [Spoolman](https://github.com/Donkie/Spoolman) server on
+your network — completely optional. The button is hidden if Spoolman isn't configured.
 
 | Feature | What it does |
 |---|---|
-| **Spool list** | Shows all your spools — name, material, colour, remaining weight and length. |
-| **Set active spool** | Tap a spool + **Set Active** to track usage against it. |
-| **Archive** | Mark an empty spool as archived to keep the list tidy. Archived spools can be shown/hidden with a toggle. |
+| **Spool list** | All your spools — name, material, colour, remaining weight and length. |
+| **Set active spool** | Tap a spool then **Set Active** to track usage against it. |
+| **Archive** | Mark an empty spool as archived to keep the list tidy. Toggle to show/hide archived. |
 | **Auto tracking** | Once a spool is active, filament used by each print is subtracted automatically. No weighing. |
-| **Wrong-filament check** | Before starting a print (or a manual Load), OpenKE shows a **"Use this filament?"** popup showing the active spool. Confirm or cancel. Catches the "oops wrong material" mistake before it ruins a print. |
-
-No Spoolman server = Spoolman panel doesn't appear. Nothing else changes.
-
-### Log Level
-
-Controls how verbose the `guppyscreen.log` file is.
-
-| Level | What gets logged | Use when |
-|---|---|---|
-| **warn** | Only warnings and errors | Normal day-to-day use. Log stays small. |
-| **info** | Warnings + general events (connections, state changes) | **Default for end users.** Good balance — enough to diagnose most issues. |
-| **debug** | Everything including per-frame events | Active debugging. Fills the log fast (~14 hours per 10 MB). |
-| **trace** | Maximum verbosity | Developer use only. |
-
-If you're reporting a bug or sending logs to a maintainer, switch to **debug** to capture more detail,
-reproduce the issue, then switch back to **info**.
-
-The log lives at `/usr/data/printer_data/logs/guppyscreen.log` (up to 30 MB across 3 rotating files).
+| **Wrong-filament check** | Before a print starts (or a manual Load), OpenKE shows a **"Use this filament?"** confirmation of the active spool. Catches the wrong-material mistake before it ruins a print. |
