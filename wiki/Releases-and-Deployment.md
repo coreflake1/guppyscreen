@@ -35,7 +35,7 @@ GUPPYSCREEN_VERSION=0.1.1-ke-gui-fixes GUPPY_THEME=blue \
 
 1. Strips the binary (using `$CROSS_COMPILE`strip).
 2. Copies the binary, `k1/k1_mods`, `k1/scripts`, `themes/`, the installers (`installer.sh`,
-   `installer-deb.sh`), `update.sh`, `reinstall-creality.sh`, and `debian/` into `releases/guppyscreen/`.
+   `installer-deb.sh`), `update.sh`, and `debian/` into `releases/guppyscreen/`.
 3. Writes a `.version` file (`{version, theme, asset_name}`).
 4. Produces `<asset>.tar.gz`.
 

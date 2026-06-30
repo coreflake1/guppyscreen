@@ -72,6 +72,7 @@ class ConsolePanel {
   bool is_favorite(const std::string &cmd) const;
   void send_command(const std::string &cmd);
   void append_output(const std::string &line);
+  void trim_output_lines();
   void push_history(const std::string &cmd);
   void save_favorites();
 

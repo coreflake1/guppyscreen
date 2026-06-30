@@ -6,6 +6,7 @@
 #include "lvgl/lvgl.h"
 #include <mutex>
 
+#include <atomic>
 #include <map>
 #include <set>
 #include <string>
@@ -23,6 +24,8 @@ public:
   void refresh_pm_label();
   void handle_wpa_event(const std::string &events);
   void handle_kb_input(lv_event_t *e);
+  void handle_eye_btn(lv_event_t *e);
+  void wait_for_connectivity(const std::string &iface, const std::string &net, uint32_t gen);
   void connect(const char *);
   bool find_current_network();
 
@@ -46,6 +49,11 @@ public:
     panel->handle_kb_input(e);
   };
 
+  static void _handle_eye_btn(lv_event_t *e) {
+    WifiPanel *panel = (WifiPanel *)e->user_data;
+    panel->handle_eye_btn(e);
+  };
+
 private:
   std::mutex &lv_lock;
   WpaEvent wpa_event;
@@ -56,7 +64,9 @@ private:
   lv_obj_t *wifi_right;
   lv_obj_t *prompt_cont;
   lv_obj_t *wifi_label;
+  lv_obj_t *pw_row;
   lv_obj_t *password_input;
+  lv_obj_t *eye_btn;
   ButtonContainer back_btn;
   lv_obj_t *kb;
   lv_obj_t *pm_cont;
@@ -67,6 +77,11 @@ private:
   std::string cur_network;
   std::map<std::string, std::string> list_networks;
   std::map<std::string, int> wifi_name_db;
+  bool entering_password = false;
+  bool pw_visible = false;
+  int rescan_budget = 0;
+  size_t last_scan_count = 0;
+  std::atomic<uint32_t> conn_gen{0};
 
 };
 

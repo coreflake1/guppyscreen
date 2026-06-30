@@ -297,11 +297,9 @@ namespace KUtils {
     return result;
   }
 
-  std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j, double scale) {
+  std::pair<std::string, std::pair<size_t, size_t>> get_thumbnail(const std::string &gcode_file, json &j) {
     auto &thumbs = j["/result/thumbnails"_json_pointer];
     if (!thumbs.is_null() && !thumbs.empty()) {
-      auto scaled_width = scale * 300;
-      spdlog::debug("using thumb at scaled width {}", scaled_width);
       uint32_t closest_index = 0;
 
       auto width = thumbs.at(0)["width"].is_number()
@@ -312,12 +310,11 @@ namespace KUtils {
         ? thumbs.at(0)["height"].template get<int>()
         : std::stoi(thumbs.at(0)["height"].template get<std::string>());
 
-      // Seed with index-0 dimensions so they're always valid even if no closer entry is found
       size_t thumb_width = width;
       size_t thumb_height = height;
+      int largest = width;
 
-      int closest = std::abs(scaled_width - width);
-      for (int i = 0; i < thumbs.size(); i++) {
+      for (int i = 1; i < thumbs.size(); i++) {
         width = thumbs.at(i)["width"].is_number()
           ? thumbs.at(i)["width"].template get<int>()
           : std::stoi(thumbs.at(i)["width"].template get<std::string>());
@@ -325,9 +322,8 @@ namespace KUtils {
           ? thumbs.at(i)["height"].template get<int>()
           : std::stoi(thumbs.at(i)["height"].template get<std::string>());
 
-        int cur_diff = std::abs(scaled_width - width);
-        if (cur_diff < closest) {
-          closest = cur_diff;
+        if (width > largest) {
+          largest = width;
           closest_index = i;
           thumb_width = width;
           thumb_height = height;
@@ -368,7 +364,6 @@ namespace KUtils {
     return std::make_pair("", std::make_pair(0, 0));
   }
 
-
   std::string download_file(const std::string &root,
     const std::string &fname,
     const std::string &dest) {
@@ -401,7 +396,10 @@ namespace KUtils {
     getifaddrs(&addrs);
     for (struct ifaddrs *addr = addrs; addr != nullptr; addr = addr->ifa_next) {
       if (addr->ifa_addr && addr->ifa_addr->sa_family == AF_PACKET) {
-        ifaces.push_back(addr->ifa_name);
+        const std::string iface = addr->ifa_name;
+        if (!iface.empty() && (iface[0] == 'w' || iface[0] == 'e')) {
+          ifaces.push_back(iface);
+        }
       }
     }
 
@@ -434,6 +432,44 @@ namespace KUtils {
     }
 
     return "";
+  }
+
+  // Returns the default-route gateway IP for `iface`, or "" if none.
+  // /proc/net/route stores addresses as hex in host byte order.
+  std::string gateway_ip(const std::string &iface) {
+    std::ifstream f("/proc/net/route");
+    std::string line;
+    std::getline(f, line); // skip header
+    while (std::getline(f, line)) {
+      std::istringstream iss(line);
+      std::string dev, dest, gw;
+      iss >> dev >> dest >> gw;
+      if (dev != iface || dest != "00000000") continue;
+      uint32_t gw_val = 0;
+      sscanf(gw.c_str(), "%x", &gw_val);
+      if (gw_val == 0) continue;
+      struct in_addr addr;
+      addr.s_addr = htonl(gw_val);
+      return inet_ntoa(addr);
+    }
+    return "";
+  }
+
+  // Returns true once the gateway has a completed ARP entry in /proc/net/arp.
+  bool gateway_in_arp(const std::string &gw_ip) {
+    std::ifstream f("/proc/net/arp");
+    std::string line;
+    std::getline(f, line); // skip header
+    while (std::getline(f, line)) {
+      std::istringstream iss(line);
+      std::string ip, hw_type, flags;
+      iss >> ip >> hw_type >> flags;
+      if (ip != gw_ip) continue;
+      int flag_val = 0;
+      sscanf(flags.c_str(), "%x", &flag_val);
+      return (flag_val & 0x2) != 0; // ATF_COM: entry is complete
+    }
+    return false;
   }
 
   template <typename Out>

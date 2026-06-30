@@ -31,6 +31,7 @@ class Numpad {
   lv_obj_t *input;
   lv_obj_t *kb;
   std::function<void(double)> ready_cb;
+  bool field_changed_this_press = false; // set by textarea VALUE_CHANGED; cleared per keyboard press
 };
 
 #endif // __NUMPAD_H__

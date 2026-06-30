@@ -33,6 +33,8 @@ typedef struct {
     lv_point_t scrPoints[3];        /* The points to be pressed (in the coordinate space of the screen) */
     lv_point_t tchPoints[3];        /* The touched points during the current calibration (in the coordinate space of the touch driver) */
     uint8_t currentStep;            /* The current calibration step */
+    uint8_t tapCount;               /* Sub-taps collected for the current crosshair (0..LV_TC_TAPS_PER_POINT-1) */
+    lv_point_t tapAccum;            /* Running sum of sub-taps for the current crosshair */
     lv_timer_t *startDelayTimer;    /* The timer for delaying user input after opening the screen */
     lv_timer_t *recalibrateTimer;   /* The timer for automatic recalibration */
 } lv_tc_screen_t;

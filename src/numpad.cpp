@@ -35,6 +35,22 @@ Numpad::Numpad(lv_obj_t *parent)
   lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_USER_1);
   lv_keyboard_set_textarea(kb, input);
 
+  // lv_textarea_del_char() returns immediately (no VALUE_CHANGED) when cur_pos==0.
+  // So if the keyboard fires VALUE_CHANGED for backspace but the textarea did NOT
+  // fire its own VALUE_CHANGED, del_char was a no-op → field was already empty → dismiss.
+  lv_obj_add_event_cb(kb, [](lv_event_t *e) {
+    Numpad *np = (Numpad*)e->user_data;
+    bool changed = np->field_changed_this_press;
+    np->field_changed_this_press = false;
+    if (lv_btnmatrix_get_selected_btn(lv_event_get_target(e)) == 9
+        && !changed
+        && lv_textarea_get_text(np->input)[0] == '\0') {
+      lv_obj_add_flag(np->edit_cont, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_move_background(np->edit_cont);
+      lv_textarea_set_text(np->input, "");
+    }
+  }, LV_EVENT_VALUE_CHANGED, this);
+
   lv_obj_add_event_cb(input, &Numpad::_handle_input, LV_EVENT_ALL, this);
   // lv_obj_add_event_cb(edit_cont, &Numpad::_handle_defocused, LV_EVENT_DEFOCUSED, this);
 }
@@ -71,7 +87,7 @@ void Numpad::handle_input(lv_event_t *e) {
   // }
 
   if (code == LV_EVENT_VALUE_CHANGED) {
-    // input validation, e.g. range
+    field_changed_this_press = true;
   }
 
   if (code == LV_EVENT_CANCEL) {
@@ -105,7 +121,7 @@ void Numpad::handle_input(lv_event_t *e) {
 
 void Numpad::foreground_reset(int initial) {
   spdlog::trace("resetting foreground with initial {}", initial);
-  if (initial >= 0) {
+  if (initial > 0) {
     lv_textarea_set_text(input, fmt::format("{}", initial).c_str());
     /* Place the cursor at the end so the next digit appends; selecting all
      * would let a fresh number replace the value but feels surprising. */
@@ -113,6 +129,7 @@ void Numpad::foreground_reset(int initial) {
   } else {
     lv_textarea_set_text(input, "");
   }
+  field_changed_this_press = false;  // lv_textarea_set_text fires VALUE_CHANGED; clear it so it doesn't bleed into the first key press
   lv_obj_clear_flag(edit_cont, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_foreground(edit_cont);
 }

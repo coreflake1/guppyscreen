@@ -89,8 +89,7 @@ void FilePanel::refresh_view(json &j, const std::string &gcode_path) {
     KUtils::bytes_to_mb(j["result"]["size"].template get<size_t>()),
     time_stream.str());
 
-  auto width_scale = (double)lv_disp_get_physical_hor_res(NULL) / 800.0;
-  auto thumb_result = KUtils::get_thumbnail(gcode_path, j, width_scale);
+  auto thumb_result = KUtils::get_thumbnail(gcode_path, j);
   std::string fullpath = thumb_result.first;
   size_t raw_thumb_w = thumb_result.second.first;
   size_t raw_thumb_h = thumb_result.second.second;
@@ -129,6 +128,14 @@ void FilePanel::show_loading(const std::string &gcode_path) {
   // Keep the previous thumbnail visible while metadata loads — refresh_view will
   // replace it once the RPC completes, avoiding a blank flash between files.
 }
+
+void FilePanel::show_no_metadata() {
+  // fname_label already set by show_loading — only update the detail.
+  // Hide the thumbnail so we don't show a stale image from a previous file.
+  lv_obj_set_style_opa(thumbnail, LV_OPA_TRANSP, 0);
+  lv_label_set_text(detail_label, "No metadata available");
+}
+
 
 lv_obj_t *FilePanel::get_container() {
   return file_cont;

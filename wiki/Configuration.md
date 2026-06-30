@@ -45,12 +45,55 @@ The KE screen is physically mounted upside-down. The kernel display driver rotat
 - `display_rotate: 1` → 90° off (wrong axis)
 - `display_rotate: 2` → **correct** (KE default)
 
-> **Changed `display_rotate`? Reset touch calibration.** The calibration coefficients are stored for a
-> specific rotation. If you change `display_rotate`, the saved calibration will be wrong and taps will
-> register in the wrong place. To force a fresh calibration: open
-> `/usr/data/guppyscreen/guppyconfig.json`, remove the `touch_calibration_coeff` key, set
-> `touch_calibrated` to `false`, then restart GuppyScreen — it will run the calibration sequence
-> automatically on startup.
+> **Changed `display_rotate`? Re-run touch calibration.** Coefficients are rotation-specific — a
+> saved calibration for ROT_180 will be wrong under ROT_270. Use **System Info → Reset Touch
+> Calibration** on the printer to recompute them for the new orientation.
+
+### Touch calibration (KE-specific)
+
+The resistive panel benefits from a one-time 3-point calibration that corrects ADC imperfections.
+Without it touch works (raw mode) but tap targets can be off by 10–20 px near the edges. After
+calibration the residual error drops to a few pixels.
+
+**Running calibration:** go to **System Info → Reset Touch Calibration**. Three crosshairs appear
+one at a time — tap each crosshair three times (lift your finger between taps; the label shows
+"Lift and tap again (2/3)" to guide you). The three taps are averaged to reduce finger-tap noise,
+giving ~2× better accuracy than a single tap. Calibration saves automatically and GuppyScreen
+restarts with the result applied. The whole process takes about 30 seconds.
+
+**Config keys:**
+
+| Key | Value | Effect |
+|---|---|---|
+| `touch_calibrated` | `false` or absent | Raw mode — no transform applied |
+| `touch_calibrated` | `true`, `touch_calibration_coeff` present | Calibration active — coefficients loaded at startup |
+| `touch_calibrated` | `true`, `touch_calibration_coeff` absent | Calibration screen shown on next startup |
+
+**Resetting to raw mode via SSH** (if calibration feels wrong and you can't reach the button):
+
+```sh
+python3 -c "
+import json
+with open('/usr/data/guppyscreen/guppyconfig.json') as f: d = json.load(f)
+d['touch_calibrated'] = False
+d.pop('touch_calibration_coeff', None)
+with open('/usr/data/guppyscreen/guppyconfig.json', 'w') as f: json.dump(d, f, indent=2)
+"
+/etc/init.d/S99guppyscreen restart
+```
+
+**Triggering the calibration screen via SSH** (if you prefer not to use the in-app button):
+
+```sh
+python3 -c "
+import json
+with open('/usr/data/guppyscreen/guppyconfig.json') as f: d = json.load(f)
+d['touch_calibrated'] = True
+d.pop('touch_calibration_coeff', None)
+with open('/usr/data/guppyscreen/guppyconfig.json', 'w') as f: json.dump(d, f, indent=2)
+"
+/etc/init.d/S99guppyscreen restart
+```
 
 ## Build-time options (environment variables)
 

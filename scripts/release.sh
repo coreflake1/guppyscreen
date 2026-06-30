@@ -25,7 +25,6 @@ cp ./scripts/update.sh $RELEASES_DIR
 if [ -f ./custom_upgrade.sh ]; then
     cp ./custom_upgrade.sh $RELEASES_DIR
 fi
-cp scripts/reinstall-creality.sh $RELEASES_DIR
 cp -r ./debian $RELEASES_DIR
 
 

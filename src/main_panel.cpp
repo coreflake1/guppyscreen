@@ -483,8 +483,8 @@ void MainPanel::sim_setup_mock_data() {
     ps["params"][0]["output_pin MainBoardFan"]["value"] = 0.4;
     ps["params"][0]["heater_fan nozzle_fan"]["speed"] = 1.0;
     auto &set = ps["params"][0]["configfile"]["settings"];
-    set["output_pin mainboardfan"]["pwm"] = true;   // -> percentage
     set["output_pin fan0"]["pwm"] = true;
+    // MainBoardFan has no pwm key on KE (digital-only pin) -> shows On/Off
     State::get_instance()->set_data("printer_state", ps, "/params/0");
 
     json editable;

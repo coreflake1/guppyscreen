@@ -1,5 +1,10 @@
 # Tuning & Saving Camera Image Settings
 
+> **Note on the H.264 stream:** hardware H.264 streaming via go2rtc was removed in v1.2.0 due to memory
+> pressure on the KE's 197 MB RAM. If you had it installed and recently upgraded, re-run the installer
+> once to remove go2rtc and free ~44 MB. The stock MJPEG camera and these image-tuning settings are
+> completely unaffected.
+
 If your camera's live image looks **flat, washed-out, or dull** compared to the promo shots, you can
 improve it a lot by adjusting the camera's **image controls** (contrast, saturation, brightness…). The
 catch: those settings are **forgotten every time the camera re-initialises** (a reboot, a replug, or the

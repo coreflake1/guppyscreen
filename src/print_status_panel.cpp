@@ -41,12 +41,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   , objects_btn(buttons_cont, &delete_img, "Objects", &PrintStatusPanel::_handle_callback, this)
   , pause_btn(buttons_cont, &pause_img, "Pause", &PrintStatusPanel::_handle_callback, this)
   , resume_btn(buttons_cont, &resume, "Resume", &PrintStatusPanel::_handle_callback, this)
-  , cancel_btn(buttons_cont, &cancel, "Cancel", &PrintStatusPanel::_handle_callback, this,
-	       "Do you want to cancel the print?",
-	       [&websocket_client]() {
-		 spdlog::debug("cancel print prompt");
-		 websocket_client.send_jsonrpc("printer.print.cancel");
-	       })
+  , cancel_btn(buttons_cont, &cancel, "Cancel", &PrintStatusPanel::_handle_callback, this)
   , emergency_btn(buttons_cont, &emergency, "Stop", &PrintStatusPanel::_handle_callback, this,
 		  "Do you want to emergency stop?",
 		  [&websocket_client]() {
@@ -138,8 +133,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
 
   lv_obj_set_style_pad_all(pbar_cont, 0, 0);
   lv_obj_set_size(pbar_cont, LV_PCT(100), LV_SIZE_CONTENT);
-  // lv_obj_set_style_border_width(pbar_cont, 2, 0);
-  // lv_obj_set_style_border_width(thumbnail_cont, 2, 0);
+  lv_obj_clear_flag(pbar_cont, LV_OBJ_FLAG_SCROLLABLE);
 
   auto hscale = (double)lv_disp_get_physical_ver_res(NULL) / 480.0;
 
@@ -153,6 +147,7 @@ PrintStatusPanel::PrintStatusPanel(KWebSocketClient &websocket_client,
   lv_obj_set_flex_align(thumbnail_cont, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_size(thumbnail_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
   lv_obj_set_style_pad_all(thumbnail_cont, 0, 0);
+  lv_obj_clear_flag(thumbnail_cont, LV_OBJ_FLAG_SCROLLABLE);
 
   // Filename label: between thumbnail and progress bar. lv_label_create defaults
   // to no width, so set a percent width + DOT long-mode so a 60-char gcode name
@@ -409,8 +404,7 @@ void PrintStatusPanel::handle_metadata(const std::string &gcode_file, json &j) {
 
   current_file = j["/result"_json_pointer];
 
-  auto width_scale = (double)lv_disp_get_physical_hor_res(NULL) / 800.0;
-  auto thumb_detail = KUtils::get_thumbnail(gcode_file, j, width_scale);
+  auto thumb_detail = KUtils::get_thumbnail(gcode_file, j);
   std::string fullpath = thumb_detail.first;
   if (fullpath.length() > 0) {
     spdlog::trace("thumb path: {}", fullpath);
@@ -669,7 +663,58 @@ void PrintStatusPanel::handle_callback(lv_event_t *event) {
     ws.send_jsonrpc("printer.print.resume");
     resume_btn.disable();
   } else if (btn == cancel_btn.get_container()) {
-    ws.send_jsonrpc("printer.print.cancel");
+    auto s = State::get_instance();
+    auto etarget_j = s->get_data("/printer_state/extruder/target"_json_pointer);
+    auto etemp_j   = s->get_data("/printer_state/extruder/temperature"_json_pointer);
+    auto btarget_j = s->get_data("/printer_state/heater_bed/target"_json_pointer);
+    auto btemp_j   = s->get_data("/printer_state/heater_bed/temperature"_json_pointer);
+    auto pdur_j    = s->get_data("/printer_state/print_stats/print_duration"_json_pointer);
+    double etarget = etarget_j.is_number() ? etarget_j.template get<double>() : 0.0;
+    double etemp   = etemp_j.is_number()   ? etemp_j.template get<double>()   : 0.0;
+    double btarget = btarget_j.is_number() ? btarget_j.template get<double>() : 0.0;
+    double btemp   = btemp_j.is_number()   ? btemp_j.template get<double>()   : 0.0;
+    double pdur    = pdur_j.is_number()    ? pdur_j.template get<double>()    : 1.0;
+    bool e_heating  = etarget > 0 && etemp < etarget - 2.0;
+    bool b_heating  = btarget > 0 && btemp < btarget - 2.0;
+    bool in_startup = pdur < 0.1;
+
+    std::string delay;
+    if (e_heating && b_heating)
+      delay = fmt::format("\n\nExtruder {:.0f}/{:.0f}°C + Bed {:.0f}/{:.0f}°C\n"
+                          "Cancel is queued and will run when heating finishes.", etemp, etarget, btemp, btarget);
+    else if (e_heating)
+      delay = fmt::format("\n\nExtruder heating: {:.0f}/{:.0f}°C\n"
+                          "Cancel is queued and will run when heating finishes.", etemp, etarget);
+    else if (b_heating)
+      delay = fmt::format("\n\nBed heating: {:.0f}/{:.0f}°C\n"
+                          "Cancel is queued and will run when heating finishes.", btemp, btarget);
+    else if (in_startup)
+      delay = "\n\nStartup in progress — cancel is queued\n"
+              "and will run when startup finishes.";
+
+    static const char *cancel_dlg_btns[] = {"Cancel Print", "Back", ""};
+    std::string cancel_msg = fmt::format("Cancel the print?{}", delay);
+    lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, cancel_msg.c_str(), cancel_dlg_btns, false);
+    lv_obj_add_event_cb(mbox, [](lv_event_t *ev) {
+      lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(ev));
+      auto *self = static_cast<PrintStatusPanel *>(lv_event_get_user_data(ev));
+      if (lv_msgbox_get_active_btn(obj) == 0) {
+        spdlog::debug("cancel print confirmed");
+        self->ws.send_jsonrpc("printer.print.cancel");
+      }
+      lv_msgbox_close(obj);
+    }, LV_EVENT_VALUE_CHANGED, this);
+    KUtils::style_lock_mbox(mbox, 90);
+    lv_obj_align(((lv_msgbox_t *)mbox)->text, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_t *btnm = lv_msgbox_get_btns(mbox);
+    lv_obj_add_event_cb(btnm, [](lv_event_t *e) {
+      lv_obj_draw_part_dsc_t *dsc = lv_event_get_draw_part_dsc(e);
+      if (dsc->part == LV_PART_ITEMS && dsc->id == 0) {
+        dsc->rect_dsc->bg_color = lv_color_hex(0xC62828);
+        dsc->rect_dsc->bg_opa   = LV_OPA_COVER;
+        dsc->label_dsc->color   = lv_color_white();
+      }
+    }, LV_EVENT_DRAW_PART_BEGIN, NULL);
   } else if (btn == finetune_btn.get_container()) {
     finetune_panel.foreground();
   } else if (btn == objects_btn.get_container()) {

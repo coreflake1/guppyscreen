@@ -205,7 +205,11 @@ void PrintPanel::populate_files(json &j) {
 
 void PrintPanel::consume(json &j) {
   if (j["method"] == "notify_filelist_changed") {
-    subscribe();
+    if (refreshing_files) {
+      refresh_pending = true;
+    } else {
+      subscribe();
+    }
     return;
   }
   json &pstat_state = j["/params/0/print_stats/state"_json_pointer];
@@ -223,6 +227,8 @@ void PrintPanel::consume(json &j) {
 }
 
 void PrintPanel::subscribe() {
+  refreshing_files = true;
+  refresh_pending = false;
   ws.send_jsonrpc("server.files.list", R"({"root":"gcodes"})"_json, [this](json &d) {
     std::lock_guard<std::mutex> lock(lv_lock);
     std::string cur_path = cur_dir->full_path;
@@ -239,6 +245,11 @@ void PrintPanel::subscribe() {
     // need to simply this using the directory endpoint
     cur_dir = dir;
     this->populate_files(d);
+    refreshing_files = false;
+    if (refresh_pending) {
+      refresh_pending = false;
+      subscribe();
+    }
     });
 }
 
@@ -370,8 +381,23 @@ void PrintPanel::show_file_detail(Tree *f) {
           cur_file->set_metadata(d);
           file_panel.refresh_view(cur_file->metadata, cur_file->full_path);
         } else {
-          spdlog::warn("metadata fetch failed for {}", path);
-          file_panel.show_loading("(metadata unavailable)");
+          // File not in Moonraker's metadata DB (normal for USB files).
+          // metascan forces a parse + thumbnail extraction and returns
+          // the same data shape as metadata — pipe it straight through.
+          spdlog::info("metadata not cached for {}, requesting metascan", path);
+          ws.send_jsonrpc("server.files.metascan",
+            json{{"filename", path}},
+            [path, this](json &d2) {
+              std::lock_guard<std::mutex> lock(lv_lock);
+              if (cur_file == nullptr || cur_file->full_path != path) return;
+              if (d2.contains("result")) {
+                cur_file->set_metadata(d2);
+                file_panel.refresh_view(cur_file->metadata, cur_file->full_path);
+              } else {
+                spdlog::warn("metascan failed for {}", path);
+                file_panel.show_no_metadata();
+              }
+            });
         }
       });
   }

@@ -23,21 +23,21 @@ OpenKE is three things in one project:
 ## New here? Do this
 
 1. **[Install OpenKE](Installation)** — one command over SSH, keeps your config (and backs it up).
-2. **[Take the screen tour](Using-GuppyKE)** — see what every panel does.
-3. **[Read "Perfect prints — start here"](Perfect-Prints)** — the short path from "it prints" to "it
+2. **[Take the screen tour](Using-GuppyKE)** — every panel, every setting, explained for newcomers.
+3. **[Calibrate your printer](Calibration-Explained)** — the short path from "it prints" to "it
    prints *well*."
 
 ## Want better prints specifically?
 
-Start with **[Perfect prints — start here](Perfect-Prints)**, then dig into whichever of these matches
+Start with **[Calibration walkthrough (A→Z)](Calibration-Explained)**, then dig into whichever matches
 your problem:
 
 - **First layer squished on one side, lifting on the other?** →
-  [Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation)
+  [Axis Twist Compensation](Axis-Twist-Compensation)
+- **Want smarter bed meshing + auto purge line?** → [Adaptive Meshing (KAMP)](Adaptive-Meshing-KAMP)
 - **Parts come out as parallelograms / not square?** → [Skew Correction](Skew-Correction)
 - **Motors loud or hot?** → [TMC Autotune](TMC-Autotune)
-- **Want the full calibration walkthrough (A→Z)?** → [Calibrate step by step](Calibration-Explained)
-- **Layer shift right after a pause/resume?** → [Fix layer shift after pause](Pause-Park-Layer-Shift-Fix)
+- **Layer shift right after a pause/resume?** → [Troubleshooting](Troubleshooting)
 
 ## What's actually in it
 

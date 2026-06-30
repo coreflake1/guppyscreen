@@ -9,6 +9,22 @@
 
 LV_IMG_DECLARE(back);
 
+static bool point_in_polygon(lv_coord_t x, lv_coord_t y, const std::vector<lv_point_t> &poly) {
+  if (poly.size() < 3) return false;
+  bool inside = false;
+  size_t j = poly.size() - 1;
+  for (size_t i = 0; i < poly.size(); j = i++) {
+    const lv_point_t &pi = poly[i];
+    const lv_point_t &pj = poly[j];
+    if ((pi.y > y) != (pj.y > y)) {
+      double xi = static_cast<double>(pj.x - pi.x) * static_cast<double>(y - pi.y)
+                  / static_cast<double>(pj.y - pi.y) + static_cast<double>(pi.x);
+      if (static_cast<double>(x) < xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+
 // Square canvas for the bed map; the bed is square on the KE (220x220) so a
 // square keeps the aspect ratio without letterboxing.
 static const lv_coord_t CANVAS_DIM = 250;
@@ -203,15 +219,7 @@ void ExcludeObjectPanel::redraw() {
       x0 = std::min(x0, p.x); y0 = std::min(y0, p.y);
       x1 = std::max(x1, p.x); y1 = std::max(y1, p.y);
     }
-    obj_boxes.push_back({name, x0, y0, x1, y1, excl});
-
-    lv_draw_rect_dsc_t fill;
-    lv_draw_rect_dsc_init(&fill);
-    fill.bg_color = color;
-    fill.bg_opa = excl ? LV_OPA_20 : LV_OPA_40;
-    fill.radius = 2;
-    lv_canvas_draw_rect(canvas, x0, y0, std::max<lv_coord_t>(x1 - x0, 1),
-                        std::max<lv_coord_t>(y1 - y0, 1), &fill);
+    obj_boxes.push_back({name, x0, y0, x1, y1, excl, pts});
 
     // Polygon outline.
     lv_draw_line_dsc_t line;
@@ -224,10 +232,16 @@ void ExcludeObjectPanel::redraw() {
       lv_canvas_draw_line(canvas, seg, 2, &line);
     }
 
-    // Cross out excluded objects.
+    // Cross out excluded objects: centred × whose arm length = half the
+    // shorter bbox dimension, so it always fits inside the polygon outline.
     if (excl) {
-      lv_point_t d1[2] = {{x0, y0}, {x1, y1}};
-      lv_point_t d2[2] = {{x0, y1}, {x1, y0}};
+      lv_coord_t cx = (x0 + x1) / 2;
+      lv_coord_t cy = (y0 + y1) / 2;
+      lv_coord_t arm = std::max<lv_coord_t>(std::min((x1 - x0), (y1 - y0)) / 2, 4);
+      lv_point_t d1[2] = {{(lv_coord_t)(cx - arm), (lv_coord_t)(cy - arm)},
+                           {(lv_coord_t)(cx + arm), (lv_coord_t)(cy + arm)}};
+      lv_point_t d2[2] = {{(lv_coord_t)(cx - arm), (lv_coord_t)(cy + arm)},
+                           {(lv_coord_t)(cx + arm), (lv_coord_t)(cy - arm)}};
       lv_canvas_draw_line(canvas, d1, 2, &line);
       lv_canvas_draw_line(canvas, d2, 2, &line);
     }
@@ -248,6 +262,7 @@ void ExcludeObjectPanel::redraw() {
                 "#b71c1c Excluded#\n\n"
                 "{} object(s), {} excluded",
                 (int)objects.size(), n_excluded).c_str());
+
 }
 
 void ExcludeObjectPanel::handle_canvas_click(lv_event_t *e) {
@@ -274,7 +289,7 @@ void ExcludeObjectPanel::handle_canvas_click(lv_event_t *e) {
   long best_area = 0;
   for (auto &b : obj_boxes) {
     if (b.excluded) continue;
-    if (cx >= b.x0 && cx <= b.x1 && cy >= b.y0 && cy <= b.y1) {
+    if (point_in_polygon(cx, cy, b.polygon)) {
       long area = (long)(b.x1 - b.x0) * (b.y1 - b.y0);
       if (hit == nullptr || area < best_area) { hit = &b; best_area = area; }
     }
@@ -286,38 +301,116 @@ void ExcludeObjectPanel::handle_canvas_click(lv_event_t *e) {
 
 void ExcludeObjectPanel::confirm_exclude(const std::string &name) {
   pending_name = name;
-  // Object names come from the slicer's labels (often the part/STL name) and can
-  // be long - ellipsize so the prompt stays one line and never overruns the card
-  // or the button row. The full name still goes to EXCLUDE_OBJECT.
+
+  // Count non-excluded objects other than this one to detect the last-object case.
+  auto s = State::get_instance();
+  auto objects  = s->get_data("/printer_state/exclude_object/objects"_json_pointer);
+  auto excluded = s->get_data("/printer_state/exclude_object/excluded_objects"_json_pointer);
+
+  auto is_excl = [&excluded](const std::string &n) {
+    if (!excluded.is_array()) return false;
+    for (auto &e : excluded) {
+      if (e.is_string() && e.template get<std::string>() == n) return true;
+      if (e.is_object() && e.contains("name") && e["name"] == n) return true;
+    }
+    return false;
+  };
+
+  int remaining = 0;
+  if (objects.is_array()) {
+    for (auto &obj : objects) {
+      if (!obj.contains("name")) continue;
+      std::string oname = obj["name"].template get<std::string>();
+      if (oname == name || is_excl(oname)) continue;
+      remaining++;
+    }
+  }
+  cancel_on_confirm = (remaining == 0);
+
   std::string shown = name;
   const size_t MAXLEN = 22;
-  if (shown.size() > MAXLEN) {
-    shown = shown.substr(0, MAXLEN) + "...";
+  if (shown.size() > MAXLEN) shown = shown.substr(0, MAXLEN) + "...";
+
+  std::string msg;
+  static const char *cancel_btns[]  = {"Cancel Print", "Back", ""};
+  static const char *exclude_btns[] = {"Exclude", "Cancel", ""};
+  const char **btns;
+
+  if (cancel_on_confirm) {
+    // Check current heater state so the dialog explains any delay honestly.
+    auto etarget_j = s->get_data("/printer_state/extruder/target"_json_pointer);
+    auto etemp_j   = s->get_data("/printer_state/extruder/temperature"_json_pointer);
+    auto btarget_j = s->get_data("/printer_state/heater_bed/target"_json_pointer);
+    auto btemp_j   = s->get_data("/printer_state/heater_bed/temperature"_json_pointer);
+    double etarget = etarget_j.is_number() ? etarget_j.template get<double>() : 0.0;
+    double etemp   = etemp_j.is_number()   ? etemp_j.template get<double>()   : 0.0;
+    double btarget = btarget_j.is_number() ? btarget_j.template get<double>() : 0.0;
+    double btemp   = btemp_j.is_number()   ? btemp_j.template get<double>()   : 0.0;
+    auto pdur_j    = s->get_data("/printer_state/print_stats/print_duration"_json_pointer);
+    double pdur    = pdur_j.is_number()    ? pdur_j.template get<double>()    : 1.0;
+    bool e_heating  = etarget > 0 && etemp < etarget - 2.0;
+    bool b_heating  = btarget > 0 && btemp < btarget - 2.0;
+    bool in_startup = pdur < 0.1;
+
+    std::string delay;
+    if (e_heating && b_heating)
+      delay = fmt::format("\n\nExtruder {:.0f}/{:.0f}°C + Bed {:.0f}/{:.0f}°C\n"
+                          "Cancel is queued and will run when heating finishes.", etemp, etarget, btemp, btarget);
+    else if (e_heating)
+      delay = fmt::format("\n\nExtruder heating: {:.0f}/{:.0f}°C\n"
+                          "Cancel is queued and will run when heating finishes.", etemp, etarget);
+    else if (b_heating)
+      delay = fmt::format("\n\nBed heating: {:.0f}/{:.0f}°C\n"
+                          "Cancel is queued and will run when heating finishes.", btemp, btarget);
+    else if (in_startup)
+      delay = "\n\nStartup in progress — cancel is queued\n"
+              "and will run when startup finishes.";
+
+    msg  = fmt::format("\"{}\" is the last object.\n"
+                       "Excluding it will cancel the print.{}", shown, delay);
+    btns = cancel_btns;
+  } else {
+    auto cur = s->get_data("/printer_state/exclude_object/current_object"_json_pointer);
+    bool printing_now = cur.is_string() && cur.template get<std::string>() == name;
+    msg  = printing_now
+             ? fmt::format("Stop printing \"{}\"?\nThis cannot be undone.", shown)
+             : fmt::format("Exclude \"{}\"?\nThis cannot be undone.", shown);
+    btns = exclude_btns;
   }
 
-  // Stronger verb when excluding the object that's printing right now.
-  auto cur = State::get_instance()->get_data("/printer_state/exclude_object/current_object"_json_pointer);
-  bool printing_now = cur.is_string() && cur.template get<std::string>() == name;
-  std::string msg = printing_now
-    ? fmt::format("Stop printing \"{}\"?\nThis cannot be undone.", shown)
-    : fmt::format("Exclude \"{}\"?\nThis cannot be undone.", shown);
-
-  static const char *btns[] = {"Exclude", "Cancel", ""};
   lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, msg.c_str(), btns, false);
   confirm_mbox = mbox;
   lv_obj_add_event_cb(mbox, [](lv_event_t *ev) {
     lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(ev));
     auto *self = static_cast<ExcludeObjectPanel *>(lv_event_get_user_data(ev));
     if (lv_msgbox_get_active_btn(obj) == 0) {
-      self->do_exclude();
+      if (self->cancel_on_confirm) {
+        spdlog::info("exclude_object: last object tapped — cancelling print");
+        self->ws.send_jsonrpc("printer.print.cancel");
+        self->is_foreground = false;
+        lv_obj_move_background(self->panel_cont);
+      } else {
+        self->do_exclude();
+      }
     }
+    self->cancel_on_confirm = false;
     self->confirm_mbox = nullptr;
     lv_msgbox_close(obj);
   }, LV_EVENT_VALUE_CHANGED, this);
-  KUtils::style_lock_mbox(mbox, 90);  // centered body + centered button row
-  // Pin the body to the top so it can't collide with the floating button row
-  // (this dialog's message is taller than the one-line print-lock prompts).
+  KUtils::style_lock_mbox(mbox, 90);
   lv_obj_align(((lv_msgbox_t *)mbox)->text, LV_ALIGN_TOP_MID, 0, 0);
+  // For the cancel-print dialog, colour the destructive button (index 0) red.
+  if (cancel_on_confirm) {
+    lv_obj_t *btnm = lv_msgbox_get_btns(mbox);
+    lv_obj_add_event_cb(btnm, [](lv_event_t *e) {
+      lv_obj_draw_part_dsc_t *dsc = lv_event_get_draw_part_dsc(e);
+      if (dsc->part == LV_PART_ITEMS && dsc->id == 0) {
+        dsc->rect_dsc->bg_color = lv_color_hex(0xC62828);
+        dsc->rect_dsc->bg_opa   = LV_OPA_COVER;
+        dsc->label_dsc->color   = lv_color_white();
+      }
+    }, LV_EVENT_DRAW_PART_BEGIN, NULL);
+  }
 }
 
 void ExcludeObjectPanel::do_exclude() {

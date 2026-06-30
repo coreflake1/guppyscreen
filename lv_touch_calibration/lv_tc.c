@@ -164,17 +164,9 @@ lv_point_t lv_tc_transform_point(lv_point_t point) {
         transformedPoint.x = roundf((lv_tc_val_t)point.x * calibResult.a + (lv_tc_val_t)point.y * calibResult.b + calibResult.c);
         transformedPoint.y = roundf((lv_tc_val_t)point.x * calibResult.d + (lv_tc_val_t)point.y * calibResult.e + calibResult.f);
 
-        lv_disp_t *disp = lv_disp_get_default();
-        if (disp->driver->rotated == LV_DISP_ROT_90 || disp->driver->rotated == LV_DISP_ROT_270) {
-            lv_coord_t tmp = transformedPoint.y;
-            transformedPoint.y = transformedPoint.x;
-            transformedPoint.x = lv_disp_get_ver_res(NULL) - tmp - 1;
-        }
-
-        if (disp->driver->rotated == LV_DISP_ROT_180) {
-            transformedPoint.y = lv_disp_get_ver_res(NULL) - transformedPoint.y;
-            transformedPoint.x = lv_disp_get_hor_res(NULL) - transformedPoint.x;
-        }
+        /* No rotation correction needed: calibration crosshairs are placed in
+         * logical (post-sw_rotate) coordinates, so the affine already maps
+         * raw touch → logical. An additional rotation here would double-apply. */
     }
 
     return transformedPoint;
@@ -197,7 +189,6 @@ static void lv_tc_indev_drv_read_cb(lv_indev_drv_t *indevDrv, lv_indev_data_t *d
             data->state = LV_INDEV_STATE_RELEASED;
             lv_point_t point = {0, 0};
             data->point = point;
-
             return;
         }
     }

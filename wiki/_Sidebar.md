@@ -1,25 +1,25 @@
 ### 🖨️ OpenKE
 
-**Start here**
+**Get started**
 - [Home](Home)
 - [Install OpenKE](Installation)
-- [Upgrading from an older version](Upgrading)
-- [Perfect prints — start here](Perfect-Prints)
+- [Upgrade from older version](Upgrading)
 
-**Get perfect prints**
-- [Calibrate step by step (A→Z)](Calibration-Explained)
-- [Perfect first layer (Axis Twist + KAMP)](KAMP-and-Axis-Twist-Compensation)
-- [Auto Z-offset: the load-sensor caveat](Auto-Z-Offset)
+**Get great prints**
+- [Calibration walkthrough (A→Z)](Calibration-Explained)
+- [Axis Twist Compensation](Axis-Twist-Compensation)
+- [Adaptive meshing (KAMP)](Adaptive-Meshing-KAMP)
 - [Square parts (Skew Correction)](Skew-Correction)
 - [Quieter steppers (TMC Autotune)](TMC-Autotune)
 
 **Using the screen**
-- [Screen tour](Using-GuppyKE)
+- [Screen reference (every setting)](Using-GuppyKE)
 - [Beeps & songs (buzzer)](Buzzer-and-Sounds)
-- [Fix layer shift after pause](Pause-Park-Layer-Shift-Fix)
-- [Camera: better image](Camera-Image-Tuning)
-- [Camera: H.264 stream (removed v1.2.0)](Camera-H264-Stream)
+- [Camera image tuning](Camera-Image-Tuning)
+
+**Help**
 - [Troubleshooting](Troubleshooting)
+- [Resetting & uninstalling](Resetting-and-Uninstalling)
 
 ---
 ### 🛠️ Developers
@@ -28,6 +28,5 @@
 - [Architecture](Architecture)
 - [Configuration](Configuration)
 - [Releases & deployment](Releases-and-Deployment)
-- [Publishing this wiki](Wiki-Publishing)
-- [Known issues](Known-Issues)
 - [Contributing](Contributing)
+- [Publishing this wiki](Wiki-Publishing)

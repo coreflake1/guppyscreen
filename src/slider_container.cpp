@@ -142,6 +142,11 @@ void SliderContainer::set_range(int min_range, int max_range) {
   lv_slider_set_range(slider, min_range, max_range);
 }
 
+void SliderContainer::hide_slider() {
+  lv_obj_add_flag(slider_cont, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_set_flex_align(control_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+}
+
 void SliderContainer::update_value(int value) {
   lv_label_set_text(slider_value, fmt::format("{}{}", value, unit).c_str());
   lv_slider_set_value(slider, value, LV_ANIM_ON);
