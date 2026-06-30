@@ -90,12 +90,11 @@ Thingiverse — **[Ender-3 V3 KE screen mount](https://www.thingiverse.com/thing
 
 Full documentation lives on the **[GitHub Wiki](https://github.com/coreflake1/guppyscreen/wiki)**. Highlights:
 
-- [Perfect prints — start here](https://github.com/coreflake1/guppyscreen/wiki/Perfect-Prints) and the [calibration walkthrough](https://github.com/coreflake1/guppyscreen/wiki/Calibration-Explained)
+- [Calibration walkthrough (start here)](https://github.com/coreflake1/guppyscreen/wiki/Calibration-Explained)
 - [Installation](https://github.com/coreflake1/guppyscreen/wiki/Installation) · [Upgrading from an older version](https://github.com/coreflake1/guppyscreen/wiki/Upgrading)
-- [Perfect first layer (KAMP + Axis Twist)](https://github.com/coreflake1/guppyscreen/wiki/KAMP-and-Axis-Twist-Compensation) · [Skew Correction](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction) · [TMC Autotune](https://github.com/coreflake1/guppyscreen/wiki/TMC-Autotune)
-- [Auto Z-offset: the load-sensor caveat](https://github.com/coreflake1/guppyscreen/wiki/Auto-Z-Offset)
-- [Camera tuning](https://github.com/coreflake1/guppyscreen/wiki/Camera-Image-Tuning) · [Why the H.264 stream was removed (v1.2.0)](https://github.com/coreflake1/guppyscreen/wiki/Camera-H264-Stream) · [Layer-shift fix](https://github.com/coreflake1/guppyscreen/wiki/Pause-Park-Layer-Shift-Fix)
-- [Troubleshooting](https://github.com/coreflake1/guppyscreen/wiki/Troubleshooting) · developer docs: [Building from Source](https://github.com/coreflake1/guppyscreen/wiki/Building-from-Source), [Architecture](https://github.com/coreflake1/guppyscreen/wiki/Architecture)
+- [Axis Twist Compensation](https://github.com/coreflake1/guppyscreen/wiki/Axis-Twist-Compensation) · [Adaptive meshing (KAMP)](https://github.com/coreflake1/guppyscreen/wiki/Adaptive-Meshing-KAMP) · [Skew Correction](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction) · [TMC Autotune](https://github.com/coreflake1/guppyscreen/wiki/TMC-Autotune)
+- [Camera image tuning](https://github.com/coreflake1/guppyscreen/wiki/Camera-Image-Tuning)
+- [Troubleshooting](https://github.com/coreflake1/guppyscreen/wiki/Troubleshooting) · [Resetting & uninstalling](https://github.com/coreflake1/guppyscreen/wiki/Resetting-and-Uninstalling) · developer docs: [Building from Source](https://github.com/coreflake1/guppyscreen/wiki/Building-from-Source), [Architecture](https://github.com/coreflake1/guppyscreen/wiki/Architecture)
 
 > The wiki pages are also maintained as Markdown in [`wiki/`](wiki/) in this repo and auto-published to the Wiki tab.
 
@@ -112,7 +111,8 @@ container (`docker/Dockerfile`, published as `ghcr.io/coreflake1/guppydev`).
 ## License & credits
 
 **GPL-3.0** — see [LICENSE](./LICENSE). The touch UI builds on
-[ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) and
-[probielodan/guppyscreen](https://github.com/probielodan/guppyscreen), with the 3D bed mesh from
+[ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen),
+[probielodan/guppyscreen](https://github.com/probielodan/guppyscreen), and
+[pellcorp/grumpyscreen](https://github.com/pellcorp/grumpyscreen), with the 3D bed mesh from
 [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen). Vendored Klipper mods keep their
 own upstream licenses and credits — see [Contributing](https://github.com/coreflake1/guppyscreen/wiki/Contributing). *(Formerly "GuppyKE".)*
