@@ -1,11 +1,7 @@
 # Screen Reference — Every Panel, Every Setting
 
-This is the plain-English reference for every screen and setting in OpenKE. No assumptions, no jargon.
-If you're looking at something and wondering "what does this do?", find it here.
-
-OpenKE replaces the stock Creality screen with a faster, fuller one. Everything runs **on the printer
-itself** — you don't need a phone or PC for day-to-day printing (though Mainsail in a browser works
-fine too).
+Plain-English reference for every screen in OpenKE. If you're looking at something and wondering
+"what does this do?" — find it here.
 
 > 🔒 **You can't break a running print by exploring the screen.** Anything that would interrupt a job is
 > blocked or asks you to confirm first. Tap around freely.
@@ -14,403 +10,450 @@ fine too).
 
 ## Getting around — the five tabs
 
-A row of icon buttons runs across the bottom of every screen. Tap one to switch tabs. Tapping the
-**already-active** tab resets it (Macros jumps back to your favourites list, Console clears the input).
+A column of icon buttons runs down the **left edge** of the screen. Tap one to switch. Tapping the
+already-active tab resets it (Macros jumps back to favourites, Console clears the input).
 
 | Tab | What's here |
 |---|---|
 | 🏠 **Home** | Temperatures, graph, and the buttons you use every day |
 | **Macros** | Your Klipper gcode macros |
 | **Console** | Type gcode directly or browse commands |
-| **Tune** | Every calibration tool |
-| **Settings** | WiFi, system, Spoolman, log level |
+| **Tune** | Grid of calibration tool launchers |
+| **Settings** | Grid of system panel launchers |
+
+> **Both Tune and Settings work the same way:** each is a grid of large icon buttons. Tapping one opens
+> a full-screen sub-panel. Nothing is adjusted or configured inline on these tabs themselves.
 
 ---
 
 ## 🏠 Home tab
 
-Your everyday screen. Everything you need to babysit a print or start a new one.
+Your everyday screen. Inline content — no launcher grid.
 
 ### Temperature panel
 
-Shows **nozzle, bed, chamber, and MCU** temperatures as a live read-out.
+Shows **nozzle, bed, chamber, and MCU** temperatures as live read-outs with target values.
 
-- **Tap any temperature** to open a numpad and set a target (preheat). The label shows both the
-  current and target value — e.g. `210 / 200` means currently 210 °C, cooling toward 200 °C.
-- **Temperature presets** appear when you tap: quick-select PLA, PETG, ABS, TPU (pre-set values), or
-  type any number.
-- **Tap the target** (the smaller number) to clear it (set to 0, i.e. off / cool down).
-- **Chamber and MCU** temperatures are display-only — they have no heater target.
+- **Tap any temperature** to set a target (preheat). A numpad opens. The reading shows current/target
+  — e.g. `45 / 210` means currently 45 °C, heating toward 210 °C.
+- **Presets** appear below the numpad: PLA, PETG, ABS, TPU quick-select buttons.
+- **Tap the target** to clear it (set to 0 — cool down / off).
+- Chamber and MCU are display-only (no heater to control).
 
 ### Temperature graph
 
-A rolling 60-second (approx.) line chart of all monitored temperatures, colour-coded. Useful for seeing
-if your heater is stable at target or still swinging.
+A rolling line chart of all monitored temperatures, colour-coded. Useful for watching whether a heater
+is stable at target or still swinging.
 
-### Quick action buttons
+### Action buttons
 
-Below the temperatures:
+Five icon buttons below the temperatures. Each opens a **floating panel** over the current screen:
 
-| Button | What it does |
+| Button | Opens |
 |---|---|
-| **Home** | Homes all axes (G28 — same as starting a print) |
-| **Home Z** | Homes Z only |
-| **Move** | Opens the movement panel (jog the toolhead manually) |
-| **Fans** | Opens the fan-speed panel |
-| **LED** | Toggles the case light on/off |
-| **Extruder / Filament** | Opens the filament load/unload panel |
-| **Files** | Opens the file browser to pick a print |
-
-### Files browser
-
-Lists `.gcode` files on internal storage and USB sticks. Tap a file to preview it (thumbnail if your
-slicer generates one, estimated time, file size). Tap **Print** to start it.
-
-- **USB sticks** are scanned automatically when plugged in.
-- **Sort:** the list remembers your last sort order (name / date / size).
-- Deleting, creating folders, and renaming are not supported — manage files from Mainsail or your
-  slicer's upload tool.
+| **Homing** | Movement panel (jog + home axes) |
+| **Extrude** | Filament panel (load/unload + manual extrude) |
+| **Fans** | Fan speed controls |
+| **LED** | Case light controls |
+| **Print** | File browser |
 
 ---
 
-## Print status screen
+## Homing panel (movement)
 
-Appears automatically when a print is running. You can also reach it by tapping the compact status bar
-at the top of any screen during a print.
-
-| Display | What it shows |
-|---|---|
-| File name + thumbnail | The file being printed |
-| Progress bar | Percentage complete (by filament, not time) |
-| Time remaining / elapsed | Estimates based on current speed |
-| Layer X / Y | Current layer and total layers |
-| **Z offset** (live) | Tap to baby-step the first layer — see below |
-| Speed % | How fast relative to the slicer's set speeds |
-| Flow % | Extrusion multiplier |
-| Pressure Advance | PA value in use |
-| Filament used | How much has been extruded so far |
-
-### Baby-stepping Z-offset while printing
-
-Tap the **Z-offset readout** on the print-status screen to get +/− buttons and a step-size selector.
-Step sizes: 0.001, 0.005, 0.01, 0.05 mm. Nudge while watching the first layer:
-
-- **Lines not fusing / gaps between them:** too high — lower (negative direction)
-- **Lines translucent / squashed flat:** too low — raise (positive direction)
-- **Lines squished together and fused with no gaps:** correct
-
-The value is saved automatically when you stop adjusting.
-
-### Pause, Resume, Cancel, Emergency Stop
-
-- **Pause** — parks the toolhead, holds temperatures. Resume brings it back.
-- **Cancel** — cancels the print. A confirmation dialog appears (red Confirm button). For the **last
-  object** being excluded, it cancels the whole print.
-- **Emergency Stop** — cuts all movement and heaters immediately. Use only if something is going wrong
-  physically (not a normal cancel). The printer needs a full power-cycle or `FIRMWARE_RESTART` after this.
-
----
-
-## Movement panel
-
-Tap the **Move** button from the Home tab.
+Opens from the Home tab **Homing** button.
 
 ### Jog controls
 
-- **Step size:** 0.1 mm / 1 mm / 10 mm / 50 mm — tap to select before pressing a direction button.
-- **X−/X+, Y−/Y+, Z−/Z+** — move the toolhead by the selected step. On a bed-slinger like the KE,
-  Y moves the bed (forward/backward).
-- The current XYZ position is shown at the top.
+- **Step size selector:** 0.1 mm / 1 mm / 10 mm / 50 mm — tap to select before pressing a direction.
+- **X−/X+, Y−/Y+, Z−/Z+** — move the toolhead by the selected step. On the KE (bed-slinger), Y moves
+  the bed.
+- Current XYZ position shown at the top.
 
-> ⚠️ The machine doesn't know where it is until you home it. Moving before homing can crash the toolhead
-> into the frame. The **Home** button is right there.
+> ⚠️ The printer doesn't know where it is until it homes. Moving before homing can crash the toolhead.
+> Use the Home buttons below first.
 
 ### Home buttons
 
-- **Home All (🏠)** — G28 — homes X, Y, and Z in sequence.
-- **Home Z** — homes Z only (useful after adjusting Z-offset).
+| Button | What it does |
+|---|---|
+| **Home All** | G28 — homes X, Y, and Z |
+| **Home Z** | Homes Z only |
+| **Home X** | Homes X only |
+| **Home Y** | Homes Y only |
 
 ### Motors off
 
-Disables the stepper motors so you can move the toolhead by hand. They re-engage on the next move
+Disables stepper motors so you can move the toolhead and bed by hand. They re-engage on the next move
 command or home.
 
-### Invert Y
+### Invert Y toggle
 
-A toggle that flips which direction Y+ and Y− move the bed. Some users find the default unintuitive on
-a bed-slinger (the bed moves toward you when you expect it to move away). Toggle this to match your
-mental model.
+Flips which direction Y+ and Y− move the bed. Some users find the default unintuitive on a bed-slinger.
+Toggle to match your mental model. (Also settable permanently in Settings → System → Invert Y Direction.)
+
+---
+
+## Filament panel (extruder)
+
+Opens from the Home tab **Extrude** button.
+
+### Load
+
+Heats the nozzle to the last-used target, feeds filament forward until you tap **Stop**. If Spoolman is
+active, a **"Use this filament?"** confirmation appears first. After loading, the nozzle auto-cools.
+
+> Start Load when your filament is already inserted into the extruder throat. Stop when plastic coming
+> out the nozzle runs clean and consistent.
+
+### Unload
+
+Heats the nozzle, retracts filament fully out of the bowden/throat, then auto-cools. Remove the
+filament from the top of the extruder manually after.
+
+### Manual extrude / retract
+
+For precise manual movement once the nozzle is already hot:
+
+- **Distance** — how far to move (mm)
+- **Speed** — feedrate (mm/s)
+- **Extrude / Retract** buttons — each press moves that amount once
+
+The nozzle must be at temperature (Klipper enforces this). Also auto-cools after each operation.
 
 ---
 
 ## Fan panel
 
-| Control | What it does |
-|---|---|
-| **Part cooling** | Slider 0–100%. This is the fan that blows on the print. 0% for first layer of ABS/ASA; 100% for PLA/PETG bridges. |
-| **Case fan** (if fitted) | Extra ventilation fan inside the enclosure, if configured. |
-| **Auxiliary fan** (if configured) | Any additional fans defined in your `fans:` config. |
+Opens from the Home tab **Fans** button.
 
-Fan speeds set here are *immediately* applied and override whatever the gcode has been sending.
+Each configured fan appears as a row:
 
----
+- **Part cooling fan** — slider 0–100%. The fan that blows on the print. 0% for first layer of
+  ABS/ASA; 100% for PLA/PETG bridges.
+- **Other fans** (auxiliary, case fan, etc.) — shown if configured in your Klipper config. Appear as
+  sliders (variable-speed) or toggles (on/off for simple fans).
 
-## Extruder / Filament panel
-
-### Load filament
-
-Heats the nozzle to the last-used target (or a default if you haven't set one), then feeds filament
-forward until you tap **Stop**. A "Use this filament?" Spoolman confirmation appears first if you have
-an active spool — tap Yes to proceed. After the load is done, the nozzle **auto-cools** back to ambient.
-
-> Start Load when your filament is already inserted into the extruder throat. Watch for plastic coming
-> out the nozzle tip — when it runs clean and consistent, stop.
-
-### Unload filament
-
-Heats the nozzle, then retracts filament fully. Auto-cools afterward. Designed to pull the filament back
-past the bowden/throat; you then remove it manually from the top.
-
-### Manual extrude / retract
-
-For precise manual extrusion when the nozzle is already hot:
-
-- **Distance:** how far to feed (mm)
-- **Speed:** feedrate (mm/s)
-- **Extrude / Retract** buttons — each press moves that amount at that speed
-
-The nozzle must be at temperature for extrusion to work (Klipper enforces this). Manual extrude also
-auto-cools after each operation.
+Fan speeds set here apply immediately and override whatever gcode has been sending.
 
 ---
 
-## Tune tab
+## LED panel
 
-The calibration and print-quality toolbox. You won't need most of these day-to-day — but when you do,
-they're on the screen, no PC needed.
+Opens from the Home tab **LED** button.
 
-### Bed Mesh
+Each configured LED/light appears as a row with a slider (brightness) or toggle (on/off). The KE case
+light is a simple toggle.
 
-Shows the bed's height map.
+---
 
-- **3D view** — a colour surface you can rotate (drag), zoom (pinch or buttons), and tilt. Peaks
-  (high spots) and valleys (low spots) are visible at a glance.
-- **Table view** — the numeric Z values at each probe point.
-- **Re-mesh button** — runs `BED_MESH_CALIBRATE` to map the whole bed fresh. Takes 2–3 minutes.
-- **Enable/disable** — toggle whether the mesh compensation is applied to the current print. Default is
-  on; you'd turn it off only for diagnostic purposes.
+## File browser (Print)
 
-A good mesh has subtle variation (a few tenths of a millimetre difference corner-to-corner). Wild spikes
-are usually noise from a dirty nozzle or a debris on the bed.
+Opens from the Home tab **Print** button.
 
-### Z Offset
+- Lists `.gcode` files from internal storage and any plugged-in USB stick.
+- **Tap a file** to preview it: thumbnail (if the slicer generated one), print time estimate, file size.
+- **Tap Print** to start.
+- Files sort by date by default; the sort order is remembered between opens.
+- USB files load full metadata (print time, filament weight) via a metascan on first access.
 
-Live first-layer baby-stepping. Same as tapping Z-offset on the print-status screen, but accessible
-from the Tune tab even outside a print.
+---
 
-- **+/− buttons** with step sizes: 0.001, 0.005, 0.01, 0.05 mm
-- **Current value** displayed at top
-- **Save** — saves the current value to the config (with the Helper Script Save Z-Offset macro — installed by the installer)
+## Print status screen
 
-> This is the recommended way to set Z-offset on the KE. Manual baby-stepping on a real first layer is
-> more reliable than the strain-sensor auto-calibration — see
-> [Calibration walkthrough](Calibration-Explained#3-z-offset--first-layer-the-big-one).
+Appears automatically when a print is running. Also reachable by tapping the compact status bar at the
+top of any screen during a print.
 
-### Axis Twist
-
-Launches the 5-point paper calibration wizard for Axis Twist Compensation. See [Axis Twist Compensation](Axis-Twist-Compensation) for the full guide and what this fixes.
-
-### Skew
-
-Corrects parts that come out as a slight parallelogram instead of a perfect square. You print a test
-frame, measure three lengths with calipers (AC, BD, and AD diagonals), type them into the three fields,
-and tap **Apply**. Save with **SAVE_CONFIG** in the console. See [Skew Correction](Skew-Correction).
-
-### Fine Tune
-
-Sliders for real-time adjustments while printing — or any time the nozzle is moving:
-
-| Control | What it does | Normal range |
-|---|---|---|
-| **Speed %** | Global speed multiplier. 100% = follow slicer speeds exactly. | 50–150% |
-| **Flow %** | Extrusion multiplier. 100% = exact filament amount. Under-extruding: raise. Over-extruding: lower. | 90–110% |
-| **Pressure Advance** | How aggressively the extruder compensates for nozzle pressure lag at speed. Fixes corner bulges and blobs. | 0–0.08 typically |
-| **Firmware Retraction** | Retraction length and speed if your slicer uses `G10`/`G11` firmware retraction commands. | depends on filament |
-
-### Input Shaper
-
-Reduces ghosting/ringing — those faint echoes that trail sharp corners at speed. The KE has an onboard
-accelerometer, so you measure and apply it from this panel.
-
-1. **Select axis** (X or Y) and tap **Run test** — the printer shakes at a sweep of frequencies.
-2. The panel shows a **frequency-response graph** for that axis. Peaks = resonant frequencies.
-3. **Recommended shaper** and frequency are shown automatically — tap **Apply** to use them.
-4. Repeat for the other axis.
-
-> 💡 **Accelerometer placement for the Y test:** the sensor needs to be on *whatever moves* — for Y
-> that's the **bed**, not the toolhead. Tape or zip-tie it to the bed for the Y measurement; it comes
-> right off after.
-
-After applying, a fast ringing-test print (a small square with sharp corners at speed) should show no
-echoes trailing the corners. If it does, try a different shaper type from the dropdown.
-
-### Belts / Shake
-
-Excites each axis at a specific frequency so you can compare the mechanical resonance. Primary use is
-comparing **left vs. right belt tension** on the X axis — matched tension = cleaner prints. If one belt
-is audibly different from the other when plucked, tighten the looser one.
-
-### Retraction
-
-If your slicer uses **firmware retraction** (`G10`/`G11` commands instead of explicit `G1 E-x` moves),
-these sliders control the retraction distance and speed that the firmware actually uses.
-
-Most slicers (OrcaSlicer default) use regular gcode retraction — in that case, these settings have no
-effect.
-
-### Limits
-
-Speed and acceleration caps for the whole machine:
-
-| Setting | What it is |
+| Element | What it shows |
 |---|---|
-| **Max velocity** | Hard cap on axis speed (mm/s) |
-| **Max acceleration** | Hard cap on acceleration (mm/s²) |
-| **Max print acceleration** | Acceleration cap used while actually extruding |
-| **Square corner velocity** | How fast the toolhead can turn a sharp corner without decelerating fully |
+| File name + thumbnail | The file being printed |
+| Progress bar | Percentage complete |
+| Time remaining / elapsed | Running estimates |
+| Layer X / Y | Current layer and total |
+| Z offset (live) | Tap to baby-step — see below |
+| Speed % | Speed relative to slicer settings |
+| Flow % | Extrusion multiplier |
+| Pressure Advance | PA value in use |
+| Filament used | How much has extruded so far |
 
-Raising these doesn't automatically make prints faster — your slicer's own speed settings have to be
-raised too. Raising them beyond the machine's structural limit causes ringing/vibration artifacts.
+### Baby-stepping Z-offset while printing
 
-### TMC Autotune
+Tap the **Z-offset readout** to get step buttons (±0.001, ±0.005, ±0.01, ±0.05 mm). Nudge while
+watching the first layer:
 
-One-time setup for quieter, cooler stepper motors. Select your motor type and a goal (Performance or
-Silent) and tap **Apply** — it computes and saves optimal stepper-driver settings that activate on
-every boot.
+- **Lines not fusing / gaps:** too high — lower (−)
+- **Lines translucent or completely flat:** too low — raise (+)
+- **Squished together and fused, no gaps:** correct
 
-> The button is greyed out until the TMC Autotune Klipper module is installed — the OpenKE installer
-> does this during the print-quality mods step. See [TMC Autotune](TMC-Autotune) for the full guide.
+Saves automatically.
 
-### TMC Metrics
+### Control buttons
 
-A live dashboard of your stepper drivers — current draw, driver temperature, and internal parameters.
-This is a diagnostic tool; you won't need it for normal printing. Use it if you suspect a motor is
-getting hot or skipping steps.
-
-### Power Settings
-
-| Setting | What it does |
+| Button | What it does |
 |---|---|
-| **Power devices** | On/off buttons for any smart plugs or relays you've configured in Moonraker |
-| **Power Loss Recovery** | If a power cut interrupted a print, tap here to resume it from where it stopped (print file must still be on the printer) |
+| **Pause** | Parks the toolhead, holds temperatures. **Resume** brings it back and continues. |
+| **Cancel** | Cancels the print. Shows a red Confirm dialog. For the very last remaining object (Exclude Object), shows a "Cancel print?" confirmation. |
+| **Emergency Stop** | Cuts all movement and heaters immediately. Use only if something is going wrong physically. Requires a power-cycle or `FIRMWARE_RESTART` to recover. |
 
 ---
 
 ## Macros tab
 
-All your Klipper gcode macros, accessible from the screen.
+All your Klipper gcode macros, accessible from the screen. Inline content — no launcher grid.
 
-- **Favourites** — macros you've pinned for quick access. Tap the star icon on any macro to pin it.
-  Tapping the Macros tab when already on it jumps back to the Favourites view.
-- **All macros** — scrollable list, grouped by category (the `[gcode_macro]` section headers).
-- **Parameters** — tap a macro to expand it and see any parameters it accepts. Fill them in before
-  running.
+- **Favourites view** (default) — macros you've pinned. Tap the ★ icon on any macro to pin/unpin. Tapping
+  the Macros tab when already on it jumps back here.
+- **All macros** — full scrollable list, grouped by category (the `[gcode_macro]` section names in your
+  config). Tap a category header to expand it.
+- **Parameters** — tap a macro to expand its parameter inputs. Fill them in before running, or leave
+  defaults as-is.
 
 ---
 
 ## Console tab
 
-Direct gcode access. Two modes:
+Direct gcode access. Inline content — no launcher grid.
 
 ### Command browser
 
-A drill-down interface: tap a **category** to see the commands in it, tap a **command** to see its
-description and parameters. Tap **Run** to execute it. This is the recommended way for exploring what
-commands exist without needing a cheat sheet.
-
-Tapping the Console tab when already on it jumps back to the top of the browser.
+Drill-down interface: tap a **category** → see commands in it → tap a **command** → see its description
+and parameters → tap **Run**. Good for exploring what's available without a cheat-sheet. Tapping the
+Console tab when already on it jumps back to the top.
 
 ### Direct input
 
-Type any gcode command directly, same as typing in the Mainsail terminal. History is kept (last 100
-entries, with spam filtering so rapidly repeating commands don't fill it up). Tap a history entry to
-re-run it.
+Type any gcode command directly, same as the Mainsail terminal.
+
+- **History** — last 100 entries. Temperature-spam lines (`T:210 B:60 …`) are filtered so they don't
+  flood the history. Tap a history entry to re-run it.
+
+---
+
+## Tune tab
+
+A **4-column × 3-row grid of icon buttons**. Tapping a button opens its sub-panel full-screen. Nothing
+is adjusted inline on this tab.
+
+| Row | Col 1 | Col 2 | Col 3 | Col 4 |
+|---|---|---|---|---|
+| 1 | Fine Tune | Z Offset | Retraction | Limits |
+| 2 | Bed Mesh | Input Shaper | Axis Twist | Skew |
+| 3 | Belts/Shake | Power Settings | TMC Autotune | TMC Metrics |
+
+### Fine Tune
+
+Live sliders — usable during a print or any time:
+
+| Slider | What it does | Typical range |
+|---|---|---|
+| **Speed %** | Global speed multiplier. 100% = follow slicer speeds exactly. | 50–150% |
+| **Flow %** | Extrusion multiplier. Under-extruding → raise. Over-extruding → lower. | 90–110% |
+| **Pressure Advance** | Compensates for nozzle pressure lag at speed. Fixes corner bulges and blobs. | 0–0.08 |
+| **Firmware Retraction** | Retraction length and speed (only if your slicer uses `G10`/`G11`). | Filament-dependent |
+
+### Z Offset
+
+First-layer baby-stepping. Same as tapping Z on the print-status screen, but also usable outside a print.
+
+- Step size buttons: **0.001 / 0.005 / 0.01 / 0.05 mm**
+- Current value shown at top
+- **Save** — persists the value to the config (with Save Z-Offset installed; added by the installer)
+
+### Retraction
+
+Only relevant if your slicer uses **firmware retraction** (`G10`/`G11`). Controls the retraction
+distance and speed the firmware executes. Most OrcaSlicer setups use regular gcode retraction — if so,
+these sliders have no effect.
+
+### Limits
+
+Hard caps on machine speed and acceleration:
+
+| Setting | What it is |
+|---|---|
+| **Max velocity** | Hard cap on axis speed (mm/s) |
+| **Max acceleration** | Hard cap on acceleration (mm/s²) |
+| **Max print acceleration** | Acceleration cap while extruding |
+| **Square corner velocity** | How fast the toolhead turns a sharp corner without fully decelerating |
+
+Raising these doesn't automatically make prints faster — the slicer's own speeds must also be raised.
+Going beyond what the machine can handle causes ringing artifacts.
+
+### Bed Mesh
+
+The bed's height map.
+
+- **3D view** — colour surface you can rotate (drag) and zoom. Peaks = high spots, valleys = low spots.
+- **Table view** — the raw Z values at each probe point.
+- **Re-mesh** — runs `BED_MESH_CALIBRATE`, maps the whole bed fresh (~2–3 min).
+- **Enable/disable** — toggles whether mesh compensation is applied. On by default.
+
+### Input Shaper
+
+Reduces ghosting/ringing (echoes trailing sharp corners at speed).
+
+1. Select **X** or **Y** axis, tap **Run test** — the printer sweeps frequencies (~1 min).
+2. A **frequency-response graph** is shown; peaks = resonant frequencies.
+3. The panel recommends a shaper type and frequency — tap **Apply**.
+4. Repeat for the other axis.
+
+> 💡 For the **Y axis** test: move the accelerometer to the **bed** (it must be on whatever moves for
+> that axis). Tape or zip-tie it on for the 1-minute test.
+
+### Axis Twist
+
+Launches the 5-point calibration wizard for Axis Twist Compensation. Fixes first layers that are
+uneven left-to-right despite re-meshing. Full guide: [Axis Twist Compensation](Axis-Twist-Compensation).
+
+### Skew
+
+Corrects parts that come out as slight parallelograms instead of squares.
+
+- Enter three caliper measurements from a printed test square: **AC diagonal**, **BD diagonal**, **AD side**.
+- Tap **Apply**, then run `SAVE_CONFIG` in the Console to persist.
+
+Full guide: [Skew Correction](Skew-Correction).
+
+### Belts/Shake
+
+Excites each axis at a chosen frequency to check mechanical resonance. Primary use: comparing left vs.
+right belt tension on the X axis. Matched tension = cleaner prints. If one belt sounds different when
+plucked, tighten the looser one.
+
+### Power Settings
+
+| Section | What it does |
+|---|---|
+| **Power devices** | On/off buttons for any smart plugs or relays configured in Moonraker |
+| **Power Loss Recovery** | Resume a print that was interrupted by a power cut (print file must still be on the printer) |
+
+### TMC Autotune
+
+Quieter, cooler, sometimes smoother steppers. Select motor type and a goal, tap Apply:
+
+- **Performance** — prioritises current/torque (slightly louder)
+- **Silent** — prioritises quiet operation
+
+Settings are saved and reapplied every boot.
+
+> The button is **greyed out** until the TMC Autotune module is installed (the installer does this
+> during the print-quality mods step). Full guide: [TMC Autotune](TMC-Autotune).
+
+### TMC Metrics
+
+Live diagnostics for each stepper driver — current draw, driver temperature, internal flags. Not needed
+for normal printing; use it if you suspect a driver is overheating or skipping steps.
 
 ---
 
 ## Settings tab
 
-The Settings tab is a **grid of icon buttons** — each one opens a separate full-screen panel. Tap a
-button to go into that panel; a **Back** button returns you here.
+A **4-column × 2-row grid of icon buttons** plus a quick-action restart row at the top. Nothing is
+configured inline on this tab.
 
-| Button | What's inside |
+### Quick-action row (top row)
+
+These execute immediately — no sub-panel opens:
+
+| Button | What it does |
 |---|---|
-| **Restart Klipper** | Immediately sends a Klipper restart (same as clicking Restart in Mainsail). |
-| **Restart Firmware** | Sends `FIRMWARE_RESTART` — resets the MCU connection without rebooting the Pi. Use this after a config change. |
-| **Restart Guppy** | Restarts the OpenKE screen app without rebooting the printer. Useful after a software update. |
-| **Update Guppy** | Downloads and installs the latest OpenKE screen binary. **Note:** this only swaps the binary — if you also need to update Klipper mods or config defaults, re-run the full installer instead. |
-| **WiFi** | Connect to a network, see your IP, toggle Low Latency mode. See below. |
-| **Printers** | Switch between printer profiles (if you have multiple configured in `guppyconfig.json`). |
-| **Spoolman** | Filament spool inventory and usage tracking. See below. |
-| **System** | All other settings — display, log level, toggles, theme, network info. See below. |
+| **Restart Klipper** | Restarts the Klipper host process. Use after editing `printer.cfg`. |
+| **Restart Firmware** | Resets the mainboard MCU (`FIRMWARE_RESTART`). Use after MCU-level config changes. |
+| **Restart Guppy** | Restarts the OpenKE screen process only (not Klipper). Use if the UI feels stuck. |
+| **Update Guppy** | Downloads and installs the latest OpenKE screen binary. **Note:** only swaps the binary — for full updates (Klipper mods, KAMP config, etc.) re-run the full installer. |
+
+### Navigation row (main row)
+
+| Button | Opens |
+|---|---|
+| **WiFi** | WiFi connection panel |
+| **Printers** | Printer connection manager |
+| **Spoolman** | Filament tracking panel |
+| **System** | Screen settings + info panel |
 
 ---
 
-### WiFi panel
+## WiFi panel
 
-| Setting | What it does |
+Opens from Settings → **WiFi**.
+
+| Control | What it does |
 |---|---|
-| **Network list** | Scans and shows available WiFi networks. Tap one to connect (prompts for password). An eye icon lets you show/hide the password while typing. |
-| **IP address** | Your printer's current local IP — handy for typing into Mainsail on a new device. Shown only once layer-3 is confirmed live (not just associated). |
-| **Low Latency** | Disables the WiFi radio's power-save, stops idle sleep, disables background network scans, and turns off Bluetooth. **Why Bluetooth?** The KE's WiFi and Bluetooth share a single 2.4 GHz radio and antenna — leaving BT on makes WiFi yield to it periodically, causing latency spikes and camera stutters. Low Latency eliminates that. Persists across reboots; turn it off to re-enable Bluetooth. |
+| **Network list** | Scans and shows available networks. Tap one to connect (prompts for password). Rescans automatically on open; tap the scan button to refresh. |
+| **IP address** | Your printer's current local IP — shown once layer-3 is confirmed. Handy for accessing Mainsail from a new device. |
+| **Password entry** | Has an **eye-toggle** button to reveal/hide what you're typing. |
+| **Low Latency** | Disables WiFi power-save, idle sleep, background roam scans, and **Bluetooth**. The KE's WiFi and Bluetooth share one 2.4 GHz radio and antenna — leaving BT on (it's unused) makes WiFi yield to it periodically and stutter. Low Latency eliminates that. Persists across reboots. Turn off to re-enable Bluetooth. |
 
-> If Mainsail feels laggy, the camera stutters, or the screen is slow to respond — turn on **Low
-> Latency** first. It fixes most WiFi-related sluggishness.
+> If Mainsail feels laggy, the camera stutters, or tap response feels slow — enable **Low Latency** first.
 
 ---
 
-### System panel
+## Printers panel
 
-Two columns of settings, plus a **Reset Options** button (top-right corner) and a **Back** button.
+Opens from Settings → **Printers**. Manages Moonraker connections.
 
-**Left column — behaviour settings:**
+Each configured printer is shown as a card with its name, IP, and port, plus:
 
-| Setting | What it does |
-|---|---|
-| **Display Sleep** | How long the screen stays on with no touch input before dimming. Options: 1 min, 5 min, 10 min, 30 min, 1 hour. |
-| **Brightness** | Screen backlight level (10% / 25% / 50% / 75% / Max). Hidden on devices without a controllable backlight. |
-| **Log Level** | How verbose the log file is. **info** (default) logs connections and state changes — enough for most diagnosis. **warn** is quieter for day-to-day use. **debug** logs everything but fills the log fast (~14h per 10 MB). **trace** is developer-only. Switch to **debug** before reproducing a bug to capture detail, then switch back. Log file: `/usr/data/printer_data/logs/guppyscreen.log` (up to 30 MB, 3 rotating files). |
-| **Prompt Emergency Stop** | When on: tapping Emergency Stop shows a confirmation dialog. When off: it fires immediately with no confirmation. Default is on — turn off only if you need one-tap emergency stop during a fire. |
-| **Invert Z Direction** | Flips the Z+ and Z− jog buttons in the movement panel. |
-| **Invert Y Direction** | Flips the Y+ and Y− jog buttons. Useful on a bed-slinger if the bed moves the opposite direction from what you expect. |
+- **Switch** — reconnects OpenKE to that printer
+- **Remove** — removes it from the config (asks for confirmation)
 
-**Right column — info and appearance:**
-
-| Setting | What it does |
-|---|---|
-| **Network** | Live read-out of your IP address(es) and GuppyScreen version. For reference — not editable here (network settings are in the WiFi panel). |
-| **Theme Color** | Changes the accent colour of the UI. Takes effect immediately. |
-| **Def. Temp** | Default nozzle temperature used when Load/Unload is triggered without a target already set. Options: 180–300 °C. |
-| **Touch Beep** | Plays a short click sound through the buzzer on every screen tap. Off by default. Requires the buzzer hardware (built-in on the KE). |
-
-**Reset Options button** (top-right corner of System panel):
-
-| Option | What it does |
-|---|---|
-| **Reset Touch Calibration** | Runs the 9-tap calibration wizard (3 taps per crosshair, averaged). Run once after first install, and any time taps feel off or you change `display_rotate`. Takes ~30 seconds. |
-| **Factory Reset Printer** | Wipes everything back to stock — see [Resetting & Uninstalling](Resetting-and-Uninstalling). |
+**Add a printer:** fill in Name, IP/hostname, and port (default 7125), then tap the add button. A
+keyboard appears for text entry.
 
 ---
 
-### Spoolman panel
+## Spoolman panel
 
-Filament inventory integration. Requires a [Spoolman](https://github.com/Donkie/Spoolman) server on
-your network — completely optional. The button is hidden if Spoolman isn't configured.
+Opens from Settings → **Spoolman**. Requires a [Spoolman](https://github.com/Donkie/Spoolman) server
+on your network — the button is greyed out until one is configured.
 
 | Feature | What it does |
 |---|---|
-| **Spool list** | All your spools — name, material, colour, remaining weight and length. |
-| **Set active spool** | Tap a spool then **Set Active** to track usage against it. |
-| **Archive** | Mark an empty spool as archived to keep the list tidy. Toggle to show/hide archived. |
-| **Auto tracking** | Once a spool is active, filament used by each print is subtracted automatically. No weighing. |
-| **Wrong-filament check** | Before a print starts (or a manual Load), OpenKE shows a **"Use this filament?"** confirmation of the active spool. Catches the wrong-material mistake before it ruins a print. |
+| **Spool list** | All spools — name, material, colour, remaining weight and length |
+| **Set active** | Tap a spool → Set Active. The active spool is deducted as you print. |
+| **Archive** | Mark an empty spool archived to keep the list tidy. Toggle to show/hide archived spools. |
+| **Auto tracking** | Once a spool is active, filament used by prints is subtracted automatically. No weighing. |
+| **Wrong-filament check** | Before a print starts (and before a manual Load), a **"Use this filament?"** popup shows the active spool. Prevents "oops, wrong material" before it ruins a print. |
+
+---
+
+## System panel
+
+Opens from Settings → **System**. This is the main settings panel for the screen itself — everything
+that changes how OpenKE behaves.
+
+**Network info label** (top of right column): shows each network interface and its IP address, plus the
+currently running OpenKE version. Read-only.
+
+### Left column
+
+| Setting | Options | What it does |
+|---|---|---|
+| **Display Sleep** | Never / 30s / 1m / 5m / 10m / 30m / 1h | Dims the screen after this period of inactivity. Touch to wake. |
+| **Brightness** | Low (10%) / Dim (25%) / Medium (50%) / Bright (75%) / Max (100%) | Backlight brightness. 10% is the minimum readable level. |
+| **Log Level** | trace / debug / info / warn | Verbosity of `guppyscreen.log`. **info** is the default (weeks-long logs). Use **debug** before reporting a bug, then switch back. **warn** = errors only (smallest logs). **trace** = developer use only. |
+| **Prompt Emergency Stop** | Toggle | **On:** tapping Emergency Stop shows a confirmation dialog first. **Off:** acts immediately, no dialog. Default on. |
+| **Invert Z Direction** | Toggle | Flips Z jog buttons in the movement panel (up/down). |
+| **Invert Y Direction** | Toggle | Flips Y jog buttons (front/back). Useful if the bed moves opposite to your expectation on a bed-slinger. |
+
+### Right column
+
+| Setting | Options | What it does |
+|---|---|---|
+| **Theme Color** | Material, Blue, others | Changes the screen colour scheme. Takes effect immediately. |
+| **Def. Temp** | Preset temperatures | Default extruder target used by Load/Unload when no explicit target has been set (e.g. on a cold boot). |
+| **Touch Beep** | Toggle | Plays a short click sound through the buzzer on every tap. A test beep plays immediately when you enable it. |
+
+### Reset Options
+
+Tap the **Reset Options** button (top-right corner of the System panel) to open a dialog with three choices:
+
+| Option | What it does |
+|---|---|
+| **Reset GuppyScreen settings** | Deletes the screen config and sensor layout (`guppyconfig.json`). OpenKE restarts with factory defaults. Your Klipper config and print files are **not** touched. |
+| **Factory Reset Printer** | Wipes OpenKE, all Klipper config, gcodes, and calibration. Reboots to stock Creality firmware. **Irreversible.** WiFi and Creality cloud account are preserved. See [Resetting & Uninstalling](Resetting-and-Uninstalling). |
+| **Reset Touch Calibration** | Clears saved calibration. OpenKE restarts and shows the 9-tap calibration wizard immediately. |
+
+Tap **Close** to dismiss without doing anything.
+
+**Back** button (bottom-right of the System panel) returns to the Settings tab.
