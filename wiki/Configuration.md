@@ -56,8 +56,10 @@ Without it touch works (raw mode) but tap targets can be off by 10–20 px near 
 calibration the residual error drops to a few pixels.
 
 **Running calibration:** go to **System Info → Reset Touch Calibration**. Three crosshairs appear
-one at a time — tap each one as precisely as you can. Calibration saves automatically and
-GuppyScreen restarts with the result applied. The whole process takes about ten seconds.
+one at a time — tap each crosshair three times (lift your finger between taps; the label shows
+"Lift and tap again (2/3)" to guide you). The three taps are averaged to reduce finger-tap noise,
+giving ~2× better accuracy than a single tap. Calibration saves automatically and GuppyScreen
+restarts with the result applied. The whole process takes about 30 seconds.
 
 **Config keys:**
 

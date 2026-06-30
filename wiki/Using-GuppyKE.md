@@ -107,8 +107,9 @@ of these day-to-day, but when you do, they're right on the screen (no PC require
   WiFi and Bluetooth share a single 2.4 GHz radio and antenna, so leaving BT running (it's unused here) makes
   WiFi periodically yield to it and stutter. The setting sticks across reboots and network changes; turn it
   off to go back to stock (which also re-enables Bluetooth).
-- **System info** — temperatures, load, versions; and **Reset Touch Calibration** — a 10-second
-  3-tap wizard that significantly improves tap accuracy. Run it once after first install. See
+- **System info** — temperatures, load, versions; and **Reset Touch Calibration** — a 30-second
+  9-tap wizard (3 taps per crosshair, averaged for accuracy) that significantly improves tap
+  accuracy. Run it once after first install. See
   [Configuration → Touch calibration](Configuration#touch-calibration-ke-specific).
 - **Macros / Console** — run any gcode macro, or type commands directly (a drill-down command browser with
   history).
