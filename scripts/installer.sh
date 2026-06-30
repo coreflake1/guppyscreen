@@ -33,6 +33,10 @@ uninstall_guppy() {
     killall -q guppyscreen 2>/dev/null
     rm -f /etc/init.d/S99guppyscreen
 
+    # Remove the factory-reset service installed by us
+    rm -f /etc/init.d/S58factoryreset
+    printf "${green}Removed S58factoryreset${white}\n"
+
     # Restore S12boot_display from backup
     if [ -f "$BACKUP_DIR/S12boot_display" ]; then
         cp "$BACKUP_DIR/S12boot_display" /etc/init.d/S12boot_display
@@ -41,11 +45,21 @@ uninstall_guppy() {
         printf "${yellow}No S12boot_display backup found. Restore manually if needed.${white}\n"
     fi
 
+    # Restore S50dropbear from backup (we replaced it with a custom version)
+    if [ -f "$BACKUP_DIR/S50dropbear" ]; then
+        cp "$BACKUP_DIR/S50dropbear" /etc/init.d/S50dropbear
+        printf "${green}Restored S50dropbear${white}\n"
+    fi
+
     # Restore S99start_app from backup
     if [ -f "$BACKUP_DIR/S99start_app" ] && [ ! -f /etc/init.d/S99start_app ]; then
         cp "$BACKUP_DIR/S99start_app" /etc/init.d/S99start_app
         printf "${green}Restored S99start_app${white}\n"
     fi
+
+    # Remove respawn symlinks added for supervise-daemon
+    rm -f /lib/libeinfo.so.1 /lib/librc.so.1
+    printf "${green}Removed respawn symlinks${white}\n"
 
     # Remove [include GuppyScreen] from printer.cfg
     if [ -f "$K1_CONFIG_DIR_U/printer.cfg" ]; then
