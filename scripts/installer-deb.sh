@@ -103,7 +103,40 @@ install_guppy_goodies() {
 
     sed -i "s|<GUPPY_DIR>|$GUPPY_DIR|g; s|<PRINTER_DATA_DIR>|$PRINTER_DATA_DIR|g" $GUPPY_DIR/debian/guppyconfig.json
 
-    cp $GUPPY_DIR/debian/guppyconfig.json $GUPPY_DIR
+    if [ -s "$GUPPY_DIR/guppyconfig.json" ] && jq empty "$GUPPY_DIR/guppyconfig.json" >/dev/null 2>&1; then
+	# Existing, valid config: merge the packaged template underneath it instead
+	# of overwriting, so values you've already set are kept rather than reset.
+	cp "$GUPPY_DIR/guppyconfig.json" "$BACKUP_DIR/guppyconfig.json.bak"
+
+	# Informational only: flag settings that differ from the recommended
+	# default so you know they were kept, not silently changed either way.
+	_dp=$(jq -r '.default_printer // "default_printer"' "$BACKUP_DIR/guppyconfig.json.bak" 2>/dev/null)
+	warn_if_default_differs() {   # $1=jq path  $2=recommended value  $3=label
+	    # Note: deliberately not using jq's `//` here — it treats `false`
+	    # the same as missing/null, which would silently swallow warnings
+	    # for exactly the boolean settings this function exists to check.
+	    _raw=$(jq "$1" "$BACKUP_DIR/guppyconfig.json.bak" 2>/dev/null)
+	    if [ "$_raw" != "null" ] && [ -n "$_raw" ]; then
+		_val=$(printf '%s' "$_raw" | sed -e 's/^"//' -e 's/"$//')
+		if [ "$_val" != "$2" ]; then
+		    printf "${yellow}Note: %s is currently '%s' (recommended default: '%s') — keeping your value.${white}\n" "$3" "$_val" "$2"
+		fi
+	    fi
+	}
+	warn_if_default_differs '.invert_y_direction' 'true' 'invert_y_direction'
+	warn_if_default_differs '.invert_z_direction' 'true' 'invert_z_direction'
+	warn_if_default_differs '.prompt_emergency_stop' 'true' 'prompt_emergency_stop'
+	warn_if_default_differs ".printers[\"$_dp\"].log_level" 'info' 'log_level'
+
+	if jq -s '.[0] * .[1]' "$GUPPY_DIR/debian/guppyconfig.json" "$GUPPY_DIR/guppyconfig.json" > "$GUPPY_DIR/guppyconfig.json.new" 2>/dev/null; then
+	    mv "$GUPPY_DIR/guppyconfig.json.new" "$GUPPY_DIR/guppyconfig.json"
+	else
+	    rm -f "$GUPPY_DIR/guppyconfig.json.new"
+	    printf "${yellow}Could not merge guppyconfig.json (jq failed) — keeping your existing file untouched.${white}\n"
+	fi
+    else
+	cp $GUPPY_DIR/debian/guppyconfig.json $GUPPY_DIR
+    fi
     mkdir $GUPPY_DIR/thumbnails
 }
 

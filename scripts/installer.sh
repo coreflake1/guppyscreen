@@ -589,7 +589,44 @@ tar xf /tmp/guppyscreen.tar.gz -C /usr/data/
 if [ -f "$K1_GUPPY_DIR/debian/guppyconfig.json" ]; then
     PRINTER_DATA_DIR=$(dirname "$K1_CONFIG_DIR")
     sed -i "s|<GUPPY_DIR>|$K1_GUPPY_DIR|g; s|<PRINTER_DATA_DIR>|$PRINTER_DATA_DIR|g" "$K1_GUPPY_DIR/debian/guppyconfig.json"
-    cp "$K1_GUPPY_DIR/debian/guppyconfig.json" "$K1_GUPPY_DIR/guppyconfig.json"
+    if [ -s "$K1_GUPPY_DIR/guppyconfig.json" ] && jq empty "$K1_GUPPY_DIR/guppyconfig.json" >/dev/null 2>&1; then
+        # Existing, valid config: merge the packaged template underneath it instead
+        # of overwriting. New default keys from this release still appear, but
+        # everything you already set (rotation, sensors, touch calibration,
+        # toggles, ...) is kept as-is rather than reset on every reinstall.
+        mkdir -p "$BACKUP_DIR" 2>/dev/null
+        OLD_GUPPYCONFIG="$BACKUP_DIR/guppyconfig.json.$(date +%Y%m%d-%H%M%S).bak"
+        cp "$K1_GUPPY_DIR/guppyconfig.json" "$OLD_GUPPYCONFIG" 2>/dev/null || true
+
+        # Informational only: flag settings that differ from the recommended
+        # default so you know they were kept, not silently changed either way.
+        _dp=$(jq -r '.default_printer // "default_printer"' "$OLD_GUPPYCONFIG" 2>/dev/null)
+        warn_if_default_differs() {   # $1=jq path  $2=recommended value  $3=label
+            # Note: deliberately not using jq's `//` here — it treats `false`
+            # the same as missing/null, which would silently swallow warnings
+            # for exactly the boolean settings this function exists to check.
+            _raw=$(jq "$1" "$OLD_GUPPYCONFIG" 2>/dev/null)
+            if [ "$_raw" != "null" ] && [ -n "$_raw" ]; then
+                _val=$(printf '%s' "$_raw" | sed -e 's/^"//' -e 's/"$//')
+                if [ "$_val" != "$2" ]; then
+                    printf "${yellow}  Note: %s is currently '%s' (recommended default: '%s') — keeping your value.${white}\n" "$3" "$_val" "$2"
+                fi
+            fi
+        }
+        warn_if_default_differs '.invert_y_direction' 'true' 'invert_y_direction'
+        warn_if_default_differs '.invert_z_direction' 'true' 'invert_z_direction'
+        warn_if_default_differs '.prompt_emergency_stop' 'true' 'prompt_emergency_stop'
+        warn_if_default_differs ".printers[\"$_dp\"].log_level" 'info' 'log_level'
+
+        if jq -s '.[0] * .[1]' "$K1_GUPPY_DIR/debian/guppyconfig.json" "$K1_GUPPY_DIR/guppyconfig.json" > "$K1_GUPPY_DIR/guppyconfig.json.new" 2>/dev/null; then
+            mv "$K1_GUPPY_DIR/guppyconfig.json.new" "$K1_GUPPY_DIR/guppyconfig.json"
+        else
+            rm -f "$K1_GUPPY_DIR/guppyconfig.json.new"
+            printf "${yellow}  Could not merge guppyconfig.json (jq failed) — keeping your existing file untouched.${white}\n"
+        fi
+    else
+        cp "$K1_GUPPY_DIR/debian/guppyconfig.json" "$K1_GUPPY_DIR/guppyconfig.json"
+    fi
 fi
 mkdir -p "$K1_GUPPY_DIR/thumbnails"
 
@@ -679,13 +716,18 @@ fi
 printf "${green}Updating SSH init script (ensures SSH is available at every boot)${white}\n"
 cp $K1_GUPPY_DIR/k1_mods/S50dropbear /etc/init.d/S50dropbear
 
-printf "${white}=== Do you want to disable all Creality services (revertible) with GuppyScreen installation? ===\n"
-printf "${green}  Pros: Frees up system resources on your K1 for critical services such as Klipper (Recommended)\n"
-printf "${white}  Cons: Disabling all Creality services breaks Creality Cloud/Creality Slicer.\n\n"
-printf "Disable all Creality Services? (y/n): "
+if [ ! -f /etc/init.d/S99start_app ]; then
+    printf "${green}Creality services are already disabled — leaving them that way.${white}\n"
+    confirm_decreality=y
+else
+    printf "${white}=== Do you want to disable all Creality services (revertible) with GuppyScreen installation? ===\n"
+    printf "${green}  Pros: Frees up system resources on your K1 for critical services such as Klipper (Recommended)\n"
+    printf "${white}  Cons: Disabling all Creality services breaks Creality Cloud/Creality Slicer.\n\n"
+    printf "Disable all Creality Services? (y/n): "
 
-read confirm_decreality
-echo
+    read confirm_decreality
+    echo
+fi
 
 if [ "$confirm_decreality" = "y" -o "$confirm_decreality" = "Y" ]; then
     printf "${green}Disabling Creality services ${white}\n"
