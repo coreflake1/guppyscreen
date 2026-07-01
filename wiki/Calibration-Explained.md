@@ -62,7 +62,16 @@ saved automatically and survives reboots.
 Software can't fix loose hardware — it can only paper over it.
 
 - **Belts:** firm. A plucked belt should "thunk", not flap. Slack belts cause layer shift and ringing.
+  Don't trust your ear alone if you can help it — **Tune → Belts/Shake** on the screen has a **Shake
+  Belts** button that measures the actual resonance response of the left and right sides, which is far
+  more precise than plucking. If one side's graph looks noticeably different from the other, that belt
+  is looser. See [Belts/Shake](Using-GuppyKE#beltsshake) in the screen reference.
 - **Gantry:** square. The X bar should be parallel to the bed, not tilted.
+- **Bed level (rough, by hand):** if your bed screws are wildly uneven, the BLTouch probe and bed mesh
+  can usually compensate — but a bed that's *very* far off makes the mesh work harder than it needs to,
+  and in bad cases can exceed what meshing can fix. If you installed the optional **Screws Tilt Adjust**
+  mod (offered at install time), run `SCREWS_TILT_CALCULATE` from the Klipper console — it tells you
+  exactly which corner screw to turn and which way, instead of guessing.
 - **Bed:** not rocking. Gently push each corner — no play.
 - **V-wheels/rails:** snug but not binding. Should spin with light finger pressure.
 - **Nozzle:** clean, no plastic blob.
@@ -182,9 +191,20 @@ The last 10%. These fix corner bulges, blobs, gaps, stringing, and over/under-ex
 after the first layer and motion quality are solid. Tuning these first wastes time.
 
 - **Flow:** start with 0.98 (a modest under-extrusion offset that reduces over-fill) and adjust from
-  your first real print.
+  your first real print. This is a quick approximation — if you want the more thorough version, Klipper
+  has its own extruder-calibration procedure (measuring exactly how much filament actually comes out vs.
+  what you asked for, then correcting `rotation_distance`). That's standard Klipper knowledge, not
+  something specific to this screen — see
+  [Klipper's rotation_distance guide](https://www.klipper3d.org/Rotation_Distance.html) if you want to
+  go that deep. Most people never need to; the flow ratio above is enough.
 - **Pressure advance:** print a PA tower or line, find the cleanest corners, dial it in. The on-screen
   **Tune → Fine Tune** lets you adjust PA live while printing.
+- **Retraction (stringing):** if you're getting fine hair-like strings between parts, that's usually a
+  retraction problem, not pressure advance. Most slicer profiles already retract in the gcode directly,
+  which this app doesn't control. If your slicer's retraction *type* is instead set to "Firmware"
+  (`G10`/`G11`), you can adjust retraction length/speed live from **Tune → Retraction** — but check
+  [Retraction](Using-GuppyKE#retraction) in the screen reference first, since that panel only does
+  anything for gcode sliced that specific way.
 - **Temperature:** print a temperature tower from your slicer's test model library and pick the layer
   that looks cleanest.
 

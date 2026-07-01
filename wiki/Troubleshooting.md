@@ -46,7 +46,7 @@ Quick-reference for the most common problems. If your symptom isn't here, check 
 
 | Symptom | Fix |
 |---|---|
-| Mainsail feels laggy, camera stutters, screen takes a beat to respond | Enable **Low Latency** in Settings → Network. This disables WiFi power-save and Bluetooth (which share the same antenna on the KE). See [Screen reference → Network](Using-GuppyKE#network--wifi). |
+| Mainsail feels laggy, camera stutters, screen takes a beat to respond | Enable **Low Latency** in Settings → WIFI. This disables WiFi power-save and Bluetooth (which share the same antenna on the KE). See [Screen reference → WiFi panel](Using-GuppyKE#wifi-panel). |
 | Mainsail still laggy with Low Latency on | Check for nearby 2.4 GHz congestion (e.g. a neighbour's network or a HP WiFi-Direct device on channel 6). Move your router channel to 1 or 11. |
 | `guppyscreen` keeps restarting after you `kill` it | It's supervised by `supervise-daemon`. Stop it properly: `/etc/init.d/S99guppyscreen stop`. |
 

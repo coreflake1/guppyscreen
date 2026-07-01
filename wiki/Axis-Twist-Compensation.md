@@ -79,7 +79,17 @@ After the 5th point, save permanently:
 SAVE_CONFIG
 ```
 
-Klipper restarts. Run a first-layer test that spans the full width — the left-right unevenness should be gone.
+Klipper restarts.
+
+### After either option — re-mesh before your next print
+
+Your existing bed mesh was measured with the *old*, un-corrected probe readings — it needs to be redone
+now that the probe tells the truth. **Re-run your bed mesh** (`BED_MESH_CALIBRATE`, or
+**Tune → Bed Mesh → Calibrate** on the screen). Skip this if you're using KAMP's
+`ADAPTIVE_BED_MESH_CALIBRATE` in your slicer start G-code — that already re-meshes fresh at the start of
+every print.
+
+Then run a first-layer test that spans the full width — the left-right unevenness should be gone.
 
 > **Small note:** if the overall first-layer height feels slightly different after calibration, just nudge
 > your Z-offset as usual. Twist is fixed; this is just fine-tuning.

@@ -94,6 +94,8 @@ if your calipers allow):
 
 ## Step 3 — Enter them on the screen
 
+### Option A — from the screen (easiest)
+
 ![Skew Correction panel](images/skew-correction.png)
 
 1. On the printer: **Tune → Skew**.
@@ -103,7 +105,18 @@ if your calipers allow):
 That sends `SET_SKEW` and saves it permanently (the printer restarts briefly to lock it in). Done — every
 print from now on comes out square. 🎉
 
-*(Want to confirm? Re-print the frame and re-measure the diagonals — they should now match.)*
+### Option B — from the Klipper console (Mainsail/Fluidd)
+
+Same three measurements, typed directly instead:
+
+```
+SET_SKEW XY=<AC>,<BD>,<AD>
+SAVE_CONFIG
+```
+
+Replace `<AC>`, `<BD>`, `<AD>` with your measured millimetre values, in that order.
+
+*(Want to confirm either way? Re-print the frame and re-measure the diagonals — they should now match.)*
 
 ---
 
@@ -146,3 +159,11 @@ Prefer to do it by hand? It's one bare section (no settings):
 Skew correction handles the small, consistent frame-squareness error that's baked into the machine. It does
 **not** fix a part that physically rocks, a loose belt, or a bent axis — fix mechanical problems first. Think
 of it as the final polish for dimensional accuracy once the hardware is sound.
+
+> **Note:** Klipper's `[skew_correction]` can actually correct three planes — XY, XZ, and YZ — but the
+> on-screen **Skew** panel only exposes **XY**, since that's the plane nearly every Cartesian printer
+> actually needs (X and Y are driven by separate motors that can be slightly non-perpendicular; X/Z and
+> Y/Z rarely are on a machine like the KE). If you have a rare case that needs XZ or YZ too, you can set
+> those from the console the same way — `SET_SKEW XZ=<AC>,<BD>,<AD>` / `SET_SKEW YZ=<AC>,<BD>,<AD>`,
+> measured the same way but with the frame stood on its corresponding edge — the screen just won't show
+> or edit those values for you.
