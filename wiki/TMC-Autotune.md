@@ -159,10 +159,12 @@ back on their own — just open **Tune → TMC Autotune** to confirm.
 The installer does all of this for you. If you'd rather do it by hand (or you want to know exactly what
 the installer changed), here are the steps. Over SSH (`ssh root@<printer-ip>`):
 
-**1. Install the add-on** — three files into Klipper's add-on folder:
+**1. Install the add-on** — three files into Klipper's add-on folder. **Use the exact commit OpenKE
+vendors and tests against**, not the upstream `main` branch — `main` can move on without notice and end
+up different from what this page (and the installer) was actually verified with:
 
 ```sh
-BASE="https://raw.githubusercontent.com/evgarthub/klipper_tmc_autotune_k1/main"
+BASE="https://raw.githubusercontent.com/evgarthub/klipper_tmc_autotune_k1/1cafcf42bfb7aa1985cfd35f3bf7e83f54b0c3d2"
 DEST="/usr/share/klipper/klippy/extras"
 for f in autotune_tmc.py motor_constants.py motor_database.cfg; do
   wget --no-check-certificate "$BASE/$f" -O "$DEST/$f"

@@ -32,9 +32,12 @@ on the printer it is installed to `/usr/data/guppyscreen/guppyconfig.json` with 
 
 ### Default monitored sensors
 
-The shipped template monitors Extruder, Bed, and **MCU Temp** (`temperature_sensor mcu_temp`). This
-default applies to **fresh installs only** — an existing on-device `guppyconfig.json` must be edited
-by hand to change which sensors are shown.
+The shipped template monitors Extruder, Bed, and **MCU Temp** (`temperature_sensor mcu_temp`). The app
+falls back to these defaults whenever `monitored_sensors` is missing **or empty** — so this isn't just
+a fresh-install thing; it also self-heals if the list ever ends up empty. If you've customized your
+sensor list already, that customization is preserved (both by the installer's merge behavior and by
+this fallback only kicking in on an empty list) — editing by hand is only needed if you want *different*
+sensors than the 3 defaults, not to fix an empty list.
 
 ### Display rotation (KE-specific)
 
@@ -46,7 +49,7 @@ The KE screen is physically mounted upside-down. The kernel display driver rotat
 - `display_rotate: 2` → **correct** (KE default)
 
 > **Changed `display_rotate`? Re-run touch calibration.** Coefficients are rotation-specific — a
-> saved calibration for ROT_180 will be wrong under ROT_270. Use **System Info → Reset Touch
+> saved calibration for ROT_180 will be wrong under ROT_270. Use **Settings → System → Reset Touch
 > Calibration** on the printer to recompute them for the new orientation.
 
 ### Touch calibration (KE-specific)
@@ -55,7 +58,7 @@ The resistive panel benefits from a one-time 3-point calibration that corrects A
 Without it touch works (raw mode) but tap targets can be off by 10–20 px near the edges. After
 calibration the residual error drops to a few pixels.
 
-**Running calibration:** go to **System Info → Reset Touch Calibration**. Three crosshairs appear
+**Running calibration:** go to **Settings → System → Reset Touch Calibration**. Three crosshairs appear
 one at a time — tap each crosshair three times (lift your finger between taps; the label shows
 "Lift and tap again (2/3)" to guide you). The three taps are averaged to reduce finger-tap noise,
 giving ~2× better accuracy than a single tap. Calibration saves automatically and GuppyScreen

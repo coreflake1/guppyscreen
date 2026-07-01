@@ -23,7 +23,7 @@ There are three things this gives you:
 
 A quiet, low "tick" on every button tap — like a phone's touchscreen feedback.
 
-- **Turn it on/off:** **Settings → Touch Beep**. (Default is **off**.)
+- **Turn it on/off:** **Settings → System → Touch Beep**. (Default is **off**.)
 - It only clicks on real taps, not when you scroll or drag.
 - It's deliberately soft and low — not the old loud beep. Nothing to configure; flip it on and it just
   works.

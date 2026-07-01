@@ -9,10 +9,10 @@ Quick-reference for the most common problems. If your symptom isn't here, check 
 | Symptom | Fix |
 |---|---|
 | Screen upside-down or 90° wrong | Set `display_rotate: 2` in `guppyconfig.json` (KE default). `0` = upside-down, `1` = wrong axis. See [Configuration](Configuration). |
-| Touch targets shifted after changing `display_rotate` | Calibration coefficients are rotation-specific. Redo: **Settings → System Info → Reset Touch Calibration**. See [Screen reference → Touch calibration](Using-GuppyKE#system-info). |
+| Touch targets shifted after changing `display_rotate` | Calibration coefficients are rotation-specific. Redo: **Settings → System → Reset Touch Calibration**. See [Screen reference → System panel](Using-GuppyKE#system-panel). |
 | Touch feels inverted / wildly off after calibration | The calibration captured bad taps. Reset to raw mode via SSH then re-run the wizard: `python3 -c "import json; d=json.load(open('/usr/data/guppyscreen/guppyconfig.json')); d['touch_calibrated']=False; d.pop('touch_calibration_coeff',None); json.dump(d,open('/usr/data/guppyscreen/guppyconfig.json','w'),indent=2)"` then restart. |
 | White screen after waking from sleep | Fixed on current builds. If still stuck, a full reboot clears it. |
-| Wrong sensor names / label overlaps value | Your `guppyconfig.json` has stale `monitored_sensors` — usually from an on-screen update that only swapped the binary. Re-run the installer to fix. See [Sensor labels wrong](#sensor-labels-are-wrong--overlap-the-value) below. |
+| Wrong sensor names / label overlaps value | Your `guppyconfig.json` has an empty or missing `monitored_sensors` list — usually from an on-screen update that only swapped the binary (see below). Recent installer versions merge your settings instead of overwriting them, so re-running the installer is now safe. See [Sensor labels wrong](#sensor-labels-are-wrong--overlap-the-value) below. |
 
 ---
 
@@ -21,7 +21,7 @@ Quick-reference for the most common problems. If your symptom isn't here, check 
 | Symptom | Fix |
 |---|---|
 | First layer uneven left↔right, bed mesh didn't help | [Axis Twist Compensation](Axis-Twist-Compensation) — the X gantry is slightly twisted, tilting the probe. |
-| First layer uneven all over | Re-run bed mesh: **Tune → Bed Mesh → Re-mesh**. Make sure the bed is clean (IPA) and nothing is loose. |
+| First layer uneven all over | Re-run bed mesh: **Tune → Bed Mesh → Calibrate**. Make sure the bed is clean (IPA) and nothing is loose. |
 | First layer too high or too low everywhere | Baby-step Z-offset: **Tune → Z Offset** or tap the Z readout while printing. |
 | Layer shift right after pause, then a "bang" sound | The Y park position was set too high and the bed hit the frame on resume. This is **auto-fixed** in the current installer — re-run the installer to get the fix. If you see it on an updated install, check that `y_park` in your `PAUSE` macro is `220` or lower. |
 | Parts not square / parallelogram | [Skew Correction](Skew-Correction). |
@@ -37,8 +37,8 @@ Quick-reference for the most common problems. If your symptom isn't here, check 
 | Klipper shuts down after a restart with `serialqueue … NoneType` / "Unhandled exception during run" | Known KE host-MCU reconnect race — **not** a config problem. Run `FIRMWARE_RESTART` once more, or a full **Restart Klipper** from Mainsail. A cold reboot always clears it. It can take more than one restart. |
 | Klipper shuts down with `Unable to connect` after installing mods | The same race condition — restart Klipper once more. If it persists, check for duplicate `[include]` lines in `printer.cfg`. |
 | `Skipping Save Z-Offset`, `Skipping M600`, or `Skipping Exclude Object` during install | The installer found those sections already in your `printer.cfg` (from a previous install or the Creality helper script) and skipped adding duplicates. Your existing config is used as-is — no action needed. |
-| `Found arch mips / Terminating` during install | You ran `installer-deb.sh` on the KE. Use `installer.sh` instead. |
-| Installer prints `tar: can't remove old file ./guppyscreen/debian: Is a directory` | Harmless — tar is replacing a directory entry. Installation continues normally. |
+| `Terminating... Your OS Platform has not been tested with Guppy Screen` during install | You ran `installer-deb.sh` on the KE — that script is for a different (aarch64/Debian) target, not this printer. Use `installer.sh` instead. |
+| Installer prints `tar: can't remove old file ./guppyscreen/debian: Is a directory` | This was a symptom of a release-packaging bug that shipped a broken settings template in every release; it's fixed as of v1.3.1. If you see this on a current release, please report it — it shouldn't happen anymore. |
 
 ---
 
@@ -75,29 +75,39 @@ Quick-reference for the most common problems. If your symptom isn't here, check 
 ## Sensor labels are wrong / overlap the value
 
 If the home screen shows a sensor labelled **Temperature** (overlapping its reading), or `Heater Bed`
-instead of `Bed`, your `guppyconfig.json` has stale `monitored_sensors`. This happens when the printer
-was updated **from the screen** (Settings → Update), which only swaps the binary and leaves the existing
-config untouched. The correct defaults ship with the installer, not the binary.
+instead of `Bed`, your `guppyconfig.json` has an empty or missing `monitored_sensors` list — the app
+falls back to showing the raw internal sensor name instead of a friendly one. This most often happens
+after the printer was updated **from the screen** (Settings → Update Guppy), which only swaps the
+binary and never touches `guppyconfig.json` at all.
+
+**As of v1.3.1, this is much safer to fix than it used to be.** Re-running the installer no longer
+overwrites your settings file — it merges the packaged defaults *underneath* whatever you already have,
+so any setting you've already customized (including a custom sensor list) is kept as-is. It will also
+print a note in the install log if one of a handful of specific settings differs from the recommended
+default, purely informational — your value is never changed without you doing it.
 
 **Easiest fix — re-run the installer:**
 ```sh
 sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/main/scripts/installer.sh)"
 ```
 
-> ⚠️ The installer rewrites `guppyconfig.json`. If you have custom sensors, copy it aside first and
-> merge your changes back.
-
-**Surgical fix — edit by hand.** Open `/usr/data/guppyscreen/guppyconfig.json` and set `monitored_sensors` to:
+**Surgical fix — edit by hand instead.** Open `/usr/data/guppyscreen/guppyconfig.json` and set
+`monitored_sensors` to:
 
 ```json
 "monitored_sensors": [
   { "id": "extruder",                    "display_name": "Extruder", "controllable": true,  "color": "red" },
   { "id": "heater_bed",                  "display_name": "Bed",      "controllable": true,  "color": "purple" },
-  { "id": "temperature_sensor mcu_temp", "display_name": "MCU",      "controllable": false, "color": "blue" }
+  { "id": "temperature_sensor mcu_temp", "display_name": "MCU Temp", "controllable": false, "color": "blue" }
 ]
 ```
 
 Then restart: `/etc/init.d/S99guppyscreen restart`.
+
+> If you were on a release **before v1.3.1** and hit this repeatedly no matter how many times you
+> reinstalled, that was a real bug (a release-packaging error that silently kept shipping a years-old
+> settings template) — not something you were doing wrong. It's fixed now; a single reinstall on v1.3.1
+> or later should resolve it for good.
 
 ---
 

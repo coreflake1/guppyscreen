@@ -39,6 +39,11 @@ rewrites those** — it only adds includes and copies files. (We verified this o
 run, every calibration value was byte-for-byte identical.) The installer also drops a timestamped
 `printer.cfg` backup in `/usr/data/guppyify-backup/` on every run, just in case.
 
+This also covers your **app settings** (display rotation, sensor names, touch calibration, direction
+toggles, WiFi low-latency, and everything else in `guppyconfig.json`) — as of v1.3.1, re-running the
+installer merges the packaged defaults underneath your existing settings instead of overwriting them,
+so anything you've already set stays exactly as you left it.
+
 ## How to update
 
 **You're on v0.3.0 or newer** → update right from the screen: **Settings → Update Guppy**. It pulls the

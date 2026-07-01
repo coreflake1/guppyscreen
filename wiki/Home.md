@@ -41,7 +41,8 @@ your problem:
 
 ## What's actually in it
 
-- Print status & control, with chamber/MCU temps on the print screen
+- Print status & control, with MCU temp on the print screen (plus chamber temp, if you've configured a
+  chamber sensor)
 - **Interactive 3D bed mesh** — colour height map you can rotate/zoom/pan (plus a table view)
 - **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset
   baby-stepping (down to 0.001 mm), input-shaper & belt graphs

@@ -20,6 +20,7 @@
 **Help**
 - [Troubleshooting](Troubleshooting)
 - [Resetting & uninstalling](Resetting-and-Uninstalling)
+- [Emergency factory reset (dead screen/SSH)](Emergency-Factory-Reset)
 
 ---
 ### 🛠️ Developers

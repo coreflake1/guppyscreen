@@ -17,14 +17,22 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 ```
 
 > **Use `installer.sh`, not `installer-deb.sh`.** The `-deb` variant targets aarch64/systemd/Debian
-> and exits immediately with `Found arch mips / Terminating` on the KE.
+> and exits immediately with `Terminating... Your OS Platform has not been tested with Guppy Screen` on
+> the KE.
 
 The installer:
 
 1. Confirms the architecture is `mips` and the screen is &lt;800 px, then selects the small-screen asset.
 2. Verifies `/lib/ld-2.29.so` is present and that Moonraker is reachable (`localhost:7125`).
-3. Downloads the release tarball and extracts it to `/usr/data/guppyscreen/`.
-4. Substitutes the `<GUPPY_DIR>` / `<PRINTER_DATA_DIR>` placeholders in `guppyconfig.json`.
+3. Downloads the release tarball and extracts it to `/usr/data/guppyscreen/`. If you still have the old
+   H.264 camera add-on (go2rtc) installed from a much older version, it's removed automatically at this
+   point to free up memory — this happens every time, no prompt.
+4. Sets up `guppyconfig.json` (your app settings — rotation, sensor names, touch calibration, toggles,
+   etc.). **If this is a fresh install**, it just writes the packaged defaults. **If you already have a
+   settings file from a previous install**, it *merges* the packaged defaults underneath it instead of
+   overwriting — anything you've already customized is kept exactly as it was. If one of a few
+   specific settings (like `invert_z_direction` or the log level) differs from the recommended default,
+   it prints a note in the install log so you know it noticed — it does **not** change your value.
 5. Smoke-tests the binary, wires up Klipper extras, and installs the init script.
 6. Starts GuppyScreen via `/etc/init.d/S99guppyscreen`.
 7. **Offers the optional features** (see below).
@@ -37,6 +45,10 @@ Partway through, the installer asks:
 === Do you want to disable all Creality services (revertible) with GuppyScreen installation? ===
 Disable all Creality Services? (y/n):
 ```
+
+**This prompt only appears if Creality's services aren't already disabled.** If you've already
+answered `y` to this on a previous install, the installer detects that and skips straight past it,
+printing "Creality services are already disabled — leaving them that way" instead of asking again.
 
 - **`y` (recommended)** — frees up CPU/RAM for the things that matter (Klipper, Moonraker, the screen) by
   not starting Creality's cloud/app stack. This is what most KE users want.
@@ -70,6 +82,8 @@ What's on offer:
 | **Axis Twist Compensation** | left/right first-layer fix | [guide](KAMP-and-Axis-Twist-Compensation) |
 | **TMC Autotune** | quieter, cooler steppers | [guide](TMC-Autotune) |
 | **Skew Correction** | square parts | [guide](Skew-Correction) |
+| **Firmware Retraction** | enables `G10`/`G11` firmware-level retraction commands, if your slicer uses them | — |
+| **Screws Tilt Adjust** | adds the `SCREWS_TILT_CALCULATE` bed-levelling helper | — |
 | **Creality Nebula camera** | image tuning that **sticks across reboots** | [guide](Camera-Image-Tuning) |
 | **Creality macros** | M600 filament change, **Save Z-Offset** (persists z-offset), useful macros (backup/PID/bed-level), Exclude Object | — |
 | **Pause/Resume layer-shift fix** | stops the bed crashing into the rail on resume (`y_park` 222→220) | [guide](Pause-Park-Layer-Shift-Fix) |
@@ -107,7 +121,7 @@ existing setup.
 
 | Change | Reverted by uninstall? |
 |---|---|
-| Extracts release to `/usr/data/guppyscreen/` | Optional (prompts) |
+| Extracts release to `/usr/data/guppyscreen/` | Yes — the uninstaller deletes this whole directory (with a confirmation prompt) |
 | Installs `/etc/init.d/S99guppyscreen` | Yes |
 | Replaces `S50dropbear` SSH init script¹ | No — original saved to backup |
 | Disables boot display (`S12boot_display` moved to backup) | Yes (restored from backup) |
@@ -120,7 +134,11 @@ existing setup.
 | Replaces matplotlib `ft2font.so` | Partially (original moved to backup) |
 
 ¹ The KE's stock `S50dropbear` has its `start` call commented out, so SSH does not auto-start on a
-clean reboot. The replacement fixes this — SSH will auto-start after install.
+clean reboot. The replacement fixes this — SSH will auto-start after install. This one is
+**permanent by design**: even uninstalling OpenKE does not put the stock version back, because the
+stock version has a separate startup race with the Creality display service that can leave SSH
+unreachable — exactly when you'd most want remote access. See
+[Resetting & Uninstalling](Resetting-and-Uninstalling).
 
 Backups are written to `/usr/data/guppyify-backup/` **before** any destructive change. A fresh,
 timestamped copy of `printer.cfg` (`printer.cfg.YYYYMMDD-HHMMSS.bak`) is taken on **every** run.

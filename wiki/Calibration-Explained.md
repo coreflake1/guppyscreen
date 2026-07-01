@@ -46,7 +46,7 @@ then slicer. Doing it out of order means redoing work.
 A fresh install has no touch calibration data, so taps are uncompensated raw coordinates. Run the
 9-tap wizard once and the touchscreen becomes accurate.
 
-**Screen:** Settings → System Info → **Reset Touch Calibration**
+**Screen:** Settings → System → **Reset Touch Calibration**
 
 The screen shows three crosshairs in turn — tap the centre of each **three times** (lift your finger
 between taps; the screen averages the three for accuracy). Takes about 30 seconds. The calibration is
@@ -115,7 +115,7 @@ BED_MESH_CALIBRATE
 SAVE_CONFIG
 ```
 
-Or tap **Tune → Bed Mesh → Re-mesh** on the screen. Takes 2–3 minutes.
+Or tap **Tune → Bed Mesh → Calibrate** on the screen. Takes 2–3 minutes.
 
 If you installed KAMP (the installer default), use `ADAPTIVE_BED_MESH_CALIBRATE` in your slicer start
 G-code instead — it re-meshes just the print footprint automatically at the start of each print. See
@@ -152,13 +152,21 @@ Set the nozzle-to-bed gap by watching the first layer go down:
 
 Those faint echoes trailing sharp corners are vibration. Input shaping cancels them.
 
-**On the screen:** Tune → Input Shaper
+**On the screen:** Tune → Input Shaper. There's a switch per axis (X, Y) — leave both on to test both at
+once, or switch one off to redo just the other. There's also a **Graph** switch, off by default; turn it
+on first if you want an actual plotted curve rather than just the numeric result.
 
-1. Select **X**, tap **Run test** — the printer shakes at a frequency sweep (~1 minute).
-2. The graph shows resonant peaks; the panel recommends a shaper and frequency.
-3. Tap **Apply**.
-4. Repeat for **Y** (move the accelerometer to the **bed** for the Y measurement — the sensor must
-   be on whatever moves for that axis).
+1. Tap **Calibrate** — the printer shakes through a frequency sweep (~1 minute) on whichever axis
+   switches are on.
+2. Each tested axis gets an updated frequency value and a recommended shaper type in its dropdown (with
+   the plotted graph too, if you turned Graph on). You can change the dropdown yourself if you want to
+   try a different shaper.
+3. Tap **Save**.
+4. If you only tested one axis, flip the switches (this axis off, the other on) and repeat — remember to
+   move the accelerometer to the **bed** for the Y measurement, since the sensor must be on whatever
+   moves for that axis.
+
+The **Stop** button on this panel is a general emergency stop, not a "cancel this test" button.
 
 **Done when:** a fast corner-test print shows no echoes. If it does, try a different shaper type.
 
@@ -190,7 +198,7 @@ with calipers, and enter them on the screen: **Tune → Skew**. Full guide: [Ske
 ## Step 8 — TMC Autotune (optional)
 
 Quieter, cooler stepper motors. **Tune → TMC Autotune** — select your motor type, choose Performance or
-Silent, tap Apply. It tunes the stepper drivers and reapplies the settings every boot. Doesn't affect
+Silent, tap **Save/Restart**. It tunes the stepper drivers and reapplies the settings every boot. Doesn't affect
 print quality or dimensions, just reduces noise and heat.
 
 See [TMC Autotune](TMC-Autotune) for the full guide and how to enable the greyed-out button.

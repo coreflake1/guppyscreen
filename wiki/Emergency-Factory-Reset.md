@@ -10,7 +10,9 @@ The OpenKE installer deploys a `S58factoryreset` init service (not present in st
 
 This is the emergency path: works even if the screen is black, SSH is dead, or Klipper won't start.
 
-1. Format a USB drive as FAT32.
+1. Format a USB drive — **FAT32 is recommended** for the widest compatibility with the printer's USB
+   auto-mount support (unrecognized formats may not get mounted at all, so the trigger file would never
+   be seen).
 2. Create an **empty file** named exactly `emergency_factory_reset` in the root of the drive (no extension).
 3. Safely eject the drive, then plug it into the printer while it is **powered off**.
 4. Power the printer on.
@@ -43,9 +45,9 @@ If you can SSH in but want a clean slate:
 | `/overlay/upper/` | **Wiped** — all system-level modifications removed |
 | `/usr/data/guppyscreen/` | **Wiped** — OpenKE binary, config, mods |
 | `/usr/data/printer_data/` | **Wiped** — Klipper config, gcodes, timelapse |
-| `/usr/data/printer_data/logs/` | **Kept** — logs survive for diagnosis |
+| `/usr/data/printer_data/logs/` | **Mostly wiped** — only `guppyscreen.log`, `grumpyscreen.log`, and `factoryreset.log` survive for diagnosis; everything else in `logs/` is deleted |
 | `/usr/data/wpa_supplicant.conf` | **Kept** — WiFi credentials survive |
-| `/usr/data/creality/` | **Kept** — Creality cloud account & device identity |
+| `/usr/data/creality/` | **Partially kept** — only specific identity files survive (`system_config.json`, `user_data_not_deleted.json`, `user_agree_root`); most other contents are wiped |
 | `/etc/init.d/S58factoryreset` | **Kept** — the reset service itself survives so USB resets work again after reinstalling |
 
 ---

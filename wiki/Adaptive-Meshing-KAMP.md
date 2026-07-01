@@ -100,7 +100,11 @@ your slicer start G-code and replace with `BED_MESH_CALIBRATE` if you still want
 
 ## Manual installation (advanced)
 
-The installer does all of this for you. This section is for reference — or if you need to reinstall by hand.
+The installer does all of this for you, using its own bundled copy of KAMP that's already patched for
+the KE — you don't need any of the steps below for a normal install. This section is only for people who
+want to pull the **raw, unmodified KAMP repo** from GitHub themselves instead of using the installer's
+copy; the patch steps below (renaming the macro, uncommenting includes) apply to that raw download, not
+to anything OpenKE ships.
 
 <details>
 <summary>Manual steps</summary>

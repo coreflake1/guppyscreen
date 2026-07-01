@@ -79,9 +79,9 @@ gcode:
     SAVE_VARIABLE VARIABLE=cam_contrast VALUE={contrast}        # <-- added
 ```
 
-Do the same for `CAM_BRIGHTNESS` (`cam_brightness`), `CAM_SATURATION` (`cam_saturation`), `CAM_HUE`
-(`cam_hue`) and `CAM_WHITE_BALANCE_TEMPERATURE_AUTO` (`cam_wb_auto`). Then add a re-apply macro and the
-boot timer at the end of the file:
+Do the same for `CAM_BRIGHTNESS` (`cam_brightness`), `CAM_SATURATION` (`cam_saturation`), and `CAM_HUE`
+(`cam_hue`) — these four (brightness, contrast, saturation, hue) are exactly the controls OpenKE's own
+installer-provided macro manages. Then add a re-apply macro and the boot timer at the end of the file:
 
 ```ini
 [gcode_macro APPLY_CAM_SETTINGS]
@@ -92,12 +92,11 @@ gcode:
     RUN_SHELL_COMMAND CMD=v4l2-ctl PARAMS="-d /dev/video4 --set-ctrl contrast="{v.cam_contrast|default(100)}
     RUN_SHELL_COMMAND CMD=v4l2-ctl PARAMS="-d /dev/video4 --set-ctrl saturation="{v.cam_saturation|default(95)}
     RUN_SHELL_COMMAND CMD=v4l2-ctl PARAMS="-d /dev/video4 --set-ctrl hue="{v.cam_hue|default(50)}
-    RUN_SHELL_COMMAND CMD=v4l2-ctl PARAMS="-d /dev/video4 --set-ctrl white_balance_temperature_auto="{v.cam_wb_auto|default(1)}
 
-# Re-apply ~20s after Klipper is ready, then once more at +40s in case the
+# Re-apply ~15s after Klipper is ready, then once more at +40s in case the
 # camera wasn't initialised yet on a cold boot.
 [delayed_gcode APPLY_CAM_SETTINGS_ON_BOOT]
-initial_duration: 20
+initial_duration: 15
 gcode:
     APPLY_CAM_SETTINGS
     UPDATE_DELAYED_GCODE ID=APPLY_CAM_SETTINGS_RETRY DURATION=40
@@ -139,7 +138,7 @@ CAM_SATURATION SATURATION=95
 CAM_BRIGHTNESS BRIGHTNESS=115
 ```
 
-- All controls range **50–160** (`CAM_WHITE_BALANCE_TEMPERATURE_AUTO` is `0`/`1`).
+- All four controls (brightness, contrast, saturation, hue) range **50–160**.
 - `CAM_SETTINGS` prints the camera's current values.
 - `APPLY_CAM_SETTINGS` re-applies everything from the saved file on demand.
 

@@ -31,9 +31,21 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 ### What it removes
 
 - OpenKE binary and config (`/usr/data/guppyscreen/`)
-- Klipper mods: KAMP configs, Axis Twist module, TMC Autotune config, Skew config
-- System patches: `probe.py` is restored from the backup the installer took
-- Init scripts added by OpenKE (the factory reset service, any camera scripts)
+- Klipper mod **config files**: KAMP configs, the Axis Twist config, TMC Autotune config, Skew config.
+  The underlying Python modules (`axis_twist_compensation.py`, `autotune_tmc.py`, etc.) are deliberately
+  **left in place** in `klippy/extras` — removing them could break a `printer.cfg` section that still
+  references them, since the uninstaller doesn't touch `printer.cfg` itself.
+- The factory-reset init script (`S58factoryreset`)
+
+### What it does NOT automatically restore
+
+- **`probe.py`** — the uninstaller does not copy this back for you. If Axis Twist Compensation patched
+  it, the original is saved at `/usr/data/guppyify-backup/probe.py.bak`; restore it yourself with
+  `cp /usr/data/guppyify-backup/probe.py.bak /usr/share/klipper/klippy/extras/probe.py` if you need to.
+- **`S50dropbear`** (the SSH startup script) — this is intentional, not an oversight. OpenKE's install
+  replaces the stock version to fix a boot-time race that can prevent SSH from starting reliably.
+  Reverting to the stock version on uninstall would bring that problem back right when you might most
+  need SSH access (e.g. to reinstall). The fixed version is left in place permanently.
 
 ### What it keeps
 
@@ -66,7 +78,9 @@ mods. Use this only when you need a truly clean slate or the printer is in an un
 
 Works even when the screen is black, Klipper is dead, or SSH isn't responding.
 
-1. Format a USB drive as FAT32.
+1. Format a USB drive — **FAT32 is recommended** for the widest compatibility with the printer's USB
+   auto-mount support (the reset script itself doesn't check the filesystem format, but unrecognized
+   formats may not get mounted at all, so the trigger file would never be seen).
 2. Create an **empty file** named exactly `emergency_factory_reset` in the root of the drive (no
    extension, no `.txt`).
 3. Eject the drive, then plug it into the printer while it is **powered off**.
@@ -75,7 +89,7 @@ Works even when the screen is black, Klipper is dead, or SSH isn't responding.
 
 ### Method 2 — Screen (Settings panel)
 
-Open **Settings → System Info → Reset Options → Factory Reset Printer** → red Confirm button.
+Open **Settings → System → Reset Options → Factory Reset Printer** → red Confirm button.
 
 ### Method 3 — SSH
 
@@ -90,9 +104,9 @@ Open **Settings → System Info → Reset Options → Factory Reset Printer** �
 | `/overlay/upper/` | **Wiped** — all system-level modifications removed |
 | `/usr/data/guppyscreen/` | **Wiped** — OpenKE binary and config |
 | `/usr/data/printer_data/` | **Wiped** — Klipper config, gcodes, calibration |
-| `/usr/data/printer_data/logs/` | **Kept** — logs survive for diagnosis |
+| `/usr/data/printer_data/logs/` | **Mostly wiped** — only 3 specific files survive: `guppyscreen.log`, `grumpyscreen.log`, and `factoryreset.log`. Everything else in `logs/` is deleted. |
 | `/usr/data/wpa_supplicant.conf` | **Kept** — WiFi credentials survive |
-| `/usr/data/creality/` | **Kept** — Creality cloud account & device identity |
+| `/usr/data/creality/` | **Partially kept** — only specific identity files survive (`system_config.json`, `user_data_not_deleted.json`, `user_agree_root`); most of the rest of this folder's contents are wiped |
 
 ### After the reset
 
