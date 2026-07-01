@@ -94,6 +94,8 @@ if your calipers allow):
 
 ## Step 3 — Enter them on the screen
 
+![Skew Correction panel](images/skew-correction.png)
+
 1. On the printer: **Tune → Skew**.
 2. Tap each field and type the millimetre value (the keypad has a decimal point): **A-C**, **B-D**, **A-D**.
 3. Tap **Apply & Save**.

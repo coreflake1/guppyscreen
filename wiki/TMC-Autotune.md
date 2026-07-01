@@ -89,6 +89,8 @@ the screen lists each stepper (X, Y, Z) with two dropdowns.
 
 ## Pick your motors and tune
 
+![TMC Autotune panel](images/tmc-autotune.png)
+
 For each axis, choose the **Motor** from the dropdown, then a **Tuning Goal**, then tap **Save/Restart**.
 
 **Recommended on the KE** (these are the stock motors):

@@ -89,6 +89,8 @@ Works even when the screen is black, Klipper is dead, or SSH isn't responding.
 
 ### Method 2 — Screen (Settings panel)
 
+![Reset Options dialog](images/reset-options.png)
+
 Open **Settings → System → Reset Options → Factory Reset Printer** → red Confirm button.
 
 ### Method 3 — SSH

@@ -44,6 +44,8 @@ You only need to do this once per printer lifetime, unless you change the X gant
 
 ### Option A — from the screen (easiest)
 
+![Axis Twist intro screen](images/axis-twist.png)
+
 Open **Tune → Axis Twist** on the printer screen. You'll see an intro screen explaining the same paper
 test described above, confirming homing and mesh-clearing happen automatically — tap the green
 **Start Calibration** button to begin. The wizard then walks you through the 5 points on the screen

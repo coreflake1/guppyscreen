@@ -30,6 +30,8 @@ already-active tab resets it (Macros jumps back to favourites, Console clears th
 
 Your everyday screen. Inline content — no launcher grid.
 
+![Home tab](images/home-tab.png)
+
 ### Temperature panel
 
 Shows live read-outs with target values for whichever sensors are configured in `guppyconfig.json`
@@ -67,6 +69,8 @@ Five icon buttons below the temperatures. Each opens a **floating panel** over t
 
 Opens from the Home tab **Homing** button.
 
+![Homing panel](images/homing-panel.png)
+
 ### Jog controls
 
 - **Move Distance selector:** 0.1 mm / 1 mm / 5 mm / 10 mm / 50 mm / 100 mm — how far each direction tap moves.
@@ -102,6 +106,8 @@ Toggle to match your mental model. (Also settable permanently in Settings → Sy
 ---
 
 ## Filament panel (extruder)
+
+![Filament panel](images/filament-panel.png)
 
 Opens from the Home tab **Extrude** button. Six buttons in total — **Load**, **Unload**, **Cooldown**
 on the left; **Spoolman**, **Extrude**, **Retract**, **Back** on the right — plus three preset
@@ -154,6 +160,8 @@ first, then runs the move once it's up to temperature. Also auto-cools after eac
 
 Opens from the Home tab **Fans** button.
 
+![Fan panel](images/fan-panel.png)
+
 There are two very different kinds of row here, and which one you get depends on whether the fan is
 listed in `guppyconfig.json`'s `fans` setting:
 
@@ -174,6 +182,8 @@ If you want a fan that currently shows as read-only to become adjustable, add it
 
 Opens from the Home tab **LED** button.
 
+![LED panel — empty because no LED/light is configured on this printer](images/led-panel.png)
+
 Each LED/light Klipper reports appears as a row with **Off**, a brightness slider, and **Max** — unless
 it's a simple on/off light (no PWM dimming), in which case the slider is hidden and you get **Off**/**On**
 only. **If your printer.cfg has no `[led]`/`[neopixel]`/output-pin light section at all, this screen is
@@ -185,6 +195,8 @@ This is common: not every KE has a case light wired into Klipper, so don't be su
 ## File browser (Print)
 
 Opens from the Home tab **Print** button.
+
+![File browser](images/file-browser.png)
 
 - Lists `.gcode` files from internal storage and any plugged-in USB stick. A `..` row at the top lets
   you go up a folder.
@@ -280,6 +292,8 @@ Type any gcode command directly, same as the Mainsail terminal.
 A **4-column × 3-row grid of icon buttons**. Tapping a button opens its sub-panel full-screen. Nothing
 is adjusted inline on this tab.
 
+![Tune tab grid](images/tune-tab-grid.png)
+
 | Row | Col 1 | Col 2 | Col 3 | Col 4 |
 |---|---|---|---|---|
 | 1 | Fine Tune | Z Offset | Retraction | Limits |
@@ -287,6 +301,8 @@ is adjusted inline on this tab.
 | 3 | Belts/Shake | Power Settings | TMC Autotune | TMC Metrics |
 
 ### Fine Tune
+
+![Fine Tune panel](images/fine-tune-panel.png)
 
 Not sliders — this panel is entirely **+ / − buttons**, each with a matching **Reset** button, usable
 during a print or any time. There are two step-size selectors that control how much each button tap
@@ -305,6 +321,8 @@ tab grid, described below.
 
 ### Z Offset
 
+![Z Offset panel](images/z-offset.png)
+
 First-layer baby-stepping. Same as tapping Z on the print-status screen, but also usable outside a print.
 
 - **Raise (farther from bed)** / **Lower (closer to bed)** buttons, plus a **Reset** button that sets
@@ -320,6 +338,8 @@ First-layer baby-stepping. Same as tapping Z on the print-status screen, but als
   which would leave the displayed value out of sync with what's actually stored. Homing first avoids that.
 
 ### Retraction
+
+![Retraction panel](images/retraction.png)
 
 There are **two separate requirements** here, and both have to be true for this to actually do
 anything to your prints:
@@ -343,6 +363,8 @@ file's values.
 
 ### Limits
 
+![Limits panel](images/limits.png)
+
 Hard caps on machine speed and acceleration, each shown as a slider with its own **Reset** button
 (resets that one value back to what's set in `printer.cfg`, not a fixed factory number):
 
@@ -361,6 +383,8 @@ Raising these doesn't automatically make prints faster — the slicer's own spee
 Going beyond what the machine can handle causes ringing artifacts.
 
 ### Bed Mesh
+
+![Bed Mesh panel (table view)](images/bed-mesh.png)
 
 Opens showing a **table of raw Z values** at each probe point by default (colour-shaded — blue is low,
 red is high) plus an info panel (Algorithm, Tension, and the X/Y probe range — min, max, count, points
@@ -381,6 +405,8 @@ actually works.
 
 #### 3D View screen
 
+![Bed Mesh 3D view](images/bed-mesh-3d-view.png)
+
 - **Drag anywhere on the mesh** to rotate it — the angle readout in the top-left (`View: X=... Y=...
   Z=...`) updates live as you drag.
 - The colour scale on the left maps colour to height (red = high, blue = low); the exact range and the
@@ -395,6 +421,8 @@ actually works.
   table to actually leave the panel.
 
 ### Input Shaper
+
+![Input Shaper panel](images/input-shaper.png)
 
 Reduces ghosting/ringing (echoes trailing sharp corners at speed). The panel has 3 buttons on the left
 (**Calibrate**, **Save**, **Stop**) and, per axis, a toggle switch, a frequency value, and a shaper-type
@@ -422,10 +450,14 @@ Typical flow:
 
 ### Axis Twist
 
+![Axis Twist intro screen](images/axis-twist.png)
+
 Launches the 5-point calibration wizard for Axis Twist Compensation. Fixes first layers that are
 uneven left-to-right despite re-meshing. Full guide: [Axis Twist Compensation](Axis-Twist-Compensation).
 
 ### Skew
+
+![Skew Correction panel](images/skew-correction.png)
 
 Corrects parts that come out as slight parallelograms instead of squares.
 
@@ -436,6 +468,8 @@ Corrects parts that come out as slight parallelograms instead of squares.
 Full guide: [Skew Correction](Skew-Correction).
 
 ### Belts/Shake
+
+![Belts/Shake panel](images/belts-shake.png)
 
 Checks mechanical resonance to help compare left vs. right belt tension. Matched tension = cleaner
 prints. Two different buttons here do different things:
@@ -452,12 +486,16 @@ prints. Two different buttons here do different things:
 
 ### Power Settings
 
+![Power Settings panel](images/power-settings.png)
+
 | Section | What it does |
 |---|---|
 | **Power devices** | On/off buttons for any smart plugs or relays configured in Moonraker. **If none are configured, this section doesn't appear at all** — no placeholder text, it's just not there. |
 | **Power Loss Recovery** | Resume a print that was interrupted by a power cut. **Not automatic** — after power comes back, you have to open this screen yourself. It reads Creality's own saved print-state file to find something to resume, so it isn't a GuppyKE-invented feature; if that file is missing or stale, there's nothing to offer. Three things you might see here: (1) if a print is currently running, "A print is running. If power is lost, reopen this screen to resume." — that's the reminder of what to do; (2) if nothing is recoverable, "No interrupted print to recover."; (3) if something is recoverable, a **Resume** button (reheats and returns to the saved position — a real resume, not a restart) and a **Dismiss** button (clears the prompt without printing). If the saved position turns out invalid, it safely restarts the file from the beginning instead of crashing. |
 
 ### TMC Autotune
+
+![TMC Autotune panel](images/tmc-autotune.png)
 
 Quieter, cooler, sometimes smoother steppers. Select motor type and a goal, tap **Save/Restart**:
 
@@ -470,6 +508,8 @@ Settings are saved and reapplied every boot.
 > during the print-quality mods step). Full guide: [TMC Autotune](TMC-Autotune).
 
 ### TMC Metrics
+
+![TMC Metrics panel](images/tmc-metrics.png)
 
 The panel itself says it best: **"TMC Metrics is experimental and disabled by default."** There's a
 toggle at the top — it's off unless you turn it on (turning it on/off loads or unloads a separate
@@ -493,6 +533,8 @@ needed for normal printing or normal troubleshooting. If you suspect a driver is
 
 A **4-column × 2-row grid of icon buttons** plus a quick-action restart row at the top. Nothing is
 configured inline on this tab.
+
+![Settings tab grid](images/settings-tab.png)
 
 ### Quick-action row (top row)
 
@@ -520,6 +562,8 @@ These execute immediately — no sub-panel opens:
 
 Opens from Settings → **WIFI**.
 
+![WiFi panel](images/wifi-panel.png)
+
 | Control | What it does |
 |---|---|
 | **Network list** | Scans and shows available networks. Tap one to connect (prompts for password). Rescans automatically on open; tap the scan button to refresh. Your **current** network and any **previously-saved** networks show a small **✕** next to them — but it does two different things depending on which: on the currently-connected network, ✕ just **disconnects** (credentials stay saved); on any other saved-but-not-connected network, ✕ **permanently forgets** it (removes the saved credentials). |
@@ -535,6 +579,8 @@ Opens from Settings → **WIFI**.
 
 Opens from Settings → **Printers**. Manages Moonraker connections.
 
+![Printers panel](images/printers-panel.png)
+
 Each configured printer is shown as a card with its name, IP, and port, plus:
 
 - **Switch** — reconnects OpenKE to that printer
@@ -547,6 +593,8 @@ Each configured printer is shown as a card with its name, IP, and port, plus:
 ---
 
 ## Spoolman panel
+
+![Spoolman panel](images/spoolman-panel.png)
 
 Opens from Settings → **Spoolman**. Requires a [Spoolman](https://github.com/Donkie/Spoolman) server
 on your network — the button is greyed out until one is configured.
@@ -563,6 +611,8 @@ on your network — the button is greyed out until one is configured.
 ---
 
 ## System panel
+
+![System panel](images/system-panel.png)
 
 Opens from Settings → **System**. This is the main settings panel for the screen itself — everything
 that changes how OpenKE behaves.
@@ -592,6 +642,8 @@ currently running OpenKE version. Read-only.
 ### Reset Options
 
 Tap the **Reset Options** button (top-right corner of the System panel) to open a dialog with three choices:
+
+![Reset Options dialog](images/reset-options.png)
 
 | Option | What it does |
 |---|---|

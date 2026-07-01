@@ -117,6 +117,8 @@ SAVE_CONFIG
 
 Or tap **Tune → Bed Mesh → Calibrate** on the screen. Takes 2–3 minutes.
 
+![Bed Mesh panel](images/bed-mesh.png)
+
 If you installed KAMP (the installer default), use `ADAPTIVE_BED_MESH_CALIBRATE` in your slicer start
 G-code instead — it re-meshes just the print footprint automatically at the start of each print. See
 [Adaptive Meshing (KAMP)](Adaptive-Meshing-KAMP).
@@ -151,6 +153,8 @@ Set the nozzle-to-bed gap by watching the first layer go down:
 ## Step 5 — Input shaper (kill ringing/ghosting)
 
 Those faint echoes trailing sharp corners are vibration. Input shaping cancels them.
+
+![Input Shaper panel](images/input-shaper.png)
 
 **On the screen:** Tune → Input Shaper. There's a switch per axis (X, Y) — leave both on to test both at
 once, or switch one off to redo just the other. There's also a **Graph** switch, off by default; turn it
