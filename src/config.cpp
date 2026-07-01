@@ -96,7 +96,12 @@ void Config::init(std::string config_path, const std::string thumbdir) {
     default_printer = "/printers/" + df_name.template get<std::string>() + "/";
 
     auto &monitored_sensors = data[json::json_pointer(df() + "monitored_sensors")];
-    if (monitored_sensors.is_null()) {
+    // Catch an empty array too, not just a missing key — a stale/broken config
+    // (e.g. from a bad packaging run) can leave this present but empty, which
+    // otherwise falls through to State::get_display_sensors()'s raw-id fallback
+    // and shows ugly labels like "Heater Bed" / "Temperature Sensor Mcu Temp".
+    if (monitored_sensors.is_null()
+        || (monitored_sensors.is_array() && monitored_sensors.empty())) {
       data[json::json_pointer(df() + "monitored_sensors")] = sensors_conf;
     }
 
@@ -135,7 +140,7 @@ void Config::init(std::string config_path, const std::string thumbdir) {
 
     auto &ll = data[json::json_pointer(df() + "log_level")];
     if (ll.is_null()) {
-      data[json::json_pointer(df() + "log_level")] = "debug";
+      data[json::json_pointer(df() + "log_level")] = "info";
     }
   }
   auto &rotate = data["/display_rotate"_json_pointer];
@@ -175,6 +180,12 @@ void Config::init(std::string config_path, const std::string thumbdir) {
   if (invert_y_applied.is_null()) {
     data["/invert_y_direction"_json_pointer] = true;
     data["/invert_y_ke_default_applied"_json_pointer] = true;
+  }
+
+  auto &invert_z_applied = data["/invert_z_ke_default_applied"_json_pointer];
+  if (invert_z_applied.is_null()) {
+    data["/invert_z_direction"_json_pointer] = true;
+    data["/invert_z_ke_default_applied"_json_pointer] = true;
   }
 
   std::ofstream o(config_path);
