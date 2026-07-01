@@ -112,13 +112,53 @@ Then delete the saved `[axis_twist_compensation]` block (if any) from `printer.c
 
 ---
 
-## Manual probe patch (advanced)
+## Manual installation (advanced)
 
-The installer patches `probe.py` for you as part of a normal install — you don't need any of the steps
-below for a normal install. This section is only for the rare case where the installer detected a
-`probe.py` that didn't look like what it expected and deliberately **skipped** patching it rather than
-risk a half-applied change (you'll see `STOP` in the install log if this happened to you). If so, apply
-the same one-line patch by hand.
+The installer does all of this for you — the module, the config section, and the `probe.py` patch —
+using its own vendored copy pinned to **Klipper v0.12.0** (the KE's stock Klipper predates this module,
+so we can't just rely on whatever version is already on the printer). You don't need any of the steps
+below for a normal install. This section is only for people who want to set it up entirely by hand
+instead of using the installer.
+
+<details>
+<summary>Manual steps</summary>
+
+1. **Install the module** — verbatim from Klipper v0.12.0:
+   ```sh
+   wget --no-check-certificate -O /usr/share/klipper/klippy/extras/axis_twist_compensation.py \
+     https://raw.githubusercontent.com/Klipper3d/klipper/v0.12.0/klippy/extras/axis_twist_compensation.py
+   ```
+2. **Add the config section** — create
+   `/usr/data/printer_data/config/GuppyScreen/axis_twist_compensation.cfg` (or paste straight into
+   `printer.cfg`) with the KE's bed bounds:
+   ```ini
+   [axis_twist_compensation]
+   calibrate_start_x: 20
+   calibrate_end_x: 200
+   calibrate_y: 110
+   ```
+3. **Patch `probe.py`** — Klipper needs a one-line hook to actually call the module during probing, and
+   the KE's stock `probe.py` predates it. Open `/usr/share/klipper/klippy/extras/probe.py`, find the
+   function `def _probe`, and just before its `return epos[:3]` line, insert:
+   ```python
+        axis_twist_compensation = self.printer.lookup_object(
+            'axis_twist_compensation', None)
+        if axis_twist_compensation is not None:
+            epos[2] += axis_twist_compensation.get_z_compensation_value(pos)
+   ```
+4. Save, then `FIRMWARE_RESTART`. Carry on to the calibration above.
+
+</details>
+
+---
+
+## If the installer skipped the probe patch
+
+The installer patches `probe.py` for you automatically as part of a normal install — you don't need
+this section unless you've hit the one specific gap it can't paper over. It deliberately **skips** the
+patch if your firmware's `probe.py` doesn't look like what it expected, rather than risk half-applying
+it — you'll see `STOP` in the install log if this happened to you. If so, the module and config are
+already installed; you just need the patch.
 
 <details>
 <summary>Manual steps</summary>
