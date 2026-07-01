@@ -259,31 +259,77 @@ Saves automatically.
 
 All your Klipper gcode macros, accessible from the screen. Inline content — no launcher grid.
 
-- **Favourites view** (default) — macros you've pinned. Tap the ★ icon on any macro to pin/unpin. Tapping
-  the Macros tab when already on it jumps back here.
-- **All macros** — full scrollable list, grouped by category (the `[gcode_macro]` section names in your
-  config). Tap a category header to expand it.
-- **Parameters** — tap a macro to expand its parameter inputs. Fill them in before running, or leave
-  defaults as-is.
+![Macros tab — All Macros view](images/macros-all.png)
+
+- **Favorites / All Macros** — a segmented toggle at the top switches between the two views. Favorites
+  (the default) shows only macros you've pinned; if you have none yet, it says "No favorites yet. Open
+  All Macros and tap the star to add." Tapping the Macros tab again while already on it jumps back to
+  Favorites.
+- **All Macros is a flat, alphabetical list — not grouped by category.** Each row has a ☆ star (tap to
+  pin/unpin as a favorite) and a green ▶ button that runs that macro immediately.
+- **Up / ✓ / Down column** on the right — this is a separate navigation aid, not a scrollbar: **Up**/
+  **Down** move a highlight cursor through the list one row at a time, and **✓** expands (or collapses)
+  the currently highlighted macro's parameter inputs, scrolling it into view. You can also just tap a
+  macro's row directly with your finger to expand it — the ✓ column is an alternative for precise
+  selection, not the only way in.
+- **Parameters** — once expanded (by tapping the row or via ✓), fill in the parameter inputs before
+  running, or leave defaults as-is.
 
 ---
 
 ## Console tab
 
-Direct gcode access. Inline content — no launcher grid.
+Direct gcode access. Inline content — no launcher grid. **Opens on the terminal view by default** —
+tapping the Console tab again while already on it resets back to this terminal view too.
 
-### Command browser
+![Console tab — terminal view](images/console-terminal.png)
 
-Drill-down interface: tap a **category** → see commands in it → tap a **command** → see its description
-and parameters → tap **Run**. Good for exploring what's available without a cheat-sheet. Tapping the
-Console tab when already on it jumps back to the top.
-
-### Direct input
+### Direct input (the default view)
 
 Type any gcode command directly, same as the Mainsail terminal.
 
 - **History** — last 100 entries. Temperature-spam lines (`T:210 B:60 …`) are filtered so they don't
   flood the history. Tap a history entry to re-run it.
+- The small **list icon** to the left of the text field (not a separate tab) is how you get to the
+  Command Browser described below.
+
+### Command browser
+
+Reached by tapping the **list icon** next to the text field on the terminal view — it isn't a separate
+tab of its own.
+
+![Console command browser — category list](images/console-categories.png)
+
+The category list always starts with **Favorites** and **Recent**, followed by keyword-based groups
+(Bed Mesh/Leveling, Probe/Calibration, Motion, Temperature/Fans, Extruder/Filament, and more), each
+showing a command count. Two things worth knowing about the first two:
+
+- **Favorites here are separate from the Macros tab's favorites** — this is its own star list, specific
+  to gcode commands in this browser, with its own empty-state message ("No favorites yet. Star commands
+  in any list.").
+- **Recent is shared history with Fluidd** — it's not tracking only what you've run from this screen;
+  it reflects command history from other interfaces too, if you use them.
+
+The same **Up / ✓ / Down** navigation column from the Macros tab appears here too (see
+[Macros tab](#macros-tab) for what it does).
+
+Drill-down interface: tap a **category** → see commands in it. **There is no third "detail" level with
+a description and its own Run button** — tapping a command inserts its name straight into the
+terminal's input field and switches you back to the terminal view, keyboard already open, cursor at
+the end so you can type any parameters yourself:
+
+![After tapping a command, it's inserted into the terminal input, ready to run or edit](images/console-command-inserted.png)
+
+Press the green **↵** button on the terminal to actually run it. This is really a fast way to look up
+and insert a command name without typing it from memory, not a guided form. If tapping a command
+doesn't seem to do anything, try again with a firm, clean tap — the resistive touchscreen occasionally
+misses a light tap.
+
+![Console — command list within a category](images/console-command-list.png)
+
+Inside a category, a **filter** box appears at the bottom (only at this level, not on the category list
+itself) — type to narrow the list live. Each command here also has its own ☆ star, same favoriting
+behavior as the category list.
 
 ---
 
