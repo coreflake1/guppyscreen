@@ -27,7 +27,7 @@ It bundles three things people usually hunt down separately:
 - 🖨️ **Print control & status** — temps, fans, LED, movement/homing, file browser (incl. USB sticks), Spoolman
 - 🟦 **Interactive 3D bed mesh** — rotate / zoom / pan colour height map (plus a table view)
 - 🎯 **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset baby-stepping, input-shaper & belt graphs
-- 🎚️ **Fine-tune mid-print** — speed, flow, Z-offset, pressure advance, firmware retraction
+- 🎚️ **Fine-tune mid-print** — speed, flow, Z-offset, pressure advance (firmware retraction is its own panel)
 - 📷 **Camera** — persistent image tuning (contrast/saturation) on the stock camera
 - 🔔 **Buzzer beeps & songs** — real-pitch `M300`, `PLAY_TUNE` jingles (editable `songs.conf`), soft touchscreen click
 - 🔌 **Power-loss recovery**, **WiFi low-latency** toggle, on-screen notifications
@@ -50,10 +50,12 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 > Use `installer.sh` — **not** `installer-deb.sh` (that one is for aarch64/Debian and refuses to run on the KE).
 
 **It also offers the print-quality extras** (install all / skip all / choose each): KAMP, Axis Twist
-Compensation, TMC Autotune, Skew Correction, the Creality Nebula camera (image tuning), the
-Pause/Resume layer-shift fix, and the Creality macros (M600, Save Z-Offset, useful macros, Exclude Object).
-Already set some up by hand or via the **Creality Helper Script**? It detects and **skips** those — safe to
-run on an existing setup, and it **never rewrites your saved calibrations**.
+Compensation, TMC Autotune, Skew Correction, Firmware Retraction, Screws Tilt Adjust, the Creality
+Nebula camera (image tuning), the Pause/Resume layer-shift fix, and the Creality macros (M600, Save
+Z-Offset, useful macros, Exclude Object). Already set some up by hand or via the **Creality Helper
+Script**? It detects and **skips** those — safe to run on an existing setup, and re-running it **merges
+into your existing settings rather than overwriting them**, so nothing you've already configured (on
+the screen or in Klipper) gets reset.
 
 **Updating:** from the screen, **Settings → Update Guppy**. Coming from an older version (or "GuppyKE")?
 See **[Upgrading](https://github.com/coreflake1/guppyscreen/wiki/Upgrading)**.
@@ -75,16 +77,17 @@ Thingiverse — **[Ender-3 V3 KE screen mount](https://www.thingiverse.com/thing
 
 ## Screenshots
 
-> Captured in the desktop simulator at the KE's native 480×272.
+> Captured live from a real Ender-3 V3 KE at its native 480×272 — not the simulator. Many more, covering
+> every screen in the app, are in the [screen reference](https://github.com/coreflake1/guppyscreen/wiki/Using-GuppyKE).
 
 | | |
 |:---:|:---:|
-| **Home** | **Live Z-Offset** |
-| ![Home screen](docs/screenshots/home.png) | ![Z-Offset baby-stepping](docs/screenshots/z-offset.png) |
-| **Firmware Retraction** | **Tune menu** |
-| ![Firmware Retraction](docs/screenshots/firmware-retraction.png) | ![Tune menu](docs/screenshots/tune-menu.png) |
-| **Fans** | **Extruder** |
-| ![Fans](docs/screenshots/fans.png) | ![Extruder heating](docs/screenshots/extruder.png) |
+| **Home** | **Tune menu** |
+| ![Home screen](docs/screenshots/home.png) | ![Tune menu](docs/screenshots/tune-menu.png) |
+| **Interactive 3D bed mesh** | **Print status** |
+| ![3D bed mesh](docs/screenshots/bed-mesh-3d.png) | ![Print status](docs/screenshots/print-status.png) |
+| **Skew Correction** | **Spoolman** |
+| ![Skew Correction](docs/screenshots/skew-correction.png) | ![Spoolman](docs/screenshots/spoolman.png) |
 
 ## Documentation
 
