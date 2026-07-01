@@ -26,6 +26,7 @@ This project builds on the work of:
 
 - [ballaswag/guppyscreen](https://github.com/ballaswag/guppyscreen) — the original GuppyScreen
 - [probielodan/guppyscreen](https://github.com/probielodan/guppyscreen) — KE-focused UI rework
+- [pellcorp/grumpyscreen](https://github.com/pellcorp/grumpyscreen) — bug fixes and improvements
 - [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen) — 3D bed mesh feature
 - [Moonraker](https://github.com/Arksine/moonraker), [KlipperScreen](https://github.com/KlipperScreen/KlipperScreen),
   [Fluidd](https://github.com/fluidd-core/fluidd), [Klippain-shaketune](https://github.com/Frix-x/klippain-shaketune)
