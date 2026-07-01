@@ -45,11 +45,12 @@ uninstall_guppy() {
         printf "${yellow}No S12boot_display backup found. Restore manually if needed.${white}\n"
     fi
 
-    # Restore S50dropbear from backup (we replaced it with a custom version)
-    if [ -f "$BACKUP_DIR/S50dropbear" ]; then
-        cp "$BACKUP_DIR/S50dropbear" /etc/init.d/S50dropbear
-        printf "${green}Restored S50dropbear${white}\n"
-    fi
+    # Deliberately NOT restoring stock S50dropbear here: it has a startup race
+    # with display-server (which S99start_app, restored below, brings back),
+    # so reverting it would reintroduce flaky SSH-at-boot right when someone
+    # uninstalling might most want reliable remote access. The fix has no
+    # GuppyScreen-specific behavior, so it's safe to leave in place.
+    printf "${green}Keeping the SSH init-script fix (S50dropbear) — it's a general boot-reliability fix, not GuppyScreen-specific.${white}\n"
 
     # Restore S99start_app from backup
     if [ -f "$BACKUP_DIR/S99start_app" ] && [ ! -f /etc/init.d/S99start_app ]; then
