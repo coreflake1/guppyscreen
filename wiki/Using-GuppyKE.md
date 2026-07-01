@@ -220,15 +220,18 @@ you navigate away from it back to the **Home tab** while printing, a compact pro
 there in place of the usual action buttons — tap it to bring the full print status screen back. This
 shortcut only appears on the Home tab, not on Macros/Console/Tune/Settings.
 
-| Element | What it shows |
-|---|---|
-| File name + thumbnail | The file being printed |
-| Progress bar | Percentage complete |
-| Time remaining / elapsed | Running estimates |
-| Layer X / Y | Current layer and total |
-| Z offset (live) | Tap to baby-step — see below |
-| Speed | Current print speed in mm/s |
-| Flow | Current volumetric flow rate in mm³/s (not the same as the Fine Tune panel's flow **percentage** — see below) |
+![Print status screen during an active print](images/print-status.png)
+
+Thumbnail, file name, and a progress bar sit on the left. On the right is a fixed **5-row × 2-column**
+grid, in this exact order:
+
+| Row | Left column | Right column |
+|---|---|---|
+| 1 | **Extruder temp** — current, or `current / target` while a target is set | **Bed temp** — same current/target format |
+| 2 | **Chamber temp** — same format. **Always shown here, even if you don't have a "Chamber" sensor configured** (unlike the Home tab, which hides it in that case) | **Speed** — current print speed in mm/s |
+| 3 | **Z-offset** — tap this one specifically to open the baby-stepping panel right here | **Flow** — volumetric flow rate in mm³/s (not the same thing as the Fine Tune panel's flow **percentage**) |
+| 4 | **Layers** — always `current / total` | **Elapsed** time |
+| 5 | **Fan speed(s)** — if more than one fan is relevant, shown comma-separated | **Time left** (estimate) |
 
 Pressure Advance and total filament used are **not** shown on this screen. Pressure Advance can be
 adjusted live from the **Tune tab → Fine Tune** panel while a print is running; filament used is
@@ -247,11 +250,29 @@ Saves automatically.
 
 ### Control buttons
 
+Six buttons in total: **Fine Tune**, **Objects**, **Pause** (becomes **Resume** once paused), **Cancel**,
+**Stop**, **Back**.
+
 | Button | What it does |
 |---|---|
-| **Pause** | Parks the toolhead, holds temperatures. **Resume** brings it back and continues. |
+| **Fine Tune** | Shortcut straight to the [Fine Tune panel](#fine-tune) — same one reachable from the Tune tab. |
+| **Objects** | Opens the [Exclude Object screen](#exclude-object-screen) below. |
+| **Pause / Resume** | Parks the toolhead, holds temperatures. **Resume** brings it back and continues. |
 | **Cancel** | Cancels the print. Shows a red Confirm dialog. For the very last remaining object (Exclude Object), shows a "Cancel print?" confirmation. |
-| **Emergency Stop** | Cuts all movement and heaters immediately. Use only if something is going wrong physically. Requires a power-cycle or `FIRMWARE_RESTART` to recover. |
+| **Stop** | The button's actual label is just **"Stop"**, not "Emergency Stop" — but it is the same emergency-stop action as everywhere else in the app. Cuts all movement and heaters immediately. Use only if something is going wrong physically. Requires a power-cycle or `FIRMWARE_RESTART` to recover. |
+
+---
+
+### Exclude Object screen
+
+![Exclude Object screen](images/exclude-object.png)
+
+Opens from the print status screen's **Objects** button — only useful for gcode files sliced with
+object labels (the same "Label Objects" slicer setting KAMP relies on). Shows each object as a shape you
+can tap: green means **"Printing now"**, plain means **"Tap to exclude"**, red means **"Excluded"**.
+Skipping an object stops printing it partway through without cancelling the whole job — useful if one
+part of a multi-part print has failed but the rest is still going well. A counter below the legend
+reads exactly **"N object(s), N excluded"**.
 
 ---
 
