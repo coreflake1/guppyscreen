@@ -159,7 +159,12 @@ back on their own — just open **Tune → TMC Autotune** to confirm.
 ## Set it up manually (advanced)
 
 The installer does all of this for you. If you'd rather do it by hand (or you want to know exactly what
-the installer changed), here are the steps. Over SSH (`ssh root@<printer-ip>`):
+the installer changed), here are the steps.
+
+<details>
+<summary>Manual steps</summary>
+
+Over SSH (`ssh root@<printer-ip>`):
 
 **1. Install the add-on** — three files into Klipper's add-on folder. **Use the exact commit OpenKE
 vendors and tests against**, not the upstream `main` branch — `main` can move on without notice and end
@@ -182,6 +187,8 @@ already have it). Without it, the on-screen Save fails with "Unknown command".
 **3. Restart** — **Restart Klipper** (Mainsail → *Restart*, or `FIRMWARE_RESTART`). The button lights up.
 If Klipper shuts down with a `serialqueue` error on the first try, restart once more — it's a harmless KE
 host-MCU race ([Troubleshooting](Troubleshooting)).
+
+</details>
 
 ---
 

@@ -139,7 +139,11 @@ The OpenKE installer enables this for you (it ships a `[skew_correction]` sectio
 and answer **Y** at the print-quality-mods prompt, then **Restart Klipper** (if it shuts down with a
 `serialqueue` error, restart once more — see [Troubleshooting](Troubleshooting)).
 
-Prefer to do it by hand? It's one bare section (no settings):
+You don't need any of the steps below for a normal install — this is only for people who'd rather add
+the one bare section (no settings) by hand instead of re-running the installer.
+
+<details>
+<summary>Manual steps</summary>
 
 1. Open `printer.cfg` (Mainsail **Machine** tab, or over SSH).
 2. Add this line **anywhere above** the `#*# <---- SAVE_CONFIG ---->` marker:
@@ -147,6 +151,8 @@ Prefer to do it by hand? It's one bare section (no settings):
    [skew_correction]
    ```
 3. Save and `FIRMWARE_RESTART`.
+
+</details>
 
 > A Creality firmware update can reset this. If the Skew button stops working after an update, just re-run
 > the installer (or re-add that one line). Your saved skew values live in `printer.cfg` and aren't lost by

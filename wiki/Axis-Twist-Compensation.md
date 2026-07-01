@@ -112,11 +112,16 @@ Then delete the saved `[axis_twist_compensation]` block (if any) from `printer.c
 
 ---
 
-## If the installer skipped the probe patch
+## Manual probe patch (advanced)
 
-The installer patches `probe.py` automatically, but deliberately **skips** if your firmware's file looks
-different than expected — better to skip than half-apply. If you see `STOP` in the install log, do the
-one edit by hand:
+The installer patches `probe.py` for you as part of a normal install — you don't need any of the steps
+below for a normal install. This section is only for the rare case where the installer detected a
+`probe.py` that didn't look like what it expected and deliberately **skipped** patching it rather than
+risk a half-applied change (you'll see `STOP` in the install log if this happened to you). If so, apply
+the same one-line patch by hand.
+
+<details>
+<summary>Manual steps</summary>
 
 1. Open `/usr/share/klipper/klippy/extras/probe.py`.
 2. Find the function `def _probe` and, just before its `return epos[:3]` line, insert:
@@ -127,6 +132,8 @@ one edit by hand:
             epos[2] += axis_twist_compensation.get_z_compensation_value(pos)
    ```
 3. Save, then `FIRMWARE_RESTART`. Carry on to the calibration above.
+
+</details>
 
 ---
 
