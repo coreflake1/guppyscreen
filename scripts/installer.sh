@@ -580,6 +580,12 @@ NGINX_CONF_EOF
                 printf "${green}  Installing Mainsail...${white}\n"
                 python3 -c "import zipfile; zipfile.ZipFile('/tmp/mainsail.zip').extractall('/usr/data/mainsail/')"
                 rm -f /tmp/mainsail.zip
+                # zipfile.extractall() falls back to the umask-masked default
+                # mode when the archive carries no Unix permission bits — on
+                # a restrictive-umask root shell that leaves everything
+                # owner-only, which nginx's www-data worker can't read
+                # (browser sees 403 Forbidden even though extraction "worked").
+                chmod -R a+rX /usr/data/mainsail
                 if [ ! -f /usr/data/mainsail/index.html ]; then
                     printf "${red}  [FAIL] Mainsail extraction failed (no index.html) — re-run the installer to retry.${white}\n"
                     _mainsail_ok=2
