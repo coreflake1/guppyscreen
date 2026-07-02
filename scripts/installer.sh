@@ -388,6 +388,12 @@ fi
 # that the next step would try to extract, crash on, and then get papered
 # over by an unconditional "[OK]" — leaving nginx serving an empty Mainsail
 # dir (browser sees 403 Forbidden) while the installer claimed success.
+#
+# Some on-device wget builds can't complete a TLS handshake with github.com's
+# release-asset redirects (works fine for raw.githubusercontent.com, fails
+# with "TLS error from peer (alert code 80)") — the same issue the
+# "bootstrap for ssl support" step below works around for the GuppyScreen
+# asset itself. Fall back to that same static curl binary here too.
 download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
     _url="$1"; _dest="$2"; _tries="${3:-3}"
     _n=0
@@ -398,6 +404,16 @@ download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
         printf "${yellow}  Download failed (attempt ${_n}/${_tries}), retrying...${white}\n"
         sleep 2
     done
+
+    printf "${yellow}  wget could not fetch it — trying the SSL-capable curl fallback...${white}\n"
+    if [ ! -x /tmp/curl ]; then
+        wget -q --no-check-certificate \
+            "https://raw.githubusercontent.com/ballaswag/k1-discovery/main/bin/curl" \
+            -O /tmp/curl
+        chmod +x /tmp/curl
+    fi
+    [ -x /tmp/curl ] && /tmp/curl -s -L "$_url" -o "$_dest"
+    [ -s "$_dest" ] && return 0
     return 1
 }
 
