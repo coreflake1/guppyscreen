@@ -382,6 +382,25 @@ fi
 ## ============================================================================
 ## OPTIONAL: Mainsail + Nginx (browser UI — not required for GuppyScreen)
 ## ============================================================================
+
+# Download with retries; only succeeds if the destination ends up non-empty.
+# A silent wget failure (bad network, flaky DNS) used to leave a 0-byte file
+# that the next step would try to extract, crash on, and then get papered
+# over by an unconditional "[OK]" — leaving nginx serving an empty Mainsail
+# dir (browser sees 403 Forbidden) while the installer claimed success.
+download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
+    _url="$1"; _dest="$2"; _tries="${3:-3}"
+    _n=0
+    while [ "$_n" -lt "$_tries" ]; do
+        wget -q --no-check-certificate "$_url" -O "$_dest"
+        [ -s "$_dest" ] && return 0
+        _n=$((_n + 1))
+        printf "${yellow}  Download failed (attempt ${_n}/${_tries}), retrying...${white}\n"
+        sleep 2
+    done
+    return 1
+}
+
 NGINX_INIT=/etc/init.d/S50nginx
 MAINSAIL_IDX=/usr/data/mainsail/index.html
 
@@ -401,9 +420,12 @@ if [ "$_nginx_ok" -eq 0 ] || [ "$_mainsail_ok" -eq 0 ]; then
     if [ "$confirm_mainsail" != "n" ] && [ "$confirm_mainsail" != "N" ]; then
         if [ "$_nginx_ok" -eq 0 ]; then
             printf "${green}  Downloading Nginx...${white}\n"
-            wget -q --no-check-certificate \
-                "https://raw.githubusercontent.com/Guilouz/Creality-Helper-Script/main/files/moonraker/nginx.tar.gz" \
-                -O /tmp/nginx.tar.gz
+            if ! download_file "https://raw.githubusercontent.com/Guilouz/Creality-Helper-Script/main/files/moonraker/nginx.tar.gz" /tmp/nginx.tar.gz; then
+                printf "${red}  [FAIL] Could not download Nginx — check your network and re-run the installer.${white}\n"
+                _nginx_ok=2
+            fi
+        fi
+        if [ "$_nginx_ok" -eq 0 ]; then
             printf "${green}  Installing Nginx...${white}\n"
             tar xf /tmp/nginx.tar.gz -C /usr/data/
             rm -f /tmp/nginx.tar.gz
@@ -530,18 +552,30 @@ NGINX_CONF_EOF
         if [ "$_mainsail_ok" -eq 0 ]; then
             printf "${green}  Downloading Mainsail...${white}\n"
             mkdir -p /usr/data/mainsail
-            wget -q --no-check-certificate \
-                "https://github.com/mainsail-crew/mainsail/releases/latest/download/mainsail.zip" \
-                -O /tmp/mainsail.zip
-            printf "${green}  Installing Mainsail...${white}\n"
-            python3 -c "import zipfile; zipfile.ZipFile('/tmp/mainsail.zip').extractall('/usr/data/mainsail/')"
-            rm -f /tmp/mainsail.zip
+            if ! download_file "https://github.com/mainsail-crew/mainsail/releases/latest/download/mainsail.zip" /tmp/mainsail.zip; then
+                printf "${red}  [FAIL] Could not download Mainsail — check your network and re-run the installer.${white}\n"
+                _mainsail_ok=2
+            else
+                printf "${green}  Installing Mainsail...${white}\n"
+                python3 -c "import zipfile; zipfile.ZipFile('/tmp/mainsail.zip').extractall('/usr/data/mainsail/')"
+                rm -f /tmp/mainsail.zip
+                if [ ! -f /usr/data/mainsail/index.html ]; then
+                    printf "${red}  [FAIL] Mainsail extraction failed (no index.html) — re-run the installer to retry.${white}\n"
+                    _mainsail_ok=2
+                fi
+            fi
         fi
 
-        printf "${green}  Starting Nginx...${white}\n"
-        /etc/init.d/S50nginx start
-        _ip=$(ip route get 1 2>/dev/null | awk 'NR==1{for(i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')
-        printf "${green}  [OK] Mainsail at http://${_ip}:4409/${white}\n"
+        if [ "$_nginx_ok" -ne 2 ]; then
+            printf "${green}  Starting Nginx...${white}\n"
+            /etc/init.d/S50nginx start
+        fi
+        if [ "$_nginx_ok" -ne 2 ] && [ "$_mainsail_ok" -ne 2 ]; then
+            _ip=$(ip route get 1 2>/dev/null | awk 'NR==1{for(i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')
+            printf "${green}  [OK] Mainsail at http://${_ip}:4409/${white}\n"
+        else
+            printf "${yellow}  Mainsail/Nginx setup did not complete — re-run the installer to retry.${white}\n"
+        fi
     else
         printf "${green}  Skipping Mainsail + Nginx${white}\n"
     fi
