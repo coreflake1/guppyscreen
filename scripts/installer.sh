@@ -10,6 +10,13 @@ K1_GUPPY_DIR=/usr/data/guppyscreen
 FT2FONT_PATH=/usr/lib/python3.8/site-packages/matplotlib/ft2font.cpython-38-mipsel-linux-gnu.so
 ASSET_NAME="guppyscreen"
 
+# Static MIPS curl binary, used where the on-device wget can't complete a TLS
+# handshake with github.com's release-asset redirects (works fine against
+# raw.githubusercontent.com, fails with "TLS error from peer (alert code 80)").
+# Vendored + pinned to a commit SHA (not a branch) so this never depends on a
+# third-party repo's unpinned main branch, or on this branch's own history.
+CURL_BOOTSTRAP_URL="https://raw.githubusercontent.com/coreflake1/guppyscreen/d5a502942bde7ad04f45d8ce64f1259adf49d9bf/scripts/vendor/curl-mipsel"
+
 uninstall_guppy() {
     printf "${green}=== Uninstalling GuppyScreen ===${white}\n"
 
@@ -407,9 +414,7 @@ download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
 
     printf "${yellow}  wget could not fetch it — trying the SSL-capable curl fallback...${white}\n"
     if [ ! -x /tmp/curl ]; then
-        wget -q --no-check-certificate \
-            "https://raw.githubusercontent.com/ballaswag/k1-discovery/main/bin/curl" \
-            -O /tmp/curl
+        wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
         chmod +x /tmp/curl
     fi
     [ -x /tmp/curl ] && /tmp/curl -s -L "$_url" -o "$_dest"
@@ -624,7 +629,7 @@ fi
 rm -rf /root/.cache
 
 ## bootstrap for ssl support
-wget -q --no-check-certificate https://raw.githubusercontent.com/ballaswag/k1-discovery/main/bin/curl -O /tmp/curl
+wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
 chmod +x /tmp/curl
 
 PINNED_RELEASE="v1.3.2-OpenKE"
