@@ -76,6 +76,10 @@ Built and verified for the **Ender-3 V3 KE**. Other boards/screens can be built 
 **Mounting the screen:** the 3D-printable bracket I use to attach the display to the printer is on
 Thingiverse — **[Ender-3 V3 KE screen mount](https://www.thingiverse.com/thing:6617266)**.
 
+Want the screen closer to its original stock position (still landscape)? **@DylanUnofficial** made an
+alternative — **[Nebula screen mount](https://www.printables.com/model/1770386-creality-ender-3-v3-ke-openke-nebula-screen-mount)**
+on Printables. Thanks Dylan!
+
 ## Screenshots
 
 > Captured live from a real Ender-3 V3 KE at its native 480×272 — not the simulator. Many more, covering
