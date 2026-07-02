@@ -898,6 +898,28 @@ backup_extra_once() {   # $1 = filename in KLIPPY_EXTRA_DIR
     return 0
 }
 
+# Klipper allows exactly one [save_variables] section in the whole config. Some
+# features (Save Z-Offset, camera tuning) need SAVE_VARIABLE support but must not
+# assume they're the one defining it — reuse whatever's already active (ours or
+# the user's own/Helper Script's), and only add one if truly none exists anywhere.
+# Unlike section_defined_elsewhere, this also checks our own GuppyScreen/ dir, so
+# it correctly sees a [save_variables] this same installer run already added.
+ensure_save_variables() {
+    _found=1
+    active_cfgs | sort -u > "/tmp/.ke_svcheck.$$"
+    while IFS= read -r _f; do
+        [ -f "$_f" ] || continue
+        if grep -qE '^\[save_variables\]' "$_f" 2>/dev/null; then _found=0; break; fi
+    done < "/tmp/.ke_svcheck.$$"
+    rm -f "/tmp/.ke_svcheck.$$"
+    [ "$_found" -eq 0 ] && return 0
+    cat > "$GUPPY_CFG_DIR/save_variables.cfg" << 'SAVE_VARS_EOF'
+[save_variables]
+filename: /usr/data/printer_data/config/variables.cfg
+SAVE_VARS_EOF
+    printf "${green}  Added [save_variables] (none was defined yet; needed by camera macros)${white}\n"
+}
+
 # Copy a vendored .cfg into GuppyScreen/ ONLY if none of the [sections] it defines
 # already exist elsewhere in the config. Prevents a duplicate-section crash when a
 # stock or Helper-Script config already owns one of those sections.
@@ -1041,19 +1063,6 @@ else
         fi
     fi
 
-    # --- Creality Nebula camera: persistent image tuning ---
-    # (The H.264 go2rtc stream was removed in v1.2.0 — see the migration step above.)
-    if want "Creality Nebula camera (persistent image tuning)"; then
-        if [ -f "$MODS_DIR/nebula_camera/nebula_camera.cfg" ]; then
-            if section_defined_elsewhere "[gcode_macro APPLY_CAM_SETTINGS]"; then
-                printf "${yellow}  Camera persist macros already present — leaving yours.${white}\n"
-            else
-                printf "${green}  Installing Nebula camera persist macros${white}\n"
-                cp "$MODS_DIR/nebula_camera/nebula_camera.cfg" "$GUPPY_CFG_DIR/nebula_camera.cfg"
-            fi
-        fi
-    fi
-
     # --- Pause/Resume layer-shift fix (PAUSE y_park 222 -> 220) ---
     if want "Pause/Resume layer-shift fix (y_park 222->220)"; then
         GM="$K1_CONFIG_DIR/gcode_macro.cfg"
@@ -1112,6 +1121,15 @@ else
                 printf "${green}  Enabled object processing in moonraker.conf${white}\n"
             fi
         fi
+    fi
+
+    # --- Creality Nebula camera: image tuning that persists across reboots ---
+    # (The H.264 go2rtc stream was removed in v1.2.0 — see the migration step above.)
+    # Runs after the Creality-macros block above so ensure_save_variables correctly
+    # sees a [save_variables] that block may have just installed (e.g. Save Z-Offset).
+    if [ -f "$MODS_DIR/nebula_camera/nebula_camera.cfg" ] && want "Creality Nebula camera (persistent image tuning)"; then
+        ensure_save_variables
+        install_cfg_guarded "$MODS_DIR/nebula_camera/nebula_camera.cfg" "nebula_camera.cfg" "Creality Nebula camera tuning + persist macros"
     fi
 
     printf "${green}Optional features done.${white}\n"

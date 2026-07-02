@@ -11,15 +11,53 @@ catch: those settings are **forgotten every time the camera re-initialises** (a 
 camera daemon restarting). This page shows how to tune them *and* make them **stick across reboots**, so
 you set them once and never think about it again.
 
-You don't need to be a programmer — if you can paste a command into a terminal, you can do this.
+> ✅ **If you used the OpenKE installer's "Creality Nebula camera" option, you already have everything on
+> this page** — it installs the `CAM_*` macros themselves (not just the persist-on-boot logic). Skip to
+> [Using it](#using-it-if-you-installed-via-openke) below. The rest of this page is the **manual route**
+> (no OpenKE installer, or you're specifically adding this to an existing Creality Helper Script setup),
+> and explains what those macros actually do under the hood.
 
-> 💡 **Shortcut:** the OpenKE [installer](Installation) can set this up — pick the **Creality Nebula
-> camera** option, which installs the persist-on-boot macros. The steps below are the manual route, and
-> explain what those macros do.
+You don't need to be a programmer — if you can paste a command into a terminal, you can do this.
 
 ---
 
-## Why camera settings don't stick on their own
+## Using it (if you installed via OpenKE)
+
+Nothing to set up — from the **Klipper console** (Mainsail/Fluidd), just run:
+
+```
+CAM_CONTRAST CONTRAST=100
+CAM_SATURATION SATURATION=95
+CAM_BRIGHTNESS BRIGHTNESS=115
+```
+
+Each command **applies the value live and saves it** in the same step — no separate save action needed.
+
+- All four controls (`CAM_BRIGHTNESS`, `CAM_CONTRAST`, `CAM_SATURATION`, `CAM_HUE`) range **50–160**.
+- `CAM_SETTINGS` prints the camera's current saved values.
+- `APPLY_CAM_SETTINGS` re-applies everything from the saved values on demand (this is also what runs
+  automatically ~15s and ~40s after every boot, so your tuning survives a restart).
+
+**Good starting point for an open-air printer with overhead LED lighting:** bump **contrast (~100)** and
+**saturation (~95)** — that fixes most of the "flat/washed" look. Leave brightness near default unless white
+prints blow out (then lower it). Leave white balance on auto unless you see a colour tint.
+
+That's it — reboot whenever you like and your settings come back on their own.
+
+> **Honest expectation:** these controls make the image *look* its best, but they can't fix the
+> **softness/blockiness** of the live stream — that comes from MJPEG compression on the printer's weak CPU
+> and isn't tunable. The "great quality" images you see online are usually full-resolution stills, not the
+> live feed.
+
+If `CAM_CONTRAST` etc. aren't found, the installer skipped adding them because your config already defines
+macros with those names (e.g. from an existing Creality Helper Script setup) — see the manual section below,
+which covers exactly that case.
+
+---
+
+## The manual route (no OpenKE installer, or adding this to an existing Helper Script setup)
+
+### Why camera settings don't stick on their own
 
 Controls like brightness/contrast/saturation are **live hardware settings** held in the camera's memory
 while it's powered. Setting one (via a macro or `v4l2-ctl`) applies instantly — but it's a *runtime* value,
@@ -27,7 +65,7 @@ not saved anywhere. The moment the camera re-initialises, it comes back at its f
 tuning is gone. They're **not** `printer.cfg`/`SAVE_CONFIG` values, so the usual Klipper save doesn't cover
 them.
 
-The fix is a small pattern:
+The fix is a small pattern (this is exactly what OpenKE's own macros do):
 
 1. **`[save_variables]`** stores your chosen values in a file.
 2. Each **`CAM_*` macro** applies the value live **and** saves it.
@@ -42,26 +80,17 @@ applied and remembered — no config editing.
 |---|---|
 | Printer | Creality Ender-3 V3 KE |
 | Camera | Creality **Nebula** (USB UVC, controls on `/dev/video4`) |
-| Builds on | Helper Script → **Nebula Camera Settings Control** (provides the `CAM_*` macros) |
+| Builds on | Creality Helper Script → **Nebula Camera Settings Control** (provides the `CAM_*` macros, if you're not using OpenKE's own) |
 | Interface | Mainsail (Fluidd works too) |
 
-> **Honest expectation:** these controls make the image *look* its best, but they can't fix the
-> **softness/blockiness** of the live stream — that comes from MJPEG compression on the printer's weak CPU
-> and isn't tunable. The "great quality" images you see online are usually full-resolution stills, not the
-> live feed.
-
----
-
-## Before you start
+### Before you start
 
 - ⏱️ **Time:** ~5 minutes.
 - 🧰 **You need:** the printer on your network, a computer, and the Helper Script's **Nebula Camera Settings
   Control** installed (gives you `CAM_BRIGHTNESS`, `CAM_CONTRAST`, etc.).
 - ↩️ **Reversible:** you'll back the file up first; removing the added block reverts everything.
 
----
-
-## Step 1 — Make the macros save-on-set + add the boot rule
+### Step 1 — Make the macros save-on-set + add the boot rule
 
 Open `Helper-Script/camera-settings.cfg` (in Mainsail: **Machine** tab, or over SSH at
 `/usr/data/printer_data/config/Helper-Script/camera-settings.cfg`). The Helper Script's `CAM_*` macros
@@ -81,7 +110,7 @@ gcode:
 
 Do the same for `CAM_BRIGHTNESS` (`cam_brightness`), `CAM_SATURATION` (`cam_saturation`), and `CAM_HUE`
 (`cam_hue`) — these four (brightness, contrast, saturation, hue) are exactly the controls OpenKE's own
-installer-provided macro manages. Then add a re-apply macro and the boot timer at the end of the file:
+macros manage. Then add a re-apply macro and the boot timer at the end of the file:
 
 ```ini
 [gcode_macro APPLY_CAM_SETTINGS]
@@ -108,15 +137,16 @@ gcode:
 
 > ### ⚠️ Only one `[save_variables]` allowed
 > `SAVE_VARIABLE` needs a `[save_variables]` section, but **Klipper permits exactly one** in the whole
-> config. If you have the Helper Script's **Save Z-Offset** installed, it already provides one (filename
-> `Helper-Script/variables.cfg`) — **reuse it, don't add a second**, or Klipper will misbehave. Only if you
-> have *no* `[save_variables]` anywhere should you add one:
+> config. If you have the Helper Script's **Save Z-Offset**, or OpenKE's own Save Z-Offset / camera-tuning
+> feature, already installed, one already exists (filename `variables.cfg`, possibly under a
+> `Helper-Script/` subfolder depending on which one) — **reuse it, don't add a second**, or Klipper will
+> misbehave. Only if you have *no* `[save_variables]` anywhere should you add one:
 > ```ini
 > [save_variables]
 > filename: /usr/data/printer_data/config/variables.cfg
 > ```
 
-## Step 2 — Restart Klipper
+### Step 2 — Restart Klipper
 
 In the **Klipper console** (Mainsail/Fluidd) or over SSH:
 
@@ -128,7 +158,7 @@ FIRMWARE_RESTART
 > `serialqueue ... NoneType` shutdown). If that happens, just run `FIRMWARE_RESTART` once more — it's a
 > known KE quirk, unrelated to this change.
 
-## Step 3 — Tune to taste (and it saves automatically)
+### Step 3 — Tune to taste (and it saves automatically)
 
 From the console, set values and watch the live feed change instantly. Each command **applies and saves**:
 
@@ -153,17 +183,22 @@ That's it — reboot whenever you like and your settings come back on their own.
 ## How to confirm it persisted
 
 Set a value (e.g. `CAM_CONTRAST CONTRAST=110`), reboot the printer, open the camera feed, and check the
-look held. To verify on the technical side, your value will be written into the save-variables file:
+look held. To verify on the technical side, your value will be written into whichever `variables.cfg` your
+`[save_variables]` section points at — check the `filename:` under `[save_variables]` in your config if
+you're not sure which one that is, then:
 
 ```sh
-grep cam_ /usr/data/printer_data/config/Helper-Script/variables.cfg
+grep cam_ <that filename>
 ```
 
 ---
 
 ## Undoing it
 
-Remove the `SAVE_VARIABLE` lines you added and the `APPLY_CAM_SETTINGS*` blocks from
+**Installed via OpenKE:** re-run the installer's optional-features step and skip the Creality Nebula camera
+option, then remove `GuppyScreen/nebula_camera.cfg` and `FIRMWARE_RESTART`.
+
+**Installed manually:** remove the `SAVE_VARIABLE` lines you added and the `APPLY_CAM_SETTINGS*` blocks from
 `camera-settings.cfg`, then `FIRMWARE_RESTART`. (Or restore your backup of the file.) The camera will go
 back to forgetting settings on reboot.
 
@@ -172,7 +207,7 @@ back to forgetting settings on reboot.
 ## Troubleshooting
 
 - **`Unknown save variable` / macro errors after editing** — usually a missing or duplicate
-  `[save_variables]`. Make sure there's exactly **one** in your whole config (see the warning in Step 1).
+  `[save_variables]`. Make sure there's exactly **one** in your whole config (see the warning above).
 - **Settings don't come back after a reboot** — the camera may not have been ready when the boot rule
   fired. The `+40s` retry covers most cases; if your camera is slow to start, raise `initial_duration`.
 - **Camera shows nothing at all** — that's a different problem (the camera pipeline can hang: "connected
