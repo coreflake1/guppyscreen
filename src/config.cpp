@@ -153,7 +153,17 @@ void Config::init(std::string config_path, const std::string thumbdir) {
   }
 
   auto &touch_calibrated = data["/touch_calibrated"_json_pointer];
-  if (touch_calibrated.is_null()) {
+  auto &touch_coeff = data["/touch_calibration_coeff"_json_pointer];
+  // "false" with no saved coefficients was never a real calibration choice
+  // (nothing sets it explicitly) — it only ever meant "unset", written by a
+  // build without EVDEV_CALIBRATE. On upgrade the installer now preserves
+  // guppyconfig.json instead of overwriting it, so a stale false from an old
+  // local/dev build would otherwise persist forever and leave the touchscreen
+  // permanently uncalibrated. Treat it the same as null so it self-heals.
+  bool never_calibrated = touch_calibrated.is_null() ||
+      (touch_calibrated.is_boolean() && !touch_calibrated.template get<bool>() &&
+       touch_coeff.is_null());
+  if (never_calibrated) {
 #ifdef EVDEV_CALIBRATE
     data["/touch_calibrated"_json_pointer] = true; // EVDEV_CALIBRATE
 #else

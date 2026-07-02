@@ -79,7 +79,8 @@ make -j"$JOBS" \
     CROSS_COMPILE="$CROSS_COMPILE" \
     GUPPY_SMALL_SCREEN=1 \
     GUPPYSCREEN_VERSION="$GUPPYSCREEN_VERSION" \
-    GUPPY_THEME="$GUPPY_THEME"
+    GUPPY_THEME="$GUPPY_THEME" \
+    EVDEV_CALIBRATE=1
 
 # --- guppybeep (hardware-PWM buzzer player) ---
 echo "=== Building guppybeep (buzzer) for MIPS ==="
