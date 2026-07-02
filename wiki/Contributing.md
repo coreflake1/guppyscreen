@@ -28,8 +28,21 @@ This project builds on the work of:
 - [probielodan/guppyscreen](https://github.com/probielodan/guppyscreen) — KE-focused UI rework
 - [pellcorp/grumpyscreen](https://github.com/pellcorp/grumpyscreen) — bug fixes and improvements
 - [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen) — 3D bed mesh feature
-- [Moonraker](https://github.com/Arksine/moonraker), [KlipperScreen](https://github.com/KlipperScreen/KlipperScreen),
-  [Fluidd](https://github.com/fluidd-core/fluidd), [Klippain-shaketune](https://github.com/Frix-x/klippain-shaketune)
+- [Moonraker](https://github.com/Arksine/moonraker), [Mainsail](https://github.com/mainsail-crew/mainsail),
+  [Klippain-shaketune](https://github.com/Frix-x/klippain-shaketune)
+- [Guilouz/Creality-Helper-Script](https://github.com/Guilouz/Creality-Helper-Script) — vendored macros
+  (`useful-macros.cfg`, `M600-support.cfg`, `save-zoffset.cfg`) and the Moonraker/Nginx install packages
+- [kyleisah/Klipper-Adaptive-Meshing-Purging](https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging) —
+  vendored KAMP (adaptive bed mesh + purge line)
+- [Klipper3d/klipper](https://github.com/Klipper3d/klipper) — Axis Twist Compensation and Screws Tilt
+  Adjust modules, vendored verbatim from `klippy/extras/` (the KE's stock Klipper build predates/strips
+  both; Skew Correction uses Klipper's native `[skew_correction]` directly, no vendored file needed)
+- [evgarthub/klipper_tmc_autotune_k1](https://github.com/evgarthub/klipper_tmc_autotune_k1) (a K1/KE fork
+  of [andrewmcgr/klipper_tmc_autotune](https://github.com/andrewmcgr/klipper_tmc_autotune)) — vendored
+  TMC Autotune
 - Icons: [Material Design Icons](https://pictogrammers.com/library/mdi/), [Z-Bolt](https://github.com/Z-Bolt/OctoScreen)
+
+See [`docs/VENDORING.md`](../docs/VENDORING.md) for pinned commits/tags and file-level provenance of
+each vendored mod.
 
 Upstream documentation: <https://ballaswag.github.io/docs/guppyscreen/configuration/>
