@@ -7,6 +7,10 @@
 > 🖨️ **Mounting the screen:** the 3D-printable bracket I use to attach the display to the printer is on
 > Thingiverse — **[Ender-3 V3 KE screen mount](https://www.thingiverse.com/thing:6617266)**. Print it
 > before you start if you don't already have a mount.
+>
+> 🖨️ **Alternative mount:** if you'd rather keep the screen closer to its original stock position,
+> **@DylanUnofficial** built **[Nebula screen mount](https://www.printables.com/model/1770386-creality-ender-3-v3-ke-openke-nebula-screen-mount)**
+> on Printables. Thanks Dylan!
 
 ## Install
 
