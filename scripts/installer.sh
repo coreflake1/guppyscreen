@@ -968,12 +968,14 @@ else
         fi
     fi
 
-    # --- Screws Tilt Adjust ---
+    # --- Screws Tilt Adjust: module + cfg (KE's stock Klipper lacks this module) ---
     if [ -d "$MODS_DIR/screws_tilt_adjust" ] && want "Screws Tilt Adjust (SCREWS_TILT_CALCULATE bed levelling)"; then
+        printf "${green}  Installing Screws Tilt Adjust${white}\n"
+        backup_extra_once screws_tilt_adjust.py
+        cp "$MODS_DIR/screws_tilt_adjust/screws_tilt_adjust.py" "$KLIPPY_EXTRA_DIR/"
         if section_defined_elsewhere "[screws_tilt_adjust]"; then
             printf "${yellow}  [screws_tilt_adjust] already in your config — leaving it untouched.${white}\n"
         else
-            printf "${green}  Installing Screws Tilt Adjust${white}\n"
             cp "$MODS_DIR/screws_tilt_adjust/screws_tilt_adjust.cfg" "$GUPPY_CFG_DIR/screws_tilt_adjust.cfg"
         fi
     fi
