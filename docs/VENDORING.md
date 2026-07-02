@@ -17,6 +17,7 @@ Twist probe patch installs through the existing `[include GuppyScreen/*.cfg]` me
 | **Axis Twist Compensation** | `klippy/extras/axis_twist_compensation.py` + `probe.py` patch + cfg | [Klipper3d/klipper](https://github.com/Klipper3d/klipper) `klippy/extras/axis_twist_compensation.py` | tag `v0.12.0` |
 | **TMC Autotune** | `klippy/extras/{autotune_tmc,motor_constants}.py`, `motor_database.cfg` | [evgarthub/klipper_tmc_autotune_k1](https://github.com/evgarthub/klipper_tmc_autotune_k1) (fork of [andrewmcgr](https://github.com/andrewmcgr/klipper_tmc_autotune)) | `1cafcf42bfb7aa1985cfd35f3bf7e83f54b0c3d2` |
 | **Skew Correction** | `[skew_correction]` cfg (written by installer) | Klipper native — no vendored source | n/a |
+| **Screws Tilt Adjust** | `klippy/extras/screws_tilt_adjust.py` + cfg | [Klipper3d/klipper](https://github.com/Klipper3d/klipper) `klippy/extras/screws_tilt_adjust.py` | tag `v0.12.0` |
 
 All vendored sources are GPL-3.0, compatible with OpenKE's GPL-3.0. Each mod folder has a `NOTICE.md`
 (provenance + any KE edits) and the upstream `LICENSE`.
@@ -42,6 +43,9 @@ git clone --depth 1 https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging
 
 # Axis Twist (single file, pin a Klipper tag)
 curl -O https://raw.githubusercontent.com/Klipper3d/klipper/<TAG>/klippy/extras/axis_twist_compensation.py
+
+# Screws Tilt Adjust (single file, pin a Klipper tag)
+curl -O https://raw.githubusercontent.com/Klipper3d/klipper/<TAG>/klippy/extras/screws_tilt_adjust.py
 
 # TMC Autotune
 git clone --depth 1 https://github.com/evgarthub/klipper_tmc_autotune_k1.git /tmp/tmc
