@@ -52,10 +52,15 @@ def restore(target):
 
 
 def main():
+    # Plain words, not dash-prefixed flags: argparse always treats a leading "-"
+    # as an option marker, even for a declared positional argument, so
+    # "-backup_klipper" was silently rejected as an unrecognized flag instead of
+    # matching the "action" positional (caught live: klippy.log showed the
+    # script running with zero arguments even though the macro passed one).
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "action",
-        choices=["-backup_klipper", "-restore_klipper", "-backup_moonraker", "-restore_moonraker"],
+        choices=["backup_klipper", "restore_klipper", "backup_moonraker", "restore_moonraker"],
     )
     args = parser.parse_args()
 
