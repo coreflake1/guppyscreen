@@ -405,7 +405,9 @@ download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
     _url="$1"; _dest="$2"; _tries="${3:-3}"
     _n=0
     while [ "$_n" -lt "$_tries" ]; do
-        wget -q --no-check-certificate "$_url" -O "$_dest"
+        # User-Agent is required by the GitHub API (a request without one gets a
+        # flat 403) and harmless for the other download targets this helper hits.
+        wget -q --no-check-certificate --header="User-Agent: OpenKE-Installer" "$_url" -O "$_dest"
         [ -s "$_dest" ] && return 0
         _n=$((_n + 1))
         printf "${yellow}  Download failed (attempt ${_n}/${_tries}), retrying...${white}\n"
@@ -417,7 +419,7 @@ download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
         wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
         chmod +x /tmp/curl
     fi
-    [ -x /tmp/curl ] && /tmp/curl -s -L "$_url" -o "$_dest"
+    [ -x /tmp/curl ] && /tmp/curl -s -L -H "User-Agent: OpenKE-Installer" "$_url" -o "$_dest"
     [ -s "$_dest" ] && return 0
     return 1
 }
@@ -638,7 +640,21 @@ rm -rf /root/.cache
 wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
 chmod +x /tmp/curl
 
-PINNED_RELEASE="v1.3.3-OpenKE"
+# Resolve the latest published stable release dynamically instead of a hardcoded
+# pin. GitHub's /releases/latest API skips prereleases/drafts, so the nightly
+# builds from plain pushes to main don't count — only an actual tagged release
+# does. This removes the "bump PINNED_RELEASE by hand at release time" step
+# entirely: forgetting it once already meant real users silently kept pulling a
+# stale, unpatched asset after a fix had already shipped in the repo.
+if download_file "https://api.github.com/repos/coreflake1/guppyscreen/releases/latest" /tmp/latest_release.json; then
+    PINNED_RELEASE=$(jq -r '.tag_name // empty' /tmp/latest_release.json 2>/dev/null)
+    rm -f /tmp/latest_release.json
+fi
+if [ -z "$PINNED_RELEASE" ]; then
+    printf "${red}Could not determine the latest OpenKE release (network issue?). Check your connection and re-run the installer.${white}\n"
+    exit 1
+fi
+printf "${green} Latest OpenKE release: $PINNED_RELEASE ${white}\n"
 ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_RELEASE}/$ASSET_NAME.tar.gz"
 
 printf "${green} Downloading asset: $ASSET_NAME.tar.gz ${white}\n"
