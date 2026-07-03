@@ -14,20 +14,38 @@
 # start-stop-daemon the same way this project's other init scripts already
 # launch detached background services — no reboot needed.
 
+import os
 import subprocess
 import time
 
 CAM_APP = ["/usr/bin/cam_app", "-i", "/dev/v4l/by-id/main-video-4", "-t", "0", "-w", "1920", "-h", "1080", "-f", "15", "-c"]
-MJPG_STREAMER = ["/usr/bin/mjpg_streamer", "-i", "input_memfd.so", "-t", "0", "-o", "output_http.so",
-                 "-w", "/usr/share/mjpg-streamer/www/", "-p", "8080"]
+
+# mjpg_streamer only takes -i/-o at the top level; each plugin's own parameters
+# (-t for the input plugin, -w/-p for the output plugin) must be embedded as a
+# single quoted string within -i/-o, not passed as separate top-level flags —
+# confirmed live via mjpg_streamer's own --help after an initial version that
+# flattened /proc/PID/cmdline's argv lost this quoting structure and passed
+# them as separate flags, which mjpg_streamer rejected outright ("invalid
+# option -- 't'"), leaving the camera pipeline half-reloaded (cam_app restarted
+# fine, mjpg_streamer did not start at all).
+MJPG_STREAMER = ["/usr/bin/mjpg_streamer", "-i", "input_memfd.so -t 0", "-o",
+                 "output_http.so -w /usr/share/mjpg-streamer/www/ -p 8080"]
+
+# mjpg_streamer dlopen()s its input/output plugins at runtime and doesn't
+# search /usr/lib/mjpg-streamer on its own — confirmed live: without this, it
+# started (start-stop-daemon reported success) but immediately exited with
+# "dlopen: input_memfd.so: cannot open shared object file", leaving nothing
+# running despite the apparent success. Whatever originally launched it at
+# boot must set this; manually relaunching needs the same environment.
+MJPG_STREAMER_ENV = dict(os.environ, LD_LIBRARY_PATH="/usr/lib/mjpg-streamer")
 
 
 def stop(binary_path):
     subprocess.run(["start-stop-daemon", "-K", "-q", "-x", binary_path], check=False)
 
 
-def start(cmd):
-    subprocess.run(["start-stop-daemon", "-S", "-b", "-q", "--exec", cmd[0], "--", *cmd[1:]], check=True)
+def start(cmd, env=None):
+    subprocess.run(["start-stop-daemon", "-S", "-b", "-q", "--exec", cmd[0], "--", *cmd[1:]], check=True, env=env)
 
 
 def main():
@@ -36,7 +54,7 @@ def main():
     time.sleep(2)  # let the camera device release before something else opens it
     start(CAM_APP)
     time.sleep(1)  # cam_app needs to be up and writing to the memfd before mjpg_streamer reads it
-    start(MJPG_STREAMER)
+    start(MJPG_STREAMER, env=MJPG_STREAMER_ENV)
     print("Camera pipeline reloaded")
 
 
