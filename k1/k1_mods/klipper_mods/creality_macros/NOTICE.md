@@ -11,7 +11,7 @@ OpenKE can be a one-shot install. Full credit to Guilouz and contributors.
 
 | File | Upstream | Change |
 |---|---|---|
-| `useful-macros.cfg` | `useful-macros-3v3.cfg` (the KE/3V3 variant) | backup/restore shell commands repointed from `/usr/data/helper-script/files/scripts/useful_macros.sh` (which most OpenKE-only installs don't have — those macros existed on-screen but silently failed) to our own `scripts/klipper_backup_restore.py`; `RELOAD_CAMERA` removed (called into Helper Script's own `auto_uvc.sh`, out of scope for this fix — see project notes) |
+| `useful-macros.cfg` | `useful-macros-3v3.cfg` (the KE/3V3 variant) | backup/restore/reload-camera shell commands repointed from `/usr/data/helper-script/files/scripts/useful_macros.sh` (which most OpenKE-only installs don't have — those macros existed on-screen but silently failed) to our own `scripts/klipper_backup_restore.py` and `scripts/reload_camera.py` |
 | `M600-support.cfg` | `M600-support-ke.cfg` (the KE variant) | bare `[respond]` removed (OpenKE's `guppy_cmd.cfg` already provides it) |
 | `save-zoffset.cfg` | `save-zoffset.cfg` | `[respond]` removed; `variables.cfg` repointed from the Helper-Script dir to `printer_data/config/variables.cfg` |
 | `exclude_object.cfg` | (Klipper native) | bare `[exclude_object]`; pairs with `enable_object_processing` in moonraker.conf |
