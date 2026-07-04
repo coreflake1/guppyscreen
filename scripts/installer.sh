@@ -443,7 +443,7 @@ if [ "$_nginx_ok" -eq 0 ] || [ "$_mainsail_ok" -eq 0 ]; then
     if [ "$confirm_mainsail" != "n" ] && [ "$confirm_mainsail" != "N" ]; then
         if [ "$_nginx_ok" -eq 0 ]; then
             printf "${green}  Downloading Nginx...${white}\n"
-            if ! download_file "https://raw.githubusercontent.com/Guilouz/Creality-Helper-Script/main/files/moonraker/nginx.tar.gz" /tmp/nginx.tar.gz; then
+            if ! download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/57bf1ab71ae8af819354870aa648760e21da82a2/scripts/vendor/nginx.tar.gz" /tmp/nginx.tar.gz; then
                 printf "${red}  [FAIL] Could not download Nginx — check your network and re-run the installer.${white}\n"
                 _nginx_ok=2
             fi
