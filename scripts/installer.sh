@@ -612,6 +612,24 @@ else
     printf "${green}  [OK] Nginx + Mainsail detected${white}\n"
 fi
 
+# Register Mainsail with Moonraker's update_manager so it actually shows up in
+# Mainsail's own "Machine Update" panel. moonraker.conf already has a bare
+# [update_manager] section (enables the feature), but that alone registers
+# nothing — Moonraker/Klipper self-detect automatically (confirmed live via
+# /machine/update/status, no config needed for those), but Mainsail is a
+# static frontend, not a git repo Moonraker can introspect on its own, so it
+# needs this explicit entry or it just never appears as updatable.
+MK_CONF=/usr/data/printer_data/config/moonraker.conf
+if [ -f /usr/data/mainsail/index.html ] && [ -f "$MK_CONF" ]; then
+    if grep -q "^\[update_manager mainsail\]" "$MK_CONF"; then
+        : # already registered
+    else
+        cp "$MK_CONF" "$BACKUP_DIR/moonraker.conf.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+        printf '\n[update_manager mainsail]\ntype: web\nrepo: mainsail-crew/mainsail\npath: /usr/data/mainsail\n' >> "$MK_CONF"
+        printf "${green}  Registered Mainsail with Moonraker's update manager${white}\n"
+    fi
+fi
+
 KLIPPER_PATH=`curl localhost:7125/printer/info 2> /dev/null | jq -r .result.klipper_path`
 if [ -z "$KLIPPER_PATH" -o x"$KLIPPER_PATH" == x"null" ]; then
     KLIPPER_PATH=/usr/share/klipper
