@@ -65,6 +65,13 @@ uninstall_guppy() {
         printf "${green}Restored S99start_app${white}\n"
     fi
 
+    # Re-enable stock webrtc if install disabled it (renamed, not deleted).
+    if [ -f /etc/init.d/DISABLED_S97webrtc ] && [ ! -f /etc/init.d/S97webrtc ]; then
+        mv /etc/init.d/DISABLED_S97webrtc /etc/init.d/S97webrtc
+        /etc/init.d/S97webrtc start >/dev/null 2>&1 || true
+        printf "${green}Restored stock webrtc (S97webrtc)${white}\n"
+    fi
+
     # Remove respawn symlinks added for supervise-daemon
     rm -f /lib/libeinfo.so.1 /lib/librc.so.1
     printf "${green}Removed respawn symlinks${white}\n"
@@ -828,6 +835,15 @@ fi
 if [ "$confirm_decreality" = "y" -o "$confirm_decreality" = "Y" ]; then
     printf "${green}Disabling Creality services ${white}\n"
     [ -f /etc/init.d/S99start_app ] && rm /etc/init.d/S99start_app
+
+    # webrtc only exists to signal Creality's cloud app (JWT-based WebSocket
+    # signaling) — with no cloud account tied to this install it just retries
+    # forever, burning real WiFi airtime even at idle. Rename (not delete) so
+    # uninstall can restore it.
+    if [ -f /etc/init.d/S97webrtc ]; then
+        /etc/init.d/S97webrtc stop >/dev/null 2>&1 || true
+        mv /etc/init.d/S97webrtc /etc/init.d/DISABLED_S97webrtc
+    fi
 else
     # disables only display-server and Monitor (guard: may not exist on all firmwares)
     [ -f /usr/bin/Monitor ] && mv /usr/bin/Monitor /usr/bin/Monitor.disable
