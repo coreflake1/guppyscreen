@@ -1004,14 +1004,20 @@ install_cfg_guarded() {   # $1 = src path, $2 = dest filename, $3 = label
     [ -f "$_src" ] || return 0
     _secfile="/tmp/.ke_secs.$$"
     grep -oE '^\[[^]]+\]' "$_src" 2>/dev/null | sort -u > "$_secfile"
-    _conflict=""
+    # Collect every conflicting section in one pass rather than stopping at the first -
+    # a file that owns N conflicting sections (e.g. M600-support.cfg) used to only ever
+    # report one per installer run, forcing a comment-one/rerun/comment-next cycle to
+    # discover them all instead of seeing the full list up front.
+    _conflicts=""
     while IFS= read -r _sec; do
         [ -z "$_sec" ] && continue
-        if section_defined_elsewhere "$_sec"; then _conflict="$_sec"; break; fi
+        if section_defined_elsewhere "$_sec"; then
+            _conflicts="${_conflicts:+$_conflicts, }$_sec"
+        fi
     done < "$_secfile"
     rm -f "$_secfile"
-    if [ -n "$_conflict" ]; then
-        printf "${yellow}  Skipping %s — your config already defines %s.${white}\n" "$_label" "$_conflict"
+    if [ -n "$_conflicts" ]; then
+        printf "${yellow}  Skipping %s — your config already defines %s.${white}\n" "$_label" "$_conflicts"
     else
         cp "$_src" "$GUPPY_CFG_DIR/$_dest"
         printf "${green}  Installed %s${white}\n" "$_label"
@@ -1171,7 +1177,16 @@ else
                         [ -f "$_f" ] || continue
                         if grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null; then
                             cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-m600-$(date +%Y%m%d-%H%M%S)"
-                            awk -v sec="$_sec" '/^\[/{in_sec=($0==sec)?1:0} {print (in_sec?"#":"") $0}' "$_f" > "/tmp/.ke_m600.$$" && mv "/tmp/.ke_m600.$$" "$_f"
+                            # Match the same way section_defined_elsewhere's grep does above
+                            # (leading whitespace only, no end anchor) rather than requiring the
+                            # whole line to be byte-identical to $_sec - a stray trailing \r
+                            # (CRLF-edited config) or trailing space made the exact match miss
+                            # silently while this step still reported success unconditionally.
+                            awk -v sec="$_sec" '
+                                { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
+                                /^\[/ { in_sec = (stripped == sec) ? 1 : 0 }
+                                { print (in_sec ? "#" : "") $0 }
+                            ' "$_f" > "/tmp/.ke_m600.$$" && mv "/tmp/.ke_m600.$$" "$_f"
                             printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
                         fi
                     done
