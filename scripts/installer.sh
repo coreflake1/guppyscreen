@@ -507,10 +507,10 @@ http {
         ip_hash;
         server 127.0.0.1:7125;
     }
-    upstream mjpgstreamer1 { ip_hash; server 127.0.0.1:8080; }
-    upstream mjpgstreamer2 { ip_hash; server 127.0.0.1:8081; }
-    upstream mjpgstreamer3 { ip_hash; server 127.0.0.1:8082; }
-    upstream mjpgstreamer4 { ip_hash; server 127.0.0.1:8083; }
+    upstream mjpgstreamer1 { ip_hash; server 127.0.0.1:8080; keepalive 8; }
+    upstream mjpgstreamer2 { ip_hash; server 127.0.0.1:8081; keepalive 8; }
+    upstream mjpgstreamer3 { ip_hash; server 127.0.0.1:8082; keepalive 8; }
+    upstream mjpgstreamer4 { ip_hash; server 127.0.0.1:8083; keepalive 8; }
 
     server {
         listen 4409 default_server;
@@ -554,24 +554,32 @@ http {
             proxy_buffering off;
             proxy_ignore_headers X-Accel-Buffering;
             access_log off; error_log off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
             proxy_pass http://mjpgstreamer1/;
         }
         location /webcam2/ {
             postpone_output 0; proxy_buffering off;
             proxy_ignore_headers X-Accel-Buffering;
             access_log off; error_log off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
             proxy_pass http://mjpgstreamer2/;
         }
         location /webcam3/ {
             postpone_output 0; proxy_buffering off;
             proxy_ignore_headers X-Accel-Buffering;
             access_log off; error_log off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
             proxy_pass http://mjpgstreamer3/;
         }
         location /webcam4/ {
             postpone_output 0; proxy_buffering off;
             proxy_ignore_headers X-Accel-Buffering;
             access_log off; error_log off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
             proxy_pass http://mjpgstreamer4/;
         }
     }
