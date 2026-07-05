@@ -207,7 +207,7 @@ if [ ! -d "$MOONRAKER_INSTALL_DIR" ] || [ ! -f "$MOONRAKER_INIT" ]; then
 
     printf "${green}  Downloading Moonraker...${white}\n"
     wget -q --no-check-certificate \
-        "https://raw.githubusercontent.com/coreflake1/guppyscreen/0786a0bc8c2bf84bc9870ee1b877c4471f5692b8/scripts/vendor/moonraker.tar.gz" \
+        "https://raw.githubusercontent.com/coreflake1/guppyscreen/469aba119d20226f982c3fbf8b949cfe255b7a93/scripts/vendor/moonraker.tar.gz" \
         -O /tmp/moonraker.tar.gz
     printf "${green}  Installing Moonraker...${white}\n"
     tar xf /tmp/moonraker.tar.gz -C /usr/data/
