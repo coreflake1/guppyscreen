@@ -399,6 +399,18 @@ else
     printf "${green}  [OK] Moonraker detected${white}\n"
 fi
 
+# Patch an already-installed Moonraker service that predates the umask fix above.
+# The heredoc only writes S56moonraker_service on a *fresh* install (the branch above) -
+# re-running the installer on an existing install never touches this file, so anyone
+# who installed before this fix shipped would stay vulnerable to the same silent
+# 403-on-self-update bug forever unless we check for it here too.
+if [ -f "$MOONRAKER_INIT" ] && ! grep -q "umask 022" "$MOONRAKER_INIT"; then
+    printf "${green}  Patching Moonraker service (adds a sane umask, fixes files it${white}\n"
+    printf "${green}  creates - e.g. a Mainsail self-update - coming out unreadable)${white}\n"
+    sed -i '/^start() {/a\        umask 022' "$MOONRAKER_INIT"
+    /etc/init.d/S56moonraker_service restart >/dev/null 2>&1 || true
+fi
+
 ## ============================================================================
 ## OPTIONAL: Mainsail + Nginx (browser UI — not required for GuppyScreen)
 ## ============================================================================
