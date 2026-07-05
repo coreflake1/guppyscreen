@@ -908,6 +908,7 @@ ln -sf $K1_GUPPY_DIR/k1_mods/respawn/librc.so.1 /lib/librc.so.1
 ## OpenKE optional features — install all / skip all / choose each:
 ##   print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew),
 ##   Creality Nebula camera (persistent image tuning),
+##   E-Steps Calibration (guided CALIBRATE_ESTEPS / CALIBRATE_ESTEPS_APPLY macros),
 ##   Pause/Resume layer-shift fix (PAUSE y_park 222 -> 220).
 ## KAMP/Skew/ATC/camera config install via the existing [include GuppyScreen/*.cfg]
 ## glob (no printer.cfg section edits); only Axis Twist touches Klipper core
@@ -1051,7 +1052,8 @@ fi
 printf "${white}=== OpenKE optional features ===\n"
 printf "${green}  Print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew Correction),\n"
 printf "${green}  the Creality Nebula camera (persistent image tuning), Creality macros\n"
-printf "${green}  (M600, Save Z-Offset, useful macros, Exclude Object), and the layer-shift fix.${white}\n\n"
+printf "${green}  (M600, Save Z-Offset, useful macros, Exclude Object), E-Steps Calibration,\n"
+printf "${green}  and the layer-shift fix.${white}\n\n"
 printf "${white}  [Y] install all     [n] skip all     [o] choose each one${white}\n"
 printf "Choice (Y/n/o): "
 read feat_mode
@@ -1221,6 +1223,12 @@ else
     if [ -f "$MODS_DIR/nebula_camera/nebula_camera.cfg" ] && want "Creality Nebula camera (persistent image tuning)"; then
         ensure_save_variables
         install_cfg_guarded "$MODS_DIR/nebula_camera/nebula_camera.cfg" "nebula_camera.cfg" "Creality Nebula camera tuning + persist macros"
+    fi
+
+    # --- E-Steps calibration: guided CALIBRATE_ESTEPS / CALIBRATE_ESTEPS_APPLY macros ---
+    if [ -f "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" ] && want "E-Steps Calibration (guided rotation_distance tuning)"; then
+        ensure_save_variables
+        install_cfg_guarded "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" "esteps_calibration.cfg" "E-Steps Calibration macros"
     fi
 
     printf "${green}Optional features done.${white}\n"
