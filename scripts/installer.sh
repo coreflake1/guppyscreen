@@ -310,6 +310,12 @@ PRINTER_CONFIG_DIR=$PRINTER_DATA_DIR/config
 PRINTER_LOGS_DIR=$PRINTER_DATA_DIR/logs
 PID_FILE=/var/run/moonraker.pid
 start() {
+        # This device's init environment inherits an 0077 umask, which silently made
+        # every file/dir Moonraker creates owner-only (600/700) - including a live
+        # Mainsail self-update's zip extraction, leaving /usr/data/mainsail
+        # unreadable to nginx's www-data worker (403 Forbidden) every time a user
+        # updates Mainsail through its own UI, not just on first install.
+        umask 022
         [ -d $PRINTER_DATA_DIR ] || mkdir -p $PRINTER_DATA_DIR
         [ -d $PRINTER_CONFIG_DIR ] || mkdir -p $PRINTER_CONFIG_DIR
         [ -d $PRINTER_LOGS_DIR ] || mkdir -p $PRINTER_LOGS_DIR
