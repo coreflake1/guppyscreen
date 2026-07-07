@@ -1164,36 +1164,102 @@ else
         CM="$MODS_DIR/creality_macros"
         install_cfg_guarded "$CM/useful-macros.cfg"  "useful-macros.cfg"  "useful macros (backup/restore, PID, bed-level, warmup)"
         install_cfg_guarded "$CM/save-zoffset.cfg"   "save-zoffset.cfg"   "Save Z-Offset (persists z-offset across reboots)"
-        if section_defined_elsewhere "[gcode_macro M600]" || section_defined_elsewhere "[filament_switch_sensor filament_sensor]"; then
-            printf "${yellow}  Skipping M600 — Creality's built-in M600 or filament sensor is already present in your config.${white}\n"
-            printf "${yellow}  The Creality version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).${white}\n"
-            printf "${yellow}  To get the full OpenKE M600 experience these sections need to be commented out:\n"
-            printf "${yellow}    [gcode_macro M600]                       — likely in $K1_CONFIG_DIR/gcode_macro.cfg\n"
-            printf "${yellow}    [filament_switch_sensor filament_sensor] — likely in $K1_CONFIG_DIR/printer.cfg${white}\n"
+        # Derive the conflict list from every section M600-support.cfg actually defines
+        # (idle_timeout, filament_switch_sensor, M600, RESUME, ...) rather than a
+        # hardcoded pair - install_cfg_guarded below rejects the whole file if ANY of
+        # its sections conflict, so checking only two of them here let a conflict on,
+        # say, [idle_timeout] (a Klipper singleton) silently fall through to that
+        # generic "already defined" skip further down with no offer to fix it.
+        _m600_secs=$(grep -oE '^\[[^]]+\]' "$CM/M600-support.cfg" 2>/dev/null | sort -u)
+        _m600_conflict=1
+        _oldifs="$IFS"; IFS='
+'
+        for _sec in $_m600_secs; do
+            IFS="$_oldifs"
+            section_defined_elsewhere "$_sec" && _m600_conflict=0
+            IFS='
+'
+        done
+        IFS="$_oldifs"
+        if [ "$_m600_conflict" -eq 0 ]; then
+            printf "${yellow}  Skipping M600 — one or more of its sections are already present in your config.${white}\n"
+            printf "${yellow}  The existing version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).${white}\n"
+            printf "${yellow}  To get the full OpenKE M600 experience these sections need to be commented out:${white}\n"
+            _oldifs="$IFS"; IFS='
+'
+            for _sec in $_m600_secs; do
+                IFS="$_oldifs"
+                printf "${yellow}    %s${white}\n" "$_sec"
+                IFS='
+'
+            done
+            IFS="$_oldifs"
             printf "  Comment out the conflicting sections automatically and install OpenKE M600? (y/N): "
             read _m600_fix
             if [ "$_m600_fix" = "y" ] || [ "$_m600_fix" = "Y" ]; then
-                for _sec in "[gcode_macro M600]" "[filament_switch_sensor filament_sensor]"; do
+                # Two passes: first find every conflicting file WITHOUT touching anything,
+                # classifying each as safe-to-comment or not; only mutate afterward, and
+                # only if nothing came back unsafe. A file is NOT safe to auto-comment when
+                # some OTHER macro in that same file reads printer["<section>"] /
+                # printer['<section>'] at runtime - that means the section isn't a stray
+                # duplicate but part of a working, self-contained subsystem (e.g. a Helper
+                # Script M600-support.cfg with its own idle_timeout/PAUSE/RESUME wired to
+                # it). Blindly commenting the definition there leaves those other macros
+                # referencing something that no longer exists, which is worse than the
+                # original "already defined" conflict - it takes an outright broken M600
+                # from an unambiguous state (installer aborts, config still loads) to a
+                # silent one that only surfaces the next time PAUSE/RESUME/M600 actually
+                # runs (jinja2 UndefinedError, e.g. 'no attribute gcode_macro M600').
+                _safe_list="/tmp/.ke_m600_safe.$$"
+                _unsafe_list="/tmp/.ke_m600_unsafe.$$"
+                : > "$_safe_list"
+                : > "$_unsafe_list"
+                _oldifs="$IFS"; IFS='
+'
+                for _sec in $_m600_secs; do
+                    IFS="$_oldifs"
                     _pat=$(printf '%s' "$_sec" | sed 's/[][]/\\&/g')
+                    _bare=$(printf '%s' "$_sec" | sed 's/^\[//; s/\]$//')
                     active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _f; do
                         [ -f "$_f" ] || continue
-                        if grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null; then
-                            cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-m600-$(date +%Y%m%d-%H%M%S)"
-                            # Match the same way section_defined_elsewhere's grep does above
-                            # (leading whitespace only, no end anchor) rather than requiring the
-                            # whole line to be byte-identical to $_sec - a stray trailing \r
-                            # (CRLF-edited config) or trailing space made the exact match miss
-                            # silently while this step still reported success unconditionally.
-                            awk -v sec="$_sec" '
-                                { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
-                                /^\[/ { in_sec = (stripped == sec) ? 1 : 0 }
-                                { print (in_sec ? "#" : "") $0 }
-                            ' "$_f" > "/tmp/.ke_m600.$$" && mv "/tmp/.ke_m600.$$" "$_f"
-                            printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
+                        grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null || continue
+                        if grep -qE "[\"']$_bare[\"']" "$_f" 2>/dev/null; then
+                            echo "$_sec|$_f" >> "$_unsafe_list"
+                        else
+                            echo "$_sec|$_f" >> "$_safe_list"
                         fi
                     done
+                    IFS='
+'
                 done
-                install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
+                IFS="$_oldifs"
+                if [ -s "$_unsafe_list" ]; then
+                    printf "${yellow}  Found sections that are defined AND read by other macros in the\n"
+                    printf "${yellow}  same file - that looks like a working, self-contained setup rather\n"
+                    printf "${yellow}  than a stray duplicate, so nothing was changed:${white}\n"
+                    while IFS='|' read -r _sec _f; do
+                        printf "${yellow}    %s in %s${white}\n" "$_sec" "$_f"
+                    done < "$_unsafe_list"
+                    printf "${yellow}  Skipping the OpenKE M600 install — your existing setup should keep working.${white}\n"
+                else
+                    while IFS='|' read -r _sec _f; do
+                        [ -f "$_f" ] || continue
+                        cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-m600-$(date +%Y%m%d-%H%M%S)"
+                        # Match the same way section_defined_elsewhere's grep does above
+                        # (leading whitespace only, no end anchor) rather than requiring the
+                        # whole line to be byte-identical to $_sec - a stray trailing \r
+                        # (CRLF-edited config) or trailing space made the exact match miss
+                        # silently while this step still reported success unconditionally.
+                        awk -v sec="$_sec" '
+                            { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
+                            /^\[/ { in_sec = (stripped == sec) ? 1 : 0 }
+                            { print (in_sec ? "#" : "") $0 }
+                        ' "$_f" > "/tmp/.ke_m600.$$" && mv "/tmp/.ke_m600.$$" "$_f"
+                        printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
+                    done < "$_safe_list"
+                    install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
+                fi
+                rm -f "$_safe_list" "$_unsafe_list"
             else
                 printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
             fi
