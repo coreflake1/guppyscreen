@@ -1,7 +1,6 @@
 #include "finetune_panel.h"
 #include "state.h"
 #include "spdlog/spdlog.h"
-#include "config.h"
 #include "utils.h"
 
 #include <algorithm>
@@ -198,16 +197,15 @@ void FineTunePanel::handle_zoffset(lv_event_t *e) {
         const char *step = lv_btnmatrix_get_btn_text(zoffset_selector.get_selector(),
           zoffset_selector.get_selected_idx());
 
-        bool invert_z = false;
-        auto invert_z_json = Config::get_instance()->get_json("/invert_z_direction");
-        if (invert_z_json.is_boolean()) {
-          invert_z = invert_z_json.get<bool>();
-        }
-
+        // SET_GCODE_OFFSET operates in Klipper's normalized gcode frame, where
+        // negative Z_ADJUST always means closer to the bed - independent of the
+        // printer's physical stepper wiring. invert_z_direction only corrects
+        // the on-screen jog arrows for manual G0 moves and must not be applied
+        // here (see homing_panel.cpp).
         bool is_up_button = (btn == zup_btn.get_container());
-        const char *sign = (is_up_button != invert_z) ? "+" : "-";
+        const char *sign = is_up_button ? "+" : "-";
 
-        spdlog::trace("clicked z-offset {}{}{}", sign, step, invert_z ? " (inverted)" : "");
+        spdlog::trace("clicked z-offset {}{}", sign, step);
         ws.gcode_script(fmt::format("SET_GCODE_OFFSET Z_ADJUST={}{} MOVE=1", sign, step));
 
       } catch (const std::exception &ex) {

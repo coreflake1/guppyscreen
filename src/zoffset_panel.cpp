@@ -1,6 +1,6 @@
 #include "zoffset_panel.h"
 #include "state.h"
-#include "config.h"
+#include "spdlog/spdlog.h"
 #include "utils.h"
 
 ZOffsetPanel::ZOffsetPanel(KWebSocketClient &websocket_client, std::mutex &l)
@@ -113,13 +113,12 @@ void ZOffsetPanel::apply_step(bool raise) {
   const char *step = lv_btnmatrix_get_btn_text(step_selector.get_selector(),
     step_selector.get_selected_idx());
 
-  // raise = nozzle up / farther from bed = positive Z_ADJUST, unless the printer
-  // is configured with an inverted Z direction (matches FineTune).
-  bool invert_z = false;
-  auto inv = Config::get_instance()->get_json("/invert_z_direction");
-  if (inv.is_boolean()) invert_z = inv.get<bool>();
-
-  const char *sign = (raise != invert_z) ? "+" : "-";
+  // SET_GCODE_OFFSET operates in Klipper's normalized gcode frame, where
+  // negative Z_ADJUST always means closer to the bed - independent of the
+  // printer's physical stepper wiring. invert_z_direction only corrects the
+  // on-screen jog arrows for manual G0 moves (see homing_panel.cpp) and must
+  // not be applied here.
+  const char *sign = raise ? "+" : "-";
   ws.gcode_script(fmt::format("SET_GCODE_OFFSET Z_ADJUST={}{} MOVE=1", sign, step));
 }
 
