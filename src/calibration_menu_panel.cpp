@@ -70,6 +70,10 @@ static lv_obj_t *make_row(lv_obj_t *parent, const void *icon, const char *label,
 
   lv_obj_t *lbl = lv_label_create(row);
   lv_label_set_text(lbl, label);
+  // Ellipsis, not wrap, if a label is ever too long for the row - a wrapped
+  // 2-line label would make just that one row taller than the rest, breaking
+  // the row-height consistency (matches macro_item.cpp's own long-name handling).
+  lv_label_set_long_mode(lbl, LV_LABEL_LONG_DOT);
   lv_obj_set_style_text_font(lbl, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(lbl, lv_palette_darken(LV_PALETTE_GREY, 1), LV_STATE_DISABLED);
   lv_obj_set_flex_grow(lbl, 1);
@@ -108,6 +112,7 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   , panel_cont(lv_obj_create(lv_scr_act()))
   , highlight_index(-1)
   , recalibration_wizard_panel(websocket_client, l)
+  , esteps_calibration_panel(websocket_client, l)
   , bedmesh_panel(bedmesh)
   , inputshaper_panel(inputshaper)
   , axis_twist_panel(axis_twist)
@@ -119,32 +124,33 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   lv_obj_set_size(panel_cont, LV_PCT(100), LV_PCT(100));
   lv_obj_clear_flag(panel_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(panel_cont, 8, 0);
+  lv_obj_set_style_pad_row(panel_cont, 4, 0);
   lv_obj_set_style_border_width(panel_cont, 0, 0);
-  // Grid, not flex, for the left-column/nav-column split: the nav column
-  // needs to span the panel's *entire* height, level with "Calibration"
-  // itself, not just the space below the title - so title+list share a left
-  // column instead of the title sitting above a body row. LV_GRID_ALIGN_
-  // STRETCH sizes both top-level cells to the panel's full height directly,
-  // the same technique printertune_panel.cpp's own Tune-tab grid relies on.
+  // 2x2 grid: row 0 (content-height) is the header - "Calibration" on the
+  // left, Back on the right, level with the title as asked. Row 1 (FR(1),
+  // fills the rest) is the list on the left, Up/OK/Down on the right.
+  // LV_GRID_ALIGN_STRETCH sizes matching cells directly - same technique
+  // printertune_panel.cpp's own Tune-tab grid relies on.
   static lv_coord_t panel_col_dsc[] = {LV_GRID_FR(1), 48, LV_GRID_TEMPLATE_LAST};
-  static lv_coord_t panel_row_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+  static lv_coord_t panel_row_dsc[] = {LV_GRID_CONTENT, LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
   lv_obj_set_grid_dsc_array(panel_cont, panel_col_dsc, panel_row_dsc);
 
-  lv_obj_t *left_col = lv_obj_create(panel_cont);
-  lv_obj_set_grid_cell(left_col, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
-  lv_obj_set_style_pad_all(left_col, 0, 0);
-  lv_obj_set_style_pad_row(left_col, 4, 0);
-  lv_obj_set_style_border_width(left_col, 0, 0);
-  lv_obj_set_flex_flow(left_col, LV_FLEX_FLOW_COLUMN);
-  lv_obj_clear_flag(left_col, LV_OBJ_FLAG_SCROLLABLE);
-
-  lv_obj_t *title = lv_label_create(left_col);
+  lv_obj_t *title = lv_label_create(panel_cont);
+  lv_obj_set_grid_cell(title, LV_GRID_ALIGN_START, 0, 1, LV_GRID_ALIGN_CENTER, 0, 1);
   lv_label_set_text(title, "Calibration");
   lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
 
-  list_cont = lv_obj_create(left_col);
-  lv_obj_set_width(list_cont, LV_PCT(100));
-  lv_obj_set_flex_grow(list_cont, 1);
+  back_btn = lv_btn_create(panel_cont);
+  lv_obj_set_grid_cell(back_btn, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+  lv_obj_set_style_bg_color(back_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+  lv_obj_t *back_lbl = lv_label_create(back_btn);
+  lv_label_set_text(back_lbl, LV_SYMBOL_LEFT);
+  lv_obj_set_style_text_font(back_lbl, &lv_font_montserrat_16, LV_PART_MAIN);
+  lv_obj_center(back_lbl);
+  lv_obj_add_event_cb(back_btn, &CalibrationMenuPanel::_handle_callback, LV_EVENT_CLICKED, this);
+
+  list_cont = lv_obj_create(panel_cont);
+  lv_obj_set_grid_cell(list_cont, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_flex_flow(list_cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_style_pad_row(list_cont, 2, 0);
   lv_obj_set_style_border_width(list_cont, 0, 0);
@@ -157,7 +163,7 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
 
   make_section_label(list_cont, "IN ORDER");
   axis_twist_row  = make_row(list_cont, &layers_img,      "Axis Twist",              &CalibrationMenuPanel::_handle_callback, this, "1");
-  wizard_row      = make_row(list_cont, &home_z,          "Auto Calibration",        &CalibrationMenuPanel::_handle_callback, this, "2");
+  wizard_row      = make_row(list_cont, &home_z,          "Z-Offset & Bed Mesh",     &CalibrationMenuPanel::_handle_callback, this, "2");
   inputshaper_row = make_row(list_cont, &inputshaper_img, "Input Shaper",            &CalibrationMenuPanel::_handle_callback, this, "3");
   esteps_row      = make_row(list_cont, &extrude_img,     "E-Steps Calibration",     &CalibrationMenuPanel::_handle_callback, this, "4");
   skew_row        = make_row(list_cont, &skew_img,        "Skew Correction",         &CalibrationMenuPanel::_handle_callback, this, "5");
@@ -169,18 +175,19 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   rows = {axis_twist_row, wizard_row, inputshaper_row, esteps_row, skew_row, tmc_tune_row, bedmesh_row};
 
   // Right-side nav column - same construction as macros_panel.cpp's nav_cont
-  // (Up/OK/Down), with a 4th Back button appended below them.
+  // (Up/OK/Down). Back moved up to the header row (grid_cell above, level
+  // with "Calibration") since having it as a 4th button down here read as
+  // just another list control instead of the way out of the screen.
   nav_cont = lv_obj_create(panel_cont);
-  lv_obj_set_grid_cell(nav_cont, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 0, 1);
+  lv_obj_set_grid_cell(nav_cont, LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_style_pad_all(nav_cont, 2, 0);
   lv_obj_set_style_border_width(nav_cont, 0, 0);
   lv_obj_clear_flag(nav_cont, LV_OBJ_FLAG_SCROLLABLE);
 
-  // Grid again, not flex_grow, for the 4 buttons themselves: flex_grow split
-  // them unevenly (three normal, Back squeezed small) even with matching
-  // style on all four - a 4-row FR(1) grid divides evenly, guaranteed, no
-  // grow-distribution ambiguity to debug further.
-  static lv_coord_t nav_row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
+  // Grid again, not flex_grow, for the buttons themselves: flex_grow split
+  // them unevenly even with matching style on all of them - an FR(1) grid
+  // divides evenly, guaranteed, no grow-distribution ambiguity to debug further.
+  static lv_coord_t nav_row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
   static lv_coord_t nav_col_dsc[] = {LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
   lv_obj_set_grid_dsc_array(nav_cont, nav_col_dsc, nav_row_dsc);
   lv_obj_set_style_pad_row(nav_cont, 4, 0);
@@ -212,14 +219,6 @@ CalibrationMenuPanel::CalibrationMenuPanel(KWebSocketClient &websocket_client, s
   lv_img_set_src(down_img, &arrow_down);
   lv_obj_center(down_img);
   lv_obj_add_event_cb(down_btn, &CalibrationMenuPanel::_handle_nav, LV_EVENT_CLICKED, this);
-
-  back_btn = lv_btn_create(nav_cont);
-  style_nav_btn(back_btn, 3);
-  lv_obj_t *back_lbl = lv_label_create(back_btn);
-  lv_label_set_text(back_lbl, LV_SYMBOL_LEFT);
-  lv_obj_set_style_text_font(back_lbl, &lv_font_montserrat_16, LV_PART_MAIN);
-  lv_obj_center(back_lbl);
-  lv_obj_add_event_cb(back_btn, &CalibrationMenuPanel::_handle_callback, LV_EVENT_CLICKED, this);
 }
 
 CalibrationMenuPanel::~CalibrationMenuPanel() {
@@ -336,11 +335,9 @@ void CalibrationMenuPanel::activate_row(lv_obj_t *row) {
   }
 
   if (row == esteps_row) {
-    // CALIBRATE_ESTEPS is a self-contained gcode macro (Klipper action:prompt
-    // protocol) - prompt_panel.cpp already renders its guided flow app-wide,
-    // no dedicated panel needed here.
+    // Heats the hotend and probes extrusion accuracy; never mid-print.
     if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
-    ws.gcode_script("CALIBRATE_ESTEPS");
+    esteps_calibration_panel.foreground();
     return;
   }
 

@@ -19,7 +19,7 @@ then slicer. Doing it out of order means redoing work.
 | 1. Mechanics | Loose hardware that no software can fix |
 | 2. Temperature (PID) | Inconsistent extrusion from wobbly heater temps |
 | 3. Axis Twist | First layer uneven left-to-right |
-| 4. Auto Calibration | First layer height everywhere (bed mesh + Z-offset, one guided flow) |
+| 4. Z-Offset & Bed Mesh | First layer height everywhere (bed mesh + Z-offset, one guided flow) |
 | 5. Input shaper | Ghosting/ringing on fast prints |
 | 6. E-Steps Calibration | Prints uniformly over- or under-extruded |
 | 7. Pressure advance, flow, temp | Corner bulges, stringing, over/under-extrusion |
@@ -36,7 +36,7 @@ mechanics, PID, and pressure advance/flow are done elsewhere, so they don't get 
 |---|---|
 | Tap targets off / need to press slightly away from what you mean | Step 0 — touch calibration |
 | First layer uneven left↔right, bed mesh didn't help | Step 3 — Axis Twist |
-| First layer uneven all over / patchy adhesion, or too high/low everywhere | Step 4 — Auto Calibration |
+| First layer uneven all over / patchy adhesion, or too high/low everywhere | Step 4 — Z-Offset & Bed Mesh |
 | Ghosting/echoes after sharp corners | Step 5 — Input shaper |
 | Prints look uniformly too thin or over-full, not just at corners | Step 6 — E-Steps |
 | Bulging corners, blobs, gaps | Step 7 — Pressure advance + flow |
@@ -115,9 +115,9 @@ result corrects the probe readings so the bed mesh is accurate. Takes ~15 minute
 
 ---
 
-## Step 4 — Auto Calibration (bed mesh + Z-offset, the big one)
+## Step 4 — Z-Offset & Bed Mesh (the big one)
 
-This is 80% of whether prints "look good." **Tune → Calibration → Auto Calibration** on the screen
+This is 80% of whether prints "look good." **Tune → Calibration → Z-Offset & Bed Mesh** on the screen
 walks you through both halves in one guided flow — the recommended path, especially right after
 changing hardware (bed, nozzle, BLTouch remount):
 
@@ -186,15 +186,15 @@ Fixes the *amount* of filament extruded being wrong everywhere — not the corne
 that pressure advance fixes next, but consistent over- or under-extrusion across an entire print (walls
 look thicker or thinner than sliced, single-wall prints too fat or too thin).
 
-**On the screen:** Tune → Calibration → **E-Steps Calibration**. It's a guided macro (not a separate
-panel) — a prompt walks you through the mark-extrude-measure procedure:
+**On the screen:** Tune → Calibration → **E-Steps Calibration**. It's a dedicated guided panel that
+walks you through the mark-extrude-measure procedure:
 
 1. It heats the hotend (this is a direct-drive extruder, so there's no cold/disconnected test) and tells
-   you where to put a piece of tape on the filament, above the extruder gears.
-2. Tap **Extrude** in the prompt — it pushes a measured length through and tells you what to measure
-   next: the gap left between the extruder and your tape mark.
-3. Type the result into the console: `CALIBRATE_ESTEPS_APPLY MEASURED=<gap in mm>`. It computes and
-   saves the corrected `rotation_distance` for you — no manual math or re-entering values.
+   you where to put a piece of tape on the filament, above where it feeds into the top of the extruder.
+2. Tap **Extrude** — it pushes a measured length through and tells you what to measure next: the gap
+   left between the extruder and your tape mark.
+3. Type the result into the on-screen keypad and tap **Apply**. It computes and saves the corrected
+   `rotation_distance` for you — no manual math or re-entering values, and no console typing needed.
 4. Run `CALIBRATE_ESTEPS` again to verify; repeat until the extruded length matches what you asked for
    (within ~0.5 mm).
 
@@ -261,9 +261,9 @@ be harmful — then set it back to a safe default.
 
 | You changed… | Redo |
 |---|---|
-| Nozzle / hotend | Z-offset (+ PID if you swapped the heater too) — Auto Calibration covers this |
-| Bed surface, springs, or anything affecting bed height | Auto Calibration (Z-offset + bed mesh together) |
-| X gantry / anything that could tilt the X axis | **Axis Twist first**, then Auto Calibration to get a fresh, twist-corrected mesh — doing it the other way round means redoing the mesh anyway, see [Axis Twist Compensation](Axis-Twist-Compensation) |
+| Nozzle / hotend | Z-offset (+ PID if you swapped the heater too) — Z-Offset & Bed Mesh covers this |
+| Bed surface, springs, or anything affecting bed height | Z-Offset & Bed Mesh |
+| X gantry / anything that could tilt the X axis | **Axis Twist first**, then Z-Offset & Bed Mesh to get a fresh, twist-corrected mesh — doing it the other way round means redoing the mesh anyway, see [Axis Twist Compensation](Axis-Twist-Compensation) |
 | Moving mass on an axis (belts, carriage, bed rails) | Input shaper for **that axis only** |
 | Extruder gear, hobbed bolt, or hotend melt zone | E-Steps |
 | Frame squareness | Skew |

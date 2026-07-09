@@ -4,6 +4,7 @@
 #include "lvgl/lvgl.h"
 #include "websocket_client.h"
 #include "recalibration_wizard_panel.h"
+#include "esteps_calibration_panel.h"
 #include "bedmesh_panel.h"
 #include "inputshaper_panel.h"
 #include "axis_twist_panel.h"
@@ -84,6 +85,7 @@ class CalibrationMenuPanel {
   int highlight_index;
 
   RecalibrationWizardPanel recalibration_wizard_panel;
+  EstepsCalibrationPanel esteps_calibration_panel;
   BedMeshPanel &bedmesh_panel;
   InputShaperPanel &inputshaper_panel;
   AxisTwistPanel &axis_twist_panel;
