@@ -101,10 +101,14 @@ What's on offer:
 > **About the Creality macros:** these used to come from the Creality Helper Script. **Save Z-Offset** and
 > **M600** redefine sections a stock or Helper-Script config may already own (`[save_variables]`,
 > `[filament_switch_sensor filament_sensor]`, `SET_GCODE_OFFSET`, `[idle_timeout]`). To avoid a
-> duplicate-section crash, the installer adds each macro file **only if your config doesn't already define
-> those sections** — otherwise it skips that file and leaves your working setup alone. So on a fresh
-> printer you get the lot; on top of an existing Helper-Script setup, the conflicting ones are skipped (you
-> already have them). Exclude Object also flips `enable_object_processing` on in `moonraker.conf` when safe.
+> duplicate-section crash, the installer checks first — if none of those sections exist yet, you get
+> OpenKE's own versions outright. If they're already defined elsewhere (e.g. an existing Helper-Script
+> setup), it **offers to safely replace them**: it checks whether the existing sections are read by some
+> *other* macro in that same file (a sign of a genuinely working, self-contained setup, not a stray
+> duplicate) — if so it leaves everything untouched; otherwise, with your confirmation, it backs up the
+> old file, comments out just the conflicting sections, and installs OpenKE's version in their place. Say
+> no to the prompt (or it detects a working setup) and your existing macros keep running exactly as they
+> were. Exclude Object also flips `enable_object_processing` on in `moonraker.conf` when safe.
 
 > **Restarting after changes:** the installer restarts Klipper for you. On the KE, the *first* restart
 > after a config change occasionally shuts down with a `serialqueue … NoneType` error — this is a harmless
@@ -113,13 +117,16 @@ What's on offer:
 > than one restart. See [Troubleshooting](Troubleshooting).
 
 **Coexists with the Creality Helper Script.** If you already set any of these up — by hand or via the
-Helper Script — the installer **detects it and leaves your version alone**: it skips adding a config
-section you already have (no duplicate-section crash), and it backs up any Klipper-extras module it
-overwrites (e.g. an existing TMC Autotune) to `/usr/data/guppyify-backup/` first. The everyday macros —
-`M600`/filament, Save Z-Offset, useful macros, `[exclude_object]` — are now **shipped by OpenKE** (the
-**Creality macros** option), so a fresh printer gets them; on a printer that already has them (e.g. an
-existing Helper-Script setup) those are skipped instead. Either way it's safe to run on top of an
-existing setup.
+Helper Script — the installer **detects it** and, for M600/Save Z-Offset specifically, **offers to
+safely swap in OpenKE's own version** (see above) rather than just leaving the old one in place forever;
+everything else it skips adding a config section you already have (no duplicate-section crash), and it
+backs up any Klipper-extras module it overwrites (e.g. an existing TMC Autotune) to
+`/usr/data/guppyify-backup/` first. The everyday macros — `M600`/filament, Save Z-Offset, useful macros,
+`[exclude_object]` — are now **shipped by OpenKE** (the **Creality macros** option), so a fresh printer
+gets them outright; on a printer that already has them (e.g. an existing Helper-Script setup), M600 and
+Save Z-Offset offer the safe-replace prompt, the rest are skipped. Either way it's safe to run on top of
+an existing setup — nothing is changed without either a clean "nothing conflicts" state or your explicit
+yes at the prompt.
 
 ## What the installer changes
 

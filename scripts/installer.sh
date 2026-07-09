@@ -1224,7 +1224,89 @@ else
     if [ -d "$MODS_DIR/creality_macros" ] && want "Creality macros (M600, Save Z-Offset, useful macros, Exclude Object)"; then
         CM="$MODS_DIR/creality_macros"
         install_cfg_guarded "$CM/useful-macros.cfg"  "useful-macros.cfg"  "useful macros (backup/restore, PID, bed-level, warmup)"
-        install_cfg_guarded "$CM/save-zoffset.cfg"   "save-zoffset.cfg"   "Save Z-Offset (persists z-offset across reboots)"
+
+        # Save Z-Offset: same detect-conflict-and-offer-to-replace treatment as M600 below,
+        # instead of install_cfg_guarded's default skip. A pre-existing Helper Script
+        # save-zoffset.cfg is exactly the scenario that leaves our own Z-offset panel
+        # silently depending on someone else's file for persistence rather than installing
+        # cleanly, like it would on a fresh setup. No settings-migration step needed here
+        # (unlike KAMP/adaptive print setup) - the actual saved value lives in
+        # variables.cfg, external to this cfg file, and both the old and new file point at
+        # the same filename, so the value survives the swap automatically.
+        _zoff_secs=$(grep -oE '^\[[^]]+\]' "$CM/save-zoffset.cfg" 2>/dev/null | sort -u)
+        _zoff_conflict=1
+        _oldifs="$IFS"; IFS='
+'
+        for _sec in $_zoff_secs; do
+            IFS="$_oldifs"
+            section_defined_elsewhere "$_sec" && _zoff_conflict=0
+            IFS='
+'
+        done
+        IFS="$_oldifs"
+        if [ "$_zoff_conflict" -eq 0 ]; then
+            printf "${yellow}  Skipping Save Z-Offset — one or more of its sections are already present in your config.${white}\n"
+            printf "  Comment out the conflicting sections automatically and install OpenKE's Save Z-Offset? (y/N): "
+            read _zoff_fix
+            if [ "$_zoff_fix" = "y" ] || [ "$_zoff_fix" = "Y" ]; then
+                # Same two-pass safe/unsafe classification as M600 - only mutate once
+                # nothing comes back unsafe (i.e. genuinely part of a working,
+                # self-contained subsystem rather than a stray duplicate).
+                _safe_list="/tmp/.ke_zoff_safe.$$"
+                _unsafe_list="/tmp/.ke_zoff_unsafe.$$"
+                : > "$_safe_list"
+                : > "$_unsafe_list"
+                _oldifs="$IFS"; IFS='
+'
+                for _sec in $_zoff_secs; do
+                    IFS="$_oldifs"
+                    _pat=$(printf '%s' "$_sec" | sed 's/[][]/\\&/g')
+                    _bare=$(printf '%s' "$_sec" | sed 's/^\[//; s/\]$//')
+                    active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _f; do
+                        [ -f "$_f" ] || continue
+                        grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null || continue
+                        if grep -qE "[\"']$_bare[\"']" "$_f" 2>/dev/null; then
+                            echo "$_sec|$_f" >> "$_unsafe_list"
+                        else
+                            echo "$_sec|$_f" >> "$_safe_list"
+                        fi
+                    done
+                    IFS='
+'
+                done
+                IFS="$_oldifs"
+                if [ -s "$_unsafe_list" ]; then
+                    printf "${yellow}  Found sections that are defined AND read by other macros in the\n"
+                    printf "${yellow}  same file - that looks like a working, self-contained setup rather\n"
+                    printf "${yellow}  than a stray duplicate, so nothing was changed:${white}\n"
+                    while IFS='|' read -r _sec _f; do
+                        printf "${yellow}    %s in %s${white}\n" "$_sec" "$_f"
+                    done < "$_unsafe_list"
+                    printf "${yellow}  Skipping the OpenKE Save Z-Offset install — your existing setup should keep working.${white}\n"
+                else
+                    while IFS='|' read -r _sec _f; do
+                        [ -f "$_f" ] || continue
+                        cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-zoffset-$(date +%Y%m%d-%H%M%S)"
+                        # Same CRLF-safe match as M600's comment-out (matches
+                        # section_defined_elsewhere's own grep: leading whitespace only,
+                        # no end anchor) rather than requiring a byte-identical line.
+                        awk -v sec="$_sec" '
+                            { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
+                            /^\[/ { in_sec = (stripped == sec) ? 1 : 0 }
+                            { print (in_sec ? "#" : "") $0 }
+                        ' "$_f" > "/tmp/.ke_zoff.$$" && mv "/tmp/.ke_zoff.$$" "$_f"
+                        printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
+                    done < "$_safe_list"
+                    install_cfg_guarded "$CM/save-zoffset.cfg" "save-zoffset.cfg" "Save Z-Offset (persists z-offset across reboots)"
+                fi
+                rm -f "$_safe_list" "$_unsafe_list"
+            else
+                printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
+            fi
+        else
+            install_cfg_guarded "$CM/save-zoffset.cfg" "save-zoffset.cfg" "Save Z-Offset (persists z-offset across reboots)"
+        fi
+
         # Derive the conflict list from every section M600-support.cfg actually defines
         # (idle_timeout, filament_switch_sensor, M600, RESUME, ...) rather than a
         # hardcoded pair - install_cfg_guarded below rejects the whole file if ANY of
