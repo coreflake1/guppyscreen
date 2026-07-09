@@ -62,16 +62,24 @@ Then set your Machine start G-code to:
 M140 S[bed_temperature_initial_layer_single]   ; start heating bed (don't wait)
 M104 S[nozzle_temperature_initial_layer]       ; start heating nozzle (don't wait)
 G28                                             ; home all axes
-ADAPTIVE_BED_MESH_CALIBRATE                     ; mesh just the print area
+ADAPTIVE_BED_MESH_CALIBRATE MARGIN={brim_width + 5}    ; mesh just the print area (+ your brim)
 M190 S[bed_temperature_initial_layer_single]   ; wait for bed to reach temp
-SMART_PARK                                      ; park next to the print while heating
+SMART_PARK MARGIN={brim_width + 10}             ; park next to the print while heating
 M109 S[nozzle_temperature_initial_layer]       ; wait for nozzle temp
-LINE_PURGE                                      ; purge a line beside the print
+LINE_PURGE MARGIN={brim_width + 10}             ; purge a line beside the print
 ```
 
 > The exact temperature token names can vary slightly across Orca versions — what matters is the
 > **order**: home → mesh → wait for temps → purge. Don't wait for temps before meshing; a cold bed
 > expands slightly as it heats, and you want the mesh taken at printing temperature.
+
+> 💡 **`MARGIN=` is optional.** `[brim_width]` is OrcaSlicer's own per-print brim setting — passing
+> `MARGIN={brim_width + 5}` means the mesh/park/purge margin automatically grows to clear whatever
+> brim that specific print actually has, instead of you guessing a fixed value. No brim on a print?
+> `brim_width` is `0`, so it just falls back to a small fixed buffer. Leave `MARGIN=` off entirely
+> and each macro uses its `Settings.cfg` default (`variable_mesh_margin` / `variable_purge_margin`)
+> instead — plain slicers without a `brim_width` placeholder (Cura, PrusaSlicer use different token
+> names — check your slicer's docs) should do that.
 
 > 🛟 **Nothing detected? No harm done.** If Label Objects isn't ticked (or your slicer didn't write
 > object labels for some other reason), `ADAPTIVE_BED_MESH_CALIBRATE` doesn't fail or stop your print —
@@ -135,7 +143,18 @@ touch, but they're there if you want to adjust the defaults:
 | `variable_smart_park_height` | Z height while parked and waiting to heat |
 
 Leave these alone unless you have a specific reason to change one — the defaults work for the KE as
-shipped.
+shipped. They're also just the *fallback*: any `MARGIN=` passed at the macro call (see Step 2) wins
+for that call, and only falls back to `variable_mesh_margin`/`variable_purge_margin` if you don't
+pass one.
+
+> ⚠️ **Supports still aren't counted in the footprint.** The polygon your slicer reports per object
+> (via `EXCLUDE_OBJECT_DEFINE`) is the outline of the model geometry only — it's generated before
+> supports are sliced, and there's no slicer setting that reports "how far supports stick out," so
+> there's nothing to pass as `MARGIN=` for that case (unlike brim, which is one fixed, known width —
+> see Step 2). If a part needs supports that extend past the model itself, the mesh area or purge
+> line can end up placed right at or under that overhang. There's no automatic fix for this one — pad
+> `MARGIN=`/`variable_mesh_margin`/`variable_purge_margin` a bit further if you print heavily
+> supported parts often.
 
 ---
 
