@@ -1435,9 +1435,80 @@ else
     fi
 
     # --- E-Steps calibration: guided CALIBRATE_ESTEPS / CALIBRATE_ESTEPS_APPLY macros ---
+    # Same detect-conflict/offer-to-replace treatment as M600/Save Z-Offset above: the
+    # on-screen E-Steps wizard (src/esteps_calibration_panel.cpp) calls these exact macro
+    # names, so a same-named pre-existing macro (someone's own e-steps helper, a different
+    # guide's version, etc.) left in place forever would silently break or mismatch the
+    # wizard rather than ever getting OpenKE's own version.
     if [ -f "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" ] && want "E-Steps Calibration (guided rotation_distance tuning)"; then
         ensure_save_variables
-        install_cfg_guarded "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" "esteps_calibration.cfg" "E-Steps Calibration macros"
+        _est_secs=$(grep -oE '^\[[^]]+\]' "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" 2>/dev/null | sort -u)
+        _est_conflict=1
+        _oldifs="$IFS"; IFS='
+'
+        for _sec in $_est_secs; do
+            IFS="$_oldifs"
+            section_defined_elsewhere "$_sec" && _est_conflict=0
+            IFS='
+'
+        done
+        IFS="$_oldifs"
+        if [ "$_est_conflict" -eq 0 ]; then
+            printf "${yellow}  Skipping E-Steps Calibration — one or more of its sections are already present in your config.${white}\n"
+            printf "  Comment out the conflicting sections automatically and install OpenKE's E-Steps Calibration? (y/N): "
+            read _est_fix
+            if [ "$_est_fix" = "y" ] || [ "$_est_fix" = "Y" ]; then
+                _safe_list="/tmp/.ke_est_safe.$$"
+                _unsafe_list="/tmp/.ke_est_unsafe.$$"
+                : > "$_safe_list"
+                : > "$_unsafe_list"
+                _oldifs="$IFS"; IFS='
+'
+                for _sec in $_est_secs; do
+                    IFS="$_oldifs"
+                    _pat=$(printf '%s' "$_sec" | sed 's/[][]/\\&/g')
+                    _bare=$(printf '%s' "$_sec" | sed 's/^\[//; s/\]$//')
+                    active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _f; do
+                        [ -f "$_f" ] || continue
+                        grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null || continue
+                        if grep -qE "[\"']$_bare[\"']" "$_f" 2>/dev/null; then
+                            echo "$_sec|$_f" >> "$_unsafe_list"
+                        else
+                            echo "$_sec|$_f" >> "$_safe_list"
+                        fi
+                    done
+                    IFS='
+'
+                done
+                IFS="$_oldifs"
+                if [ -s "$_unsafe_list" ]; then
+                    printf "${yellow}  Found sections that are defined AND read by other macros in the\n"
+                    printf "${yellow}  same file - that looks like a working, self-contained setup rather\n"
+                    printf "${yellow}  than a stray duplicate, so nothing was changed:${white}\n"
+                    while IFS='|' read -r _sec _f; do
+                        printf "${yellow}    %s in %s${white}\n" "$_sec" "$_f"
+                    done < "$_unsafe_list"
+                    printf "${yellow}  Skipping the OpenKE E-Steps Calibration install — your existing setup should keep working.${white}\n"
+                else
+                    while IFS='|' read -r _sec _f; do
+                        [ -f "$_f" ] || continue
+                        cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-esteps-$(date +%Y%m%d-%H%M%S)"
+                        awk -v sec="$_sec" '
+                            { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
+                            /^\[/ { in_sec = (stripped == sec) ? 1 : 0 }
+                            { print (in_sec ? "#" : "") $0 }
+                        ' "$_f" > "/tmp/.ke_est.$$" && mv "/tmp/.ke_est.$$" "$_f"
+                        printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
+                    done < "$_safe_list"
+                    install_cfg_guarded "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" "esteps_calibration.cfg" "E-Steps Calibration macros"
+                fi
+                rm -f "$_safe_list" "$_unsafe_list"
+            else
+                printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
+            fi
+        else
+            install_cfg_guarded "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" "esteps_calibration.cfg" "E-Steps Calibration macros"
+        fi
     fi
 
     printf "${green}Optional features done.${white}\n"
