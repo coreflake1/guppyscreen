@@ -63,6 +63,22 @@ See **[Upgrading](https://github.com/coreflake1/guppyscreen/wiki/Upgrading)**.
 
 **Uninstall:** re-run the command above with `uninstall` appended. Details: **[Installation](https://github.com/coreflake1/guppyscreen/wiki/Installation)**.
 
+### Testing bleeding-edge builds
+
+> ⚠️ **Unstable, for testers only.** This is the `ke-next` development branch — it can contain
+> half-finished or experimental work between releases. Don't run this on a printer you rely on for
+> real prints unless you're comfortable recovering it yourself.
+
+Every push here builds automatically and publishes to a moving `nightly-ke-next` prerelease. To
+install the latest one:
+
+```sh
+PINNED_RELEASE=nightly-ke-next sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-next/scripts/installer.sh)"
+```
+
+To go back to the latest stable release, just re-run the normal install command above (no
+`PINNED_RELEASE`). More detail: **[Installation](wiki/Installation.md#testing-bleeding-edge-builds-ke-next-nightly)**.
+
 ## Compatibility
 
 | | |
