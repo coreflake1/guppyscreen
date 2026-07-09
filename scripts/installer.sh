@@ -112,6 +112,10 @@ uninstall_guppy() {
         printf "${yellow}      and remove autotune_tmc.py / axis_twist_compensation.py from $KLIPPY_EXTRA_DIR_U${white}\n"
         printf "${yellow}      plus any [autotune_tmc]/[axis_twist_compensation] sections from printer.cfg.${white}\n"
     fi
+    if [ -f "$BACKUP_DIR/bed_mesh.py.bak" ]; then
+        printf "${yellow}NOTE: KAMP edited bed_mesh.py (adds BED_MESH_CALIBRATE ADAPTIVE=1). To fully revert:${white}\n"
+        printf "${yellow}      cp $BACKUP_DIR/bed_mesh.py.bak $KLIPPY_EXTRA_DIR_U/bed_mesh.py${white}\n"
+    fi
 
     # Optionally remove /usr/data/guppyscreen
     printf "${yellow}Remove $K1_GUPPY_DIR (binary + themes + configs)? (y/n): ${white}"
@@ -1094,6 +1098,14 @@ else
             cp -r "$MODS_DIR/kamp/KAMP" "$GUPPY_CFG_DIR/"
             cp "$MODS_DIR/kamp/KAMP_Settings.cfg" "$GUPPY_CFG_DIR/KAMP_Settings.cfg"
         fi
+        # ADAPTIVE_BED_MESH_CALIBRATE now delegates to Klipper's native adaptive
+        # mesh (BED_MESH_CALIBRATE ADAPTIVE=1) instead of KAMP's own macro-based
+        # implementation - the KE's stock bed_mesh.py predates that upstream
+        # merge and has no ADAPTIVE support at all, so patch it in. Idempotent
+        # and purely additive (see patch_bed_mesh.py); safe to run every install.
+        backup_extra_once bed_mesh.py
+        python3 "$MODS_DIR/kamp/patch_bed_mesh.py" "$KLIPPY_EXTRA_DIR/bed_mesh.py" || \
+            printf "${yellow}  KAMP: bed_mesh.py not auto-patched (see above); adaptive mesh needs it - patch by hand if your firmware differs (wiki).${white}\n"
     fi
 
     # --- Axis Twist Compensation: module + cfg + idempotent probe.py patch ---
