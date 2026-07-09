@@ -1110,6 +1110,19 @@ else
             printf "${yellow}  Adaptive print setup already configured elsewhere — leaving it untouched.${white}\n"
         else
             printf "${green}  Installing Adaptive Print Setup (mesh + purge + park)${white}\n"
+
+            # Settings.cfg below gets overwritten unconditionally (section_defined_elsewhere
+            # deliberately excludes our own GuppyScreen/ dir, so a prior OpenKE install's
+            # Settings.cfg never blocks this - that's what lets a re-run pick up a newly
+            # added macro like START_PRINT). Snapshot any customized values first so
+            # migrate_settings.py can restore them afterward - same mechanism as the KAMP
+            # migration below, just pointed at our own previous file instead of KAMP's.
+            _prev_settings="$OLD_KAMP_SETTINGS"
+            if [ -z "$_prev_settings" ] && [ -f "$GUPPY_CFG_DIR/Settings.cfg" ]; then
+                _prev_settings="/tmp/.ke_prev_settings.$$"
+                cp "$GUPPY_CFG_DIR/Settings.cfg" "$_prev_settings"
+            fi
+
             cp -r "$MODS_DIR/adaptive_print_setup/modules" "$GUPPY_CFG_DIR/"
             cp "$MODS_DIR/adaptive_print_setup/Settings.cfg" "$GUPPY_CFG_DIR/Settings.cfg"
 
@@ -1125,6 +1138,10 @@ else
                 rm -rf "$K1_CONFIG_DIR/KAMP" "$K1_CONFIG_DIR/KAMP_Settings.cfg" \
                        "$GUPPY_CFG_DIR/KAMP" "$GUPPY_CFG_DIR/KAMP_Settings.cfg"
                 sed -i '/\[include KAMP_Settings\.cfg\]/d' "$K1_CONFIG_DIR/printer.cfg"
+            elif [ -n "$_prev_settings" ]; then
+                python3 "$MODS_DIR/adaptive_print_setup/migrate_settings.py" \
+                    "$_prev_settings" "$GUPPY_CFG_DIR/Settings.cfg"
+                rm -f "$_prev_settings"
             fi
         fi
 

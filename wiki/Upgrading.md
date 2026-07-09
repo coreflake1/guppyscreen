@@ -44,6 +44,11 @@ toggles, WiFi low-latency, and everything else in `guppyconfig.json`) — as of 
 installer merges the packaged defaults underneath your existing settings instead of overwriting them,
 so anything you've already set stays exactly as you left it.
 
+Same guarantee for **[Adaptive Print Setup](Adaptive-Print-Setup)'s `Settings.cfg`** (mesh margin,
+purge amount, flow rate, etc.) — its file gets replaced on every run so newly added macros (like
+`START_PRINT`) always land, but any value you'd already customized is migrated across that replacement
+automatically, the same way values survive a KAMP migration.
+
 ## How to update
 
 **You're on v0.3.0 or newer** → update right from the screen: **Settings → Update Guppy**. It pulls the
