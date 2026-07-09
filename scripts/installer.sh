@@ -1040,6 +1040,121 @@ install_cfg_guarded() {   # $1 = src path, $2 = dest filename, $3 = label
     fi
 }
 
+# Like install_cfg_guarded, but for macro files an OpenKE on-screen feature (M600's
+# filament-change UI, the Z-offset panel, the E-Steps wizard, ...) specifically depends
+# on by exact macro name - instead of skipping forever on a conflict, offer to safely
+# replace it: back up the conflicting file, comment out just the conflicting sections,
+# and install our version in their place. Only ever mutates if NOTHING comes back
+# "unsafe" (i.e. some OTHER macro in that same file reads printer["<section>"] /
+# printer['<section>'] at runtime - a sign of a genuinely working, self-contained
+# subsystem rather than a stray duplicate; blindly commenting there would leave those
+# other macros referencing something that no longer exists). Always asks first.
+replace_conflicting_cfg() {   # $1=src path, $2=dest filename, $3=label, $4=backup-tag
+    _rc_src="$1"; _rc_dest="$2"; _rc_label="$3"; _rc_tag="$4"
+    _rc_secs=$(grep -oE '^\[[^]]+\]' "$_rc_src" 2>/dev/null | sort -u)
+    _rc_conflict=1
+    _rc_oldifs="$IFS"; IFS='
+'
+    for _rc_sec in $_rc_secs; do
+        IFS="$_rc_oldifs"
+        section_defined_elsewhere "$_rc_sec" && _rc_conflict=0
+        IFS='
+'
+    done
+    IFS="$_rc_oldifs"
+    if [ "$_rc_conflict" -ne 0 ]; then
+        install_cfg_guarded "$_rc_src" "$_rc_dest" "$_rc_label"
+        return 0
+    fi
+
+    printf "${yellow}  Skipping %s — one or more of its sections are already present in your config:${white}\n" "$_rc_label"
+    _rc_oldifs="$IFS"; IFS='
+'
+    for _rc_sec in $_rc_secs; do
+        IFS="$_rc_oldifs"
+        printf "${yellow}    %s${white}\n" "$_rc_sec"
+        IFS='
+'
+    done
+    IFS="$_rc_oldifs"
+    printf "  Comment out the conflicting sections automatically and install OpenKE's %s? (y/N): " "$_rc_label"
+    read _rc_fix
+    if [ "$_rc_fix" != "y" ] && [ "$_rc_fix" != "Y" ]; then
+        printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
+        return 0
+    fi
+
+    # Two passes: find every conflicting file WITHOUT touching anything, classifying
+    # each section as safe-to-comment or not, only mutate afterward and only if
+    # nothing came back unsafe.
+    _rc_safe="/tmp/.ke_rc_safe.$$"
+    _rc_unsafe="/tmp/.ke_rc_unsafe.$$"
+    : > "$_rc_safe"
+    : > "$_rc_unsafe"
+    _rc_oldifs="$IFS"; IFS='
+'
+    for _rc_sec in $_rc_secs; do
+        IFS="$_rc_oldifs"
+        _rc_pat=$(printf '%s' "$_rc_sec" | sed 's/[][]/\\&/g')
+        _rc_bare=$(printf '%s' "$_rc_sec" | sed 's/^\[//; s/\]$//')
+        active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _rc_f; do
+            [ -f "$_rc_f" ] || continue
+            grep -qE "^[[:space:]]*$_rc_pat" "$_rc_f" 2>/dev/null || continue
+            if grep -qE "[\"']$_rc_bare[\"']" "$_rc_f" 2>/dev/null; then
+                echo "$_rc_sec|$_rc_f" >> "$_rc_unsafe"
+            else
+                echo "$_rc_sec|$_rc_f" >> "$_rc_safe"
+            fi
+        done
+        IFS='
+'
+    done
+    IFS="$_rc_oldifs"
+
+    if [ -s "$_rc_unsafe" ]; then
+        printf "${yellow}  Found sections that are defined AND read by other macros in the\n"
+        printf "${yellow}  same file - that looks like a working, self-contained setup rather\n"
+        printf "${yellow}  than a stray duplicate, so nothing was changed:${white}\n"
+        while IFS='|' read -r _rc_sec _rc_f; do
+            printf "${yellow}    %s in %s${white}\n" "$_rc_sec" "$_rc_f"
+        done < "$_rc_unsafe"
+        printf "${yellow}  Skipping the OpenKE %s install — your existing setup should keep working.${white}\n" "$_rc_label"
+        rm -f "$_rc_safe" "$_rc_unsafe"
+        return 0
+    fi
+
+    # Comment out every safe section for a given file in ONE pass (not one pass per
+    # section) - a separate awk invocation per section can't reset `in_sec` once an
+    # earlier pass's own target header becomes a comment and stops matching /^\[/,
+    # so a later pass bleeds past it to the next real header, stacking extra '#'s
+    # onto lines already handled. Harmless (still all correctly disabled) but noisy;
+    # a single batched pass per file avoids it.
+    _rc_files=$(cut -d'|' -f2 "$_rc_safe" | sort -u)
+    _rc_oldifs="$IFS"; IFS='
+'
+    for _rc_f in $_rc_files; do
+        IFS="$_rc_oldifs"
+        [ -f "$_rc_f" ] || continue
+        cp "$_rc_f" "$BACKUP_DIR/$(basename "$_rc_f").bak-$_rc_tag-$(date +%Y%m%d-%H%M%S)"
+        _rc_target=$(awk -F'|' -v f="$_rc_f" '$2==f{print $1}' "$_rc_safe")
+        awk -v secs="$_rc_target" '
+            BEGIN { n = split(secs, arr, "\n"); for (i=1;i<=n;i++) target[arr[i]] = 1 }
+            # Same CRLF-safe match as the section-conflict check (leading whitespace
+            # only, no end anchor) rather than requiring a byte-identical line - a
+            # stray trailing \r or trailing space made an exact match miss silently.
+            { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
+            /^\[/ { in_sec = (stripped in target) ? 1 : 0 }
+            { print (in_sec ? "#" : "") $0 }
+        ' "$_rc_f" > "/tmp/.ke_rc.$$" && mv "/tmp/.ke_rc.$$" "$_rc_f"
+        printf "${green}  Commented out the conflicting sections in %s${white}\n" "$_rc_f"
+        IFS='
+'
+    done
+    IFS="$_rc_oldifs"
+    rm -f "$_rc_safe" "$_rc_unsafe"
+    install_cfg_guarded "$_rc_src" "$_rc_dest" "$_rc_label"
+}
+
 # --- Migration: remove the deprecated H.264 camera stream (go2rtc), if present. ---
 # Runs unconditionally on every install/upgrade (not an opt-in). The go2rtc+ffmpeg
 # stack is the memory-pressure / OOM driver on the 197 MB box; v1.2.0 drops it and
@@ -1223,7 +1338,13 @@ else
     # --- Creality / extra macros: M600, Save Z-Offset, useful macros, Exclude Object ---
     if [ -d "$MODS_DIR/creality_macros" ] && want "Creality macros (M600, Save Z-Offset, useful macros, Exclude Object)"; then
         CM="$MODS_DIR/creality_macros"
-        install_cfg_guarded "$CM/useful-macros.cfg"  "useful-macros.cfg"  "useful macros (backup/restore, PID, bed-level, warmup)"
+        # Useful macros (backup/restore/reload-camera/PID/bed-leveling/warmup): same
+        # detect-conflict-and-offer-to-replace treatment as the others below. No OpenKE
+        # panel depends on these by exact name, but a pre-existing conflicting version
+        # would otherwise keep silently pointing at someone else's backup/restore scripts
+        # forever - fixing it here for the same future-proofing/maintainability reason as
+        # the rest, not because anything currently breaks without it.
+        replace_conflicting_cfg "$CM/useful-macros.cfg" "useful-macros.cfg" "useful macros (backup/restore, PID, bed-level, warmup)" "usefulmacros"
 
         # Save Z-Offset: same detect-conflict-and-offer-to-replace treatment as M600 below,
         # instead of install_cfg_guarded's default skip. A pre-existing Helper Script
@@ -1233,182 +1354,13 @@ else
         # (unlike KAMP/adaptive print setup) - the actual saved value lives in
         # variables.cfg, external to this cfg file, and both the old and new file point at
         # the same filename, so the value survives the swap automatically.
-        _zoff_secs=$(grep -oE '^\[[^]]+\]' "$CM/save-zoffset.cfg" 2>/dev/null | sort -u)
-        _zoff_conflict=1
-        _oldifs="$IFS"; IFS='
-'
-        for _sec in $_zoff_secs; do
-            IFS="$_oldifs"
-            section_defined_elsewhere "$_sec" && _zoff_conflict=0
-            IFS='
-'
-        done
-        IFS="$_oldifs"
-        if [ "$_zoff_conflict" -eq 0 ]; then
-            printf "${yellow}  Skipping Save Z-Offset — one or more of its sections are already present in your config.${white}\n"
-            printf "  Comment out the conflicting sections automatically and install OpenKE's Save Z-Offset? (y/N): "
-            read _zoff_fix
-            if [ "$_zoff_fix" = "y" ] || [ "$_zoff_fix" = "Y" ]; then
-                # Same two-pass safe/unsafe classification as M600 - only mutate once
-                # nothing comes back unsafe (i.e. genuinely part of a working,
-                # self-contained subsystem rather than a stray duplicate).
-                _safe_list="/tmp/.ke_zoff_safe.$$"
-                _unsafe_list="/tmp/.ke_zoff_unsafe.$$"
-                : > "$_safe_list"
-                : > "$_unsafe_list"
-                _oldifs="$IFS"; IFS='
-'
-                for _sec in $_zoff_secs; do
-                    IFS="$_oldifs"
-                    _pat=$(printf '%s' "$_sec" | sed 's/[][]/\\&/g')
-                    _bare=$(printf '%s' "$_sec" | sed 's/^\[//; s/\]$//')
-                    active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _f; do
-                        [ -f "$_f" ] || continue
-                        grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null || continue
-                        if grep -qE "[\"']$_bare[\"']" "$_f" 2>/dev/null; then
-                            echo "$_sec|$_f" >> "$_unsafe_list"
-                        else
-                            echo "$_sec|$_f" >> "$_safe_list"
-                        fi
-                    done
-                    IFS='
-'
-                done
-                IFS="$_oldifs"
-                if [ -s "$_unsafe_list" ]; then
-                    printf "${yellow}  Found sections that are defined AND read by other macros in the\n"
-                    printf "${yellow}  same file - that looks like a working, self-contained setup rather\n"
-                    printf "${yellow}  than a stray duplicate, so nothing was changed:${white}\n"
-                    while IFS='|' read -r _sec _f; do
-                        printf "${yellow}    %s in %s${white}\n" "$_sec" "$_f"
-                    done < "$_unsafe_list"
-                    printf "${yellow}  Skipping the OpenKE Save Z-Offset install — your existing setup should keep working.${white}\n"
-                else
-                    while IFS='|' read -r _sec _f; do
-                        [ -f "$_f" ] || continue
-                        cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-zoffset-$(date +%Y%m%d-%H%M%S)"
-                        # Same CRLF-safe match as M600's comment-out (matches
-                        # section_defined_elsewhere's own grep: leading whitespace only,
-                        # no end anchor) rather than requiring a byte-identical line.
-                        awk -v sec="$_sec" '
-                            { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
-                            /^\[/ { in_sec = (stripped == sec) ? 1 : 0 }
-                            { print (in_sec ? "#" : "") $0 }
-                        ' "$_f" > "/tmp/.ke_zoff.$$" && mv "/tmp/.ke_zoff.$$" "$_f"
-                        printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
-                    done < "$_safe_list"
-                    install_cfg_guarded "$CM/save-zoffset.cfg" "save-zoffset.cfg" "Save Z-Offset (persists z-offset across reboots)"
-                fi
-                rm -f "$_safe_list" "$_unsafe_list"
-            else
-                printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
-            fi
-        else
-            install_cfg_guarded "$CM/save-zoffset.cfg" "save-zoffset.cfg" "Save Z-Offset (persists z-offset across reboots)"
-        fi
+        replace_conflicting_cfg "$CM/save-zoffset.cfg" "save-zoffset.cfg" "Save Z-Offset (persists z-offset across reboots)" "zoffset"
 
-        # Derive the conflict list from every section M600-support.cfg actually defines
-        # (idle_timeout, filament_switch_sensor, M600, RESUME, ...) rather than a
-        # hardcoded pair - install_cfg_guarded below rejects the whole file if ANY of
-        # its sections conflict, so checking only two of them here let a conflict on,
-        # say, [idle_timeout] (a Klipper singleton) silently fall through to that
-        # generic "already defined" skip further down with no offer to fix it.
-        _m600_secs=$(grep -oE '^\[[^]]+\]' "$CM/M600-support.cfg" 2>/dev/null | sort -u)
-        _m600_conflict=1
-        _oldifs="$IFS"; IFS='
-'
-        for _sec in $_m600_secs; do
-            IFS="$_oldifs"
-            section_defined_elsewhere "$_sec" && _m600_conflict=0
-            IFS='
-'
-        done
-        IFS="$_oldifs"
-        if [ "$_m600_conflict" -eq 0 ]; then
-            printf "${yellow}  Skipping M600 — one or more of its sections are already present in your config.${white}\n"
-            printf "${yellow}  The existing version will NOT show the OpenKE filament-change UI (load/unload/purge buttons).${white}\n"
-            printf "${yellow}  To get the full OpenKE M600 experience these sections need to be commented out:${white}\n"
-            _oldifs="$IFS"; IFS='
-'
-            for _sec in $_m600_secs; do
-                IFS="$_oldifs"
-                printf "${yellow}    %s${white}\n" "$_sec"
-                IFS='
-'
-            done
-            IFS="$_oldifs"
-            printf "  Comment out the conflicting sections automatically and install OpenKE M600? (y/N): "
-            read _m600_fix
-            if [ "$_m600_fix" = "y" ] || [ "$_m600_fix" = "Y" ]; then
-                # Two passes: first find every conflicting file WITHOUT touching anything,
-                # classifying each as safe-to-comment or not; only mutate afterward, and
-                # only if nothing came back unsafe. A file is NOT safe to auto-comment when
-                # some OTHER macro in that same file reads printer["<section>"] /
-                # printer['<section>'] at runtime - that means the section isn't a stray
-                # duplicate but part of a working, self-contained subsystem (e.g. a Helper
-                # Script M600-support.cfg with its own idle_timeout/PAUSE/RESUME wired to
-                # it). Blindly commenting the definition there leaves those other macros
-                # referencing something that no longer exists, which is worse than the
-                # original "already defined" conflict - it takes an outright broken M600
-                # from an unambiguous state (installer aborts, config still loads) to a
-                # silent one that only surfaces the next time PAUSE/RESUME/M600 actually
-                # runs (jinja2 UndefinedError, e.g. 'no attribute gcode_macro M600').
-                _safe_list="/tmp/.ke_m600_safe.$$"
-                _unsafe_list="/tmp/.ke_m600_unsafe.$$"
-                : > "$_safe_list"
-                : > "$_unsafe_list"
-                _oldifs="$IFS"; IFS='
-'
-                for _sec in $_m600_secs; do
-                    IFS="$_oldifs"
-                    _pat=$(printf '%s' "$_sec" | sed 's/[][]/\\&/g')
-                    _bare=$(printf '%s' "$_sec" | sed 's/^\[//; s/\]$//')
-                    active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _f; do
-                        [ -f "$_f" ] || continue
-                        grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null || continue
-                        if grep -qE "[\"']$_bare[\"']" "$_f" 2>/dev/null; then
-                            echo "$_sec|$_f" >> "$_unsafe_list"
-                        else
-                            echo "$_sec|$_f" >> "$_safe_list"
-                        fi
-                    done
-                    IFS='
-'
-                done
-                IFS="$_oldifs"
-                if [ -s "$_unsafe_list" ]; then
-                    printf "${yellow}  Found sections that are defined AND read by other macros in the\n"
-                    printf "${yellow}  same file - that looks like a working, self-contained setup rather\n"
-                    printf "${yellow}  than a stray duplicate, so nothing was changed:${white}\n"
-                    while IFS='|' read -r _sec _f; do
-                        printf "${yellow}    %s in %s${white}\n" "$_sec" "$_f"
-                    done < "$_unsafe_list"
-                    printf "${yellow}  Skipping the OpenKE M600 install — your existing setup should keep working.${white}\n"
-                else
-                    while IFS='|' read -r _sec _f; do
-                        [ -f "$_f" ] || continue
-                        cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-m600-$(date +%Y%m%d-%H%M%S)"
-                        # Match the same way section_defined_elsewhere's grep does above
-                        # (leading whitespace only, no end anchor) rather than requiring the
-                        # whole line to be byte-identical to $_sec - a stray trailing \r
-                        # (CRLF-edited config) or trailing space made the exact match miss
-                        # silently while this step still reported success unconditionally.
-                        awk -v sec="$_sec" '
-                            { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
-                            /^\[/ { in_sec = (stripped == sec) ? 1 : 0 }
-                            { print (in_sec ? "#" : "") $0 }
-                        ' "$_f" > "/tmp/.ke_m600.$$" && mv "/tmp/.ke_m600.$$" "$_f"
-                        printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
-                    done < "$_safe_list"
-                    install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
-                fi
-                rm -f "$_safe_list" "$_unsafe_list"
-            else
-                printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
-            fi
-        else
-            install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
-        fi
+        # Same detect-conflict-and-offer-to-replace treatment as Save Z-Offset above -
+        # the on-screen OpenKE filament-change UI (load/unload/purge buttons) needs its
+        # own M600/idle_timeout/RESUME structure, so a pre-existing conflicting version
+        # left in place forever would silently degrade or break that UI.
+        replace_conflicting_cfg "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support" "m600"
         install_cfg_guarded "$CM/exclude_object.cfg" "exclude_object.cfg" "Exclude Object"
         # moonraker: object processing (needed by Exclude Object + adaptive mesh). Add only if safe.
         MK_CONF="$K1_CONFIG_DIR/moonraker.conf"
@@ -1442,73 +1394,7 @@ else
     # wizard rather than ever getting OpenKE's own version.
     if [ -f "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" ] && want "E-Steps Calibration (guided rotation_distance tuning)"; then
         ensure_save_variables
-        _est_secs=$(grep -oE '^\[[^]]+\]' "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" 2>/dev/null | sort -u)
-        _est_conflict=1
-        _oldifs="$IFS"; IFS='
-'
-        for _sec in $_est_secs; do
-            IFS="$_oldifs"
-            section_defined_elsewhere "$_sec" && _est_conflict=0
-            IFS='
-'
-        done
-        IFS="$_oldifs"
-        if [ "$_est_conflict" -eq 0 ]; then
-            printf "${yellow}  Skipping E-Steps Calibration — one or more of its sections are already present in your config.${white}\n"
-            printf "  Comment out the conflicting sections automatically and install OpenKE's E-Steps Calibration? (y/N): "
-            read _est_fix
-            if [ "$_est_fix" = "y" ] || [ "$_est_fix" = "Y" ]; then
-                _safe_list="/tmp/.ke_est_safe.$$"
-                _unsafe_list="/tmp/.ke_est_unsafe.$$"
-                : > "$_safe_list"
-                : > "$_unsafe_list"
-                _oldifs="$IFS"; IFS='
-'
-                for _sec in $_est_secs; do
-                    IFS="$_oldifs"
-                    _pat=$(printf '%s' "$_sec" | sed 's/[][]/\\&/g')
-                    _bare=$(printf '%s' "$_sec" | sed 's/^\[//; s/\]$//')
-                    active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _f; do
-                        [ -f "$_f" ] || continue
-                        grep -qE "^[[:space:]]*$_pat" "$_f" 2>/dev/null || continue
-                        if grep -qE "[\"']$_bare[\"']" "$_f" 2>/dev/null; then
-                            echo "$_sec|$_f" >> "$_unsafe_list"
-                        else
-                            echo "$_sec|$_f" >> "$_safe_list"
-                        fi
-                    done
-                    IFS='
-'
-                done
-                IFS="$_oldifs"
-                if [ -s "$_unsafe_list" ]; then
-                    printf "${yellow}  Found sections that are defined AND read by other macros in the\n"
-                    printf "${yellow}  same file - that looks like a working, self-contained setup rather\n"
-                    printf "${yellow}  than a stray duplicate, so nothing was changed:${white}\n"
-                    while IFS='|' read -r _sec _f; do
-                        printf "${yellow}    %s in %s${white}\n" "$_sec" "$_f"
-                    done < "$_unsafe_list"
-                    printf "${yellow}  Skipping the OpenKE E-Steps Calibration install — your existing setup should keep working.${white}\n"
-                else
-                    while IFS='|' read -r _sec _f; do
-                        [ -f "$_f" ] || continue
-                        cp "$_f" "$BACKUP_DIR/$(basename "$_f").bak-esteps-$(date +%Y%m%d-%H%M%S)"
-                        awk -v sec="$_sec" '
-                            { stripped = $0; gsub(/[ \t\r]+$/, "", stripped) }
-                            /^\[/ { in_sec = (stripped == sec) ? 1 : 0 }
-                            { print (in_sec ? "#" : "") $0 }
-                        ' "$_f" > "/tmp/.ke_est.$$" && mv "/tmp/.ke_est.$$" "$_f"
-                        printf "${green}  Commented out %s in %s${white}\n" "$_sec" "$_f"
-                    done < "$_safe_list"
-                    install_cfg_guarded "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" "esteps_calibration.cfg" "E-Steps Calibration macros"
-                fi
-                rm -f "$_safe_list" "$_unsafe_list"
-            else
-                printf "${yellow}  Skipped. Re-run the installer after commenting out the sections above.${white}\n"
-            fi
-        else
-            install_cfg_guarded "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" "esteps_calibration.cfg" "E-Steps Calibration macros"
-        fi
+        replace_conflicting_cfg "$MODS_DIR/esteps_calibration/esteps_calibration.cfg" "esteps_calibration.cfg" "E-Steps Calibration macros" "esteps"
     fi
 
     printf "${green}Optional features done.${white}\n"
