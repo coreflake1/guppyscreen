@@ -60,7 +60,7 @@ that, the on-screen **Update Guppy** button works for every future release.
 ## After updating: grab the newly-bundled extras (optional)
 
 Recent OpenKE folds what used to be manual add-ons into the installer, under a prompt
-(**install all / skip all / choose each**): KAMP, Axis Twist Compensation, TMC Autotune, Skew Correction,
+(**install all / skip all / choose each**): adaptive mesh + purge + park, Axis Twist Compensation, TMC Autotune, Skew Correction,
 the Creality Nebula camera (persistent image tuning), the Pause/Resume layer-shift fix,
 and the Creality macros (M600, Save Z-Offset, useful macros, Exclude Object). See
 [Installation](Installation) for the full list.

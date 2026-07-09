@@ -268,7 +268,7 @@ Six buttons in total: **Fine Tune**, **Objects**, **Pause** (becomes **Resume** 
 ![Exclude Object screen](images/exclude-object.png)
 
 Opens from the print status screen's **Objects** button — only useful for gcode files sliced with
-object labels (the same "Label Objects" slicer setting KAMP relies on). Shows each object as a shape you
+object labels (the same "Label Objects" slicer setting adaptive meshing relies on). Shows each object as a shape you
 can tap: green means **"Printing now"**, plain means **"Tap to exclude"**, red means **"Excluded"**.
 Skipping an object stops printing it partway through without cancelling the whole job — useful if one
 part of a multi-part print has failed but the rest is still going well. A counter below the legend
@@ -612,7 +612,7 @@ These execute immediately — no sub-panel opens:
 | **Restart Klipper** | Restarts the Klipper host process. Use after editing `printer.cfg`. |
 | **Restart Firmware** | Resets the mainboard MCU (`FIRMWARE_RESTART`). Use after MCU-level config changes. |
 | **Restart Guppy** | Restarts the OpenKE screen process only (not Klipper). Use if the UI feels stuck. |
-| **Update Guppy** | Downloads and installs the latest OpenKE screen binary. **Note:** only swaps the binary — for full updates (Klipper mods, KAMP config, etc.) re-run the full installer. |
+| **Update Guppy** | Downloads and installs the latest OpenKE screen binary. **Note:** only swaps the binary — for full updates (Klipper mods, adaptive mesh config, etc.) re-run the full installer. |
 
 ### Navigation row (main row)
 

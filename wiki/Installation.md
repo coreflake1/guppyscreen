@@ -75,15 +75,15 @@ Choice (Y/n/o):
 
 - **`Y`** installs everything below.
 - **`n`** skips it all (you can re-run the installer later to add them — it's safe to run again).
-- **`o`** walks you through each one with its own `y/N` prompt, so you can take Axis Twist but skip KAMP,
-  add the camera but not TMC, etc.
+- **`o`** walks you through each one with its own `y/N` prompt, so you can take Axis Twist but skip
+  adaptive mesh + purge, add the camera but not TMC, etc.
 
 What's on offer:
 
 | Feature | What it does | Guide |
 |---|---|---|
-| **KAMP** | adaptive bed mesh + purge | [guide](KAMP-and-Axis-Twist-Compensation) |
-| **Axis Twist Compensation** | left/right first-layer fix | [guide](KAMP-and-Axis-Twist-Compensation) |
+| **Adaptive mesh + purge + park** | mesh only the print footprint, adaptive purge line, smart park | [guide](Adaptive-Print-Setup) |
+| **Axis Twist Compensation** | left/right first-layer fix | [guide](Axis-Twist-Compensation) |
 | **TMC Autotune** | quieter, cooler steppers | [guide](TMC-Autotune) |
 | **Skew Correction** | square parts | [guide](Skew-Correction) |
 | **Firmware Retraction** | enables `G10`/`G11` firmware-level retraction commands, if your slicer uses them | — |

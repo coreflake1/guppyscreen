@@ -8,7 +8,7 @@
 **Get great prints**
 - [Calibration walkthrough (A→Z)](Calibration-Explained)
 - [Axis Twist Compensation](Axis-Twist-Compensation)
-- [Adaptive meshing (KAMP)](Adaptive-Meshing-KAMP)
+- [Adaptive meshing + purge](Adaptive-Print-Setup)
 - [Square parts (Skew Correction)](Skew-Correction)
 - [Quieter steppers (TMC Autotune)](TMC-Autotune)
 

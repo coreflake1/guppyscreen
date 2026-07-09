@@ -9,7 +9,7 @@ OpenKE is three things in one project:
    interactive 3D bed mesh you can spin around, and an on-screen calibration suite. It runs right on the
    printer's display (no PC, no display server). The UI is a KE-focused fork of
    [GuppyScreen](https://github.com/ballaswag/guppyscreen).
-2. **The mods that actually make prints good.** Adaptive bed mesh + purge (KAMP), Axis Twist
+2. **The mods that actually make prints good.** Adaptive bed mesh + purge + park, Axis Twist
    Compensation, TMC Autotune, skew correction — the stuff people normally hunt down across a dozen
    GitHub repos, gathered and documented here for the KE.
 3. **Guides that explain the *why*.** Not just "tap this button" — *when* to recalibrate, what each
@@ -34,7 +34,7 @@ your problem:
 
 - **First layer squished on one side, lifting on the other?** →
   [Axis Twist Compensation](Axis-Twist-Compensation)
-- **Want smarter bed meshing + auto purge line?** → [Adaptive Meshing (KAMP)](Adaptive-Meshing-KAMP)
+- **Want smarter bed meshing + auto purge line?** → [Adaptive Meshing](Adaptive-Print-Setup)
 - **Parts come out as parallelograms / not square?** → [Skew Correction](Skew-Correction)
 - **Motors loud or hot?** → [TMC Autotune](TMC-Autotune)
 - **Layer shift right after a pause/resume?** → [Troubleshooting](Troubleshooting)

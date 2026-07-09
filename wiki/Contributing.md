@@ -33,7 +33,8 @@ This project builds on the work of:
 - [Guilouz/Creality-Helper-Script](https://github.com/Guilouz/Creality-Helper-Script) — vendored macros
   (`useful-macros.cfg`, `M600-support.cfg`, `save-zoffset.cfg`) and the Moonraker/Nginx install packages
 - [kyleisah/Klipper-Adaptive-Meshing-Purging](https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging) —
-  vendored KAMP (adaptive bed mesh + purge line)
+  `Smart_Park.cfg`/`Line_Purge.cfg` are still adapted from KAMP (GPL-3.0); the adaptive-mesh macro itself
+  is now original OpenKE code delegating to Klipper's own native adaptive meshing, no longer vendored KAMP
 - [Klipper3d/klipper](https://github.com/Klipper3d/klipper) — Axis Twist Compensation and Screws Tilt
   Adjust modules, vendored verbatim from `klippy/extras/` (the KE's stock Klipper build predates/strips
   both; Skew Correction uses Klipper's native `[skew_correction]` directly, no vendored file needed)

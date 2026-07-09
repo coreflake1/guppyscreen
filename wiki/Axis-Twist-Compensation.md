@@ -85,7 +85,7 @@ Klipper restarts.
 
 Your existing bed mesh was measured with the *old*, un-corrected probe readings — it needs to be redone
 now that the probe tells the truth. **Re-run your bed mesh** (`BED_MESH_CALIBRATE`, or
-**Tune → Bed Mesh → Calibrate** on the screen). Skip this if you're using KAMP's
+**Tune → Bed Mesh → Calibrate** on the screen). Skip this if you're using
 `ADAPTIVE_BED_MESH_CALIBRATE` in your slicer start G-code — that already re-meshes fresh at the start of
 every print.
 
@@ -185,5 +185,5 @@ A Creality firmware update wipes these Klipper-side files. Getting back takes 2 
 2. **Re-run the calibration** (5-point paper test above) and `SAVE_CONFIG` — the saved correction is
    cleared by the firmware update.
 
-> Next: **[Adaptive Meshing (KAMP)](Adaptive-Meshing-KAMP)** — mesh only the area your print actually
+> Next: **[Adaptive Meshing](Adaptive-Print-Setup)** — mesh only the area your print actually
 > uses, plus an automatic purge line.

@@ -103,7 +103,7 @@ uninstall_guppy() {
     rm -f "$KLIPPY_EXTRA_DIR_U/tmcstatus.py"
     printf "${green}Removed Klipper symlinks${white}\n"
 
-    # Print-quality mods: KAMP/Skew/ATC cfgs lived in GuppyScreen/ (removed above).
+    # Print-quality mods: Adaptive Print Setup/Skew/ATC cfgs lived in GuppyScreen/ (removed above).
     # Leave the Klipper modules in place — removing them would break a printer.cfg
     # that still has saved [autotune_tmc ...] / [axis_twist_compensation] sections.
     if [ -f "$BACKUP_DIR/probe.py.bak" ]; then
@@ -113,8 +113,12 @@ uninstall_guppy() {
         printf "${yellow}      plus any [autotune_tmc]/[axis_twist_compensation] sections from printer.cfg.${white}\n"
     fi
     if [ -f "$BACKUP_DIR/bed_mesh.py.bak" ]; then
-        printf "${yellow}NOTE: KAMP edited bed_mesh.py (adds BED_MESH_CALIBRATE ADAPTIVE=1). To fully revert:${white}\n"
+        printf "${yellow}NOTE: Adaptive Print Setup edited bed_mesh.py (adds BED_MESH_CALIBRATE ADAPTIVE=1). To fully revert:${white}\n"
         printf "${yellow}      cp $BACKUP_DIR/bed_mesh.py.bak $KLIPPY_EXTRA_DIR_U/bed_mesh.py${white}\n"
+    fi
+    if [ -f "$BACKUP_DIR/KAMP_Settings.cfg.bak" ]; then
+        printf "${yellow}NOTE: an old KAMP install was migrated/removed. Your pre-migration settings are at:${white}\n"
+        printf "${yellow}      $BACKUP_DIR/KAMP_Settings.cfg.bak (and KAMP.bak/ for the macro files)${white}\n"
     fi
 
     # Optionally remove /usr/data/guppyscreen
@@ -917,11 +921,11 @@ ln -sf $K1_GUPPY_DIR/k1_mods/respawn/librc.so.1 /lib/librc.so.1
 
 ## ============================================================================
 ## OpenKE optional features — install all / skip all / choose each:
-##   print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew),
+##   print-quality mods (adaptive mesh + purge + park, Axis Twist Compensation, TMC Autotune, Skew),
 ##   Creality Nebula camera (persistent image tuning),
 ##   E-Steps Calibration (guided CALIBRATE_ESTEPS / CALIBRATE_ESTEPS_APPLY macros),
 ##   Pause/Resume layer-shift fix (PAUSE y_park 222 -> 220).
-## KAMP/Skew/ATC/camera config install via the existing [include GuppyScreen/*.cfg]
+## Adaptive print setup/Skew/ATC/camera config install via the existing [include GuppyScreen/*.cfg]
 ## glob (no printer.cfg section edits); only Axis Twist touches Klipper core
 ## (probe.py), via an idempotent, backed-up patch. The layer-shift fix sed-edits
 ## gcode_macro.cfg (backed up first, guarded on the 222 line existing).
@@ -1061,7 +1065,7 @@ PY
 fi
 
 printf "${white}=== OpenKE optional features ===\n"
-printf "${green}  Print-quality mods (KAMP, Axis Twist Compensation, TMC Autotune, Skew Correction),\n"
+printf "${green}  Print-quality mods (adaptive mesh + purge + park, Axis Twist Compensation, TMC Autotune, Skew Correction),\n"
 printf "${green}  the Creality Nebula camera (persistent image tuning), Creality macros\n"
 printf "${green}  (M600, Save Z-Offset, useful macros, Exclude Object), E-Steps Calibration,\n"
 printf "${green}  and the layer-shift fix.${white}\n\n"
@@ -1089,23 +1093,44 @@ if [ "$FEAT" = "none" ]; then
 elif [ ! -d "$MODS_DIR" ]; then
     printf "${yellow}Mods dir $MODS_DIR not in this release; skipping optional features.${white}\n"
 else
-    # --- KAMP ---
-    if [ -d "$MODS_DIR/kamp" ] && want "KAMP (adaptive mesh + purge)"; then
-        if section_defined_elsewhere "[gcode_macro _KAMP_Settings]"; then
-            printf "${yellow}  KAMP already set up elsewhere — leaving it untouched.${white}\n"
+    # --- Adaptive Print Setup (mesh + purge + park) ---
+    # Used to vendor KAMP wholesale. Adaptive_Meshing.cfg is now original OpenKE
+    # code delegating to Klipper's native BED_MESH_CALIBRATE ADAPTIVE=1 (patched
+    # into the KE's Klipper via patch_bed_mesh.py, since its fork predates that
+    # upstream merge). Line_Purge.cfg/Smart_Park.cfg are still adapted from KAMP
+    # (GPL-3.0, see NOTICE.md) but no longer a package dependency we track/sync -
+    # own copies, own settings macro. See docs/VENDORING.md.
+    if [ -d "$MODS_DIR/adaptive_print_setup" ] && want "Adaptive mesh + purge + park (formerly KAMP)"; then
+        OLD_KAMP_SETTINGS=""
+        for _cand in "$K1_CONFIG_DIR/KAMP_Settings.cfg" "$GUPPY_CFG_DIR/KAMP_Settings.cfg"; do
+            [ -f "$_cand" ] && OLD_KAMP_SETTINGS="$_cand" && break
+        done
+
+        if section_defined_elsewhere "[gcode_macro _OPENKE_ADAPTIVE_SETTINGS]"; then
+            printf "${yellow}  Adaptive print setup already configured elsewhere — leaving it untouched.${white}\n"
         else
-            printf "${green}  Installing KAMP${white}\n"
-            cp -r "$MODS_DIR/kamp/KAMP" "$GUPPY_CFG_DIR/"
-            cp "$MODS_DIR/kamp/KAMP_Settings.cfg" "$GUPPY_CFG_DIR/KAMP_Settings.cfg"
+            printf "${green}  Installing Adaptive Print Setup (mesh + purge + park)${white}\n"
+            cp -r "$MODS_DIR/adaptive_print_setup/modules" "$GUPPY_CFG_DIR/"
+            cp "$MODS_DIR/adaptive_print_setup/Settings.cfg" "$GUPPY_CFG_DIR/Settings.cfg"
+
+            if [ -n "$OLD_KAMP_SETTINGS" ]; then
+                printf "${green}  Found an existing KAMP install — migrating its settings and removing it${white}\n"
+                if [ ! -f "$BACKUP_DIR/KAMP_Settings.cfg.bak" ]; then
+                    cp "$OLD_KAMP_SETTINGS" "$BACKUP_DIR/KAMP_Settings.cfg.bak"
+                    [ -d "$(dirname "$OLD_KAMP_SETTINGS")/KAMP" ] && \
+                        cp -r "$(dirname "$OLD_KAMP_SETTINGS")/KAMP" "$BACKUP_DIR/KAMP.bak"
+                fi
+                python3 "$MODS_DIR/adaptive_print_setup/migrate_settings.py" \
+                    "$OLD_KAMP_SETTINGS" "$GUPPY_CFG_DIR/Settings.cfg"
+                rm -rf "$K1_CONFIG_DIR/KAMP" "$K1_CONFIG_DIR/KAMP_Settings.cfg" \
+                       "$GUPPY_CFG_DIR/KAMP" "$GUPPY_CFG_DIR/KAMP_Settings.cfg"
+                sed -i '/\[include KAMP_Settings\.cfg\]/d' "$K1_CONFIG_DIR/printer.cfg"
+            fi
         fi
-        # ADAPTIVE_BED_MESH_CALIBRATE now delegates to Klipper's native adaptive
-        # mesh (BED_MESH_CALIBRATE ADAPTIVE=1) instead of KAMP's own macro-based
-        # implementation - the KE's stock bed_mesh.py predates that upstream
-        # merge and has no ADAPTIVE support at all, so patch it in. Idempotent
-        # and purely additive (see patch_bed_mesh.py); safe to run every install.
+
         backup_extra_once bed_mesh.py
-        python3 "$MODS_DIR/kamp/patch_bed_mesh.py" "$KLIPPY_EXTRA_DIR/bed_mesh.py" || \
-            printf "${yellow}  KAMP: bed_mesh.py not auto-patched (see above); adaptive mesh needs it - patch by hand if your firmware differs (wiki).${white}\n"
+        python3 "$MODS_DIR/adaptive_print_setup/patch_bed_mesh.py" "$KLIPPY_EXTRA_DIR/bed_mesh.py" || \
+            printf "${yellow}  Adaptive mesh needs bed_mesh.py patched (see above) - patch by hand if your firmware differs (wiki).${white}\n"
     fi
 
     # --- Axis Twist Compensation: module + cfg + idempotent probe.py patch ---
@@ -1286,13 +1311,13 @@ else
             install_cfg_guarded "$CM/M600-support.cfg" "M600-support.cfg" "M600 filament-change support"
         fi
         install_cfg_guarded "$CM/exclude_object.cfg" "exclude_object.cfg" "Exclude Object"
-        # moonraker: object processing (needed by Exclude Object + KAMP). Add only if safe.
+        # moonraker: object processing (needed by Exclude Object + adaptive mesh). Add only if safe.
         MK_CONF="$K1_CONFIG_DIR/moonraker.conf"
         if [ -f "$MK_CONF" ]; then
             if grep -q "enable_object_processing" "$MK_CONF"; then
                 : # already set
             elif grep -q "^\[file_manager\]" "$MK_CONF"; then
-                printf "${yellow}  moonraker.conf has [file_manager] but no enable_object_processing — add 'enable_object_processing: True' under it for Exclude Object/KAMP.${white}\n"
+                printf "${yellow}  moonraker.conf has [file_manager] but no enable_object_processing — add 'enable_object_processing: True' under it for Exclude Object/adaptive mesh.${white}\n"
             else
                 cp "$MK_CONF" "$BACKUP_DIR/moonraker.conf.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
                 printf '\n[file_manager]\nenable_object_processing: True\n' >> "$MK_CONF"
@@ -1319,7 +1344,7 @@ else
     printf "${green}Optional features done.${white}\n"
     printf "${yellow}  One-time setup still needed where applicable (see the OpenKE wiki):\n"
     printf "${yellow}    Axis Twist: BED_MESH_CLEAR; AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5; SAVE_CONFIG\n"
-    printf "${yellow}    KAMP:       add ADAPTIVE_BED_MESH_CALIBRATE / SMART_PARK / LINE_PURGE to slicer start g-code\n"
+    printf "${yellow}    Adaptive mesh/purge/park: add ADAPTIVE_BED_MESH_CALIBRATE / SMART_PARK / LINE_PURGE to slicer start g-code\n"
     printf "${yellow}    TMC Autotune & Skew: configure on-screen (Tune tab).${white}\n"
 fi
 

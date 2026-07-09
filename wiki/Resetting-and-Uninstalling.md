@@ -31,7 +31,7 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 ### What it removes
 
 - OpenKE binary and config (`/usr/data/guppyscreen/`)
-- Klipper mod **config files**: KAMP configs, the Axis Twist config, TMC Autotune config, Skew config.
+- Klipper mod **config files**: adaptive print setup configs, the Axis Twist config, TMC Autotune config, Skew config.
   The underlying Python modules (`axis_twist_compensation.py`, `autotune_tmc.py`, etc.) are deliberately
   **left in place** in `klippy/extras` — removing them could break a `printer.cfg` section that still
   references them, since the uninstaller doesn't touch `printer.cfg` itself.

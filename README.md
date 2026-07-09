@@ -18,7 +18,7 @@ It bundles three things people usually hunt down separately:
   display server) on top of [Klipper](https://www.klipper3d.org/) and
   [Moonraker](https://github.com/Arksine/moonraker). The UI is a KE-focused fork of
   [GuppyScreen](https://github.com/ballaswag/guppyscreen).
-- 🔧 **The Klipper mods that actually improve prints** — adaptive meshing + purge (KAMP), Axis Twist
+- 🔧 **The Klipper mods that actually improve prints** — adaptive meshing + purge + park, Axis Twist
   Compensation, TMC Autotune, skew correction, and more — vendored in and set up by the installer, not
   scattered across a dozen repos.
 - 📚 **Plain-English guides** — how to *dial the printer in*, not just which button does what.
@@ -50,8 +50,8 @@ sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/cor
 
 > Use `installer.sh` — **not** `installer-deb.sh` (that one is for aarch64/Debian and refuses to run on the KE).
 
-**It also offers the print-quality extras** (install all / skip all / choose each): KAMP, Axis Twist
-Compensation, TMC Autotune, Skew Correction, Firmware Retraction, Screws Tilt Adjust, the Creality
+**It also offers the print-quality extras** (install all / skip all / choose each): adaptive mesh +
+purge + park, Axis Twist Compensation, TMC Autotune, Skew Correction, Firmware Retraction, Screws Tilt Adjust, the Creality
 Nebula camera (image tuning), the Pause/Resume layer-shift fix, and the Creality macros (M600, Save
 Z-Offset, useful macros, Exclude Object). Already set some up by hand or via the **Creality Helper
 Script**? It detects and **skips** those — safe to run on an existing setup, and re-running it **merges
@@ -116,7 +116,7 @@ Full documentation lives on the **[GitHub Wiki](https://github.com/coreflake1/gu
 
 - [Calibration walkthrough (start here)](https://github.com/coreflake1/guppyscreen/wiki/Calibration-Explained)
 - [Installation](https://github.com/coreflake1/guppyscreen/wiki/Installation) · [Upgrading from an older version](https://github.com/coreflake1/guppyscreen/wiki/Upgrading)
-- [Axis Twist Compensation](https://github.com/coreflake1/guppyscreen/wiki/Axis-Twist-Compensation) · [Adaptive meshing (KAMP)](https://github.com/coreflake1/guppyscreen/wiki/Adaptive-Meshing-KAMP) · [Skew Correction](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction) · [TMC Autotune](https://github.com/coreflake1/guppyscreen/wiki/TMC-Autotune)
+- [Axis Twist Compensation](https://github.com/coreflake1/guppyscreen/wiki/Axis-Twist-Compensation) · [Adaptive meshing + purge](https://github.com/coreflake1/guppyscreen/wiki/Adaptive-Print-Setup) · [Skew Correction](https://github.com/coreflake1/guppyscreen/wiki/Skew-Correction) · [TMC Autotune](https://github.com/coreflake1/guppyscreen/wiki/TMC-Autotune)
 - [Camera image tuning](https://github.com/coreflake1/guppyscreen/wiki/Camera-Image-Tuning)
 - [Troubleshooting](https://github.com/coreflake1/guppyscreen/wiki/Troubleshooting) · [Resetting & uninstalling](https://github.com/coreflake1/guppyscreen/wiki/Resetting-and-Uninstalling) · developer docs: [Building from Source](https://github.com/coreflake1/guppyscreen/wiki/Building-from-Source), [Architecture](https://github.com/coreflake1/guppyscreen/wiki/Architecture)
 

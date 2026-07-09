@@ -132,9 +132,9 @@ changing hardware (bed, nozzle, BLTouch remount):
 3. **Review, then save** — both new values are shown together before anything is written. From here you
    can Save & Restart directly, or optionally try **Refine with Load Sensor** first (see below).
 
-If you installed KAMP (the installer default), your slicer's `ADAPTIVE_BED_MESH_CALIBRATE` start G-code
-still re-meshes just the print footprint at the start of every print, on top of whatever full mesh the
-wizard saves — see [Adaptive Meshing (KAMP)](Adaptive-Meshing-KAMP).
+If you installed adaptive meshing (the installer default), your slicer's `ADAPTIVE_BED_MESH_CALIBRATE`
+start G-code still re-meshes just the print footprint at the start of every print, on top of whatever
+full mesh the wizard saves — see [Adaptive Meshing](Adaptive-Print-Setup).
 
 Prefer doing it by hand, or don't want the guided flow? Both halves are still available as separate
 tools: `BED_MESH_CALIBRATE` from the console or **Tune → Bed Mesh → Calibrate** on the screen, and the

@@ -1,9 +1,10 @@
-# Adaptive Meshing + Purge Line (KAMP)
+# Adaptive Meshing + Purge Line
 
-KAMP makes your printer smarter about bed preparation before each print:
+OpenKE makes your printer smarter about bed preparation before each print:
 
 - **Adaptive meshing** — instead of mapping the whole 220×220 mm bed every time, it maps only the
   area your actual print footprint covers. Faster, and the points are denser where it matters.
+  Uses Klipper's own native adaptive meshing under the hood, ported onto the KE's Klipper.
 - **Auto purge line** — draws a clean purge line right next to the print, so the nozzle is primed and
   clean for the first move.
 
@@ -13,7 +14,8 @@ its own purge/skirt, or skip `SMART_PARK` if you don't care where the nozzle par
 they're a nice pair, but nothing forces you to use all three.
 
 > **Do [Axis Twist Compensation](Axis-Twist-Compensation) first** if you have left-right unevenness.
-> KAMP relies on accurate probing; there's no point in a denser mesh if the probe readings are skewed.
+> Adaptive meshing relies on accurate probing; there's no point in a denser mesh if the probe readings
+> are skewed.
 
 ---
 
@@ -27,24 +29,28 @@ they're a nice pair, but nothing forces you to use all three.
 
 ---
 
-## Step 1 — Make sure KAMP is installed
+## Step 1 — Make sure it's installed
 
-The OpenKE installer drops in a pre-edited KAMP config during the print-quality mods step. To verify,
-check Mainsail's Machine tab for a `GuppyScreen/KAMP/` folder in your config directory. If it's there,
-you're good — jump to Step 2.
+The OpenKE installer drops this in during the print-quality mods step. To verify, check Mainsail's
+Machine tab for a `GuppyScreen/modules/` folder (with `Adaptive_Meshing.cfg`, `Line_Purge.cfg`,
+`Smart_Park.cfg` inside) plus `GuppyScreen/Settings.cfg`. If they're there, you're good — jump to
+Step 2.
 
-If it's not, re-run the [installer](Installation) and answer **Y** at the print-quality mods prompt.
+If not, re-run the [installer](Installation) and answer **Y** at the print-quality mods prompt. If
+you previously had **KAMP** installed (an older OpenKE version vendored it directly), the installer
+detects it, carries over any settings you'd customized, and removes the old files automatically —
+nothing to do by hand.
 
 ---
 
 ## Step 2 — Tell your slicer to use it (OrcaSlicer)
 
-KAMP is triggered from your slicer's **Machine start G-code**. Nothing works until this is set.
+This is triggered from your slicer's **Machine start G-code**. Nothing works until this is set.
 
 In **OrcaSlicer**, go to your printer profile → **Machine G-code** → **Machine start G-code**.
 
 First, enable **Label Objects** in your print settings (Orca: **Others** tab → tick **Label Objects**).
-KAMP uses the object labels to know the print footprint.
+The adaptive macros use the object labels to know the print footprint.
 
 > 🎁 **Bonus:** the same **Label Objects** setting also enables **Exclude Object** — if a print starts
 > failing partway through, you can drop the failed piece and let the rest keep printing. One setting,
@@ -75,7 +81,7 @@ LINE_PURGE                                      ; purge a line beside the print
 
 ### Using a different slicer (Cura, PrusaSlicer, SuperSlicer)
 
-The G-code above is Orca-flavoured, but KAMP itself doesn't care which slicer sends it — only that
+The G-code above is Orca-flavoured, but these macros don't care which slicer sends them — only that
 **object labels** are present and the **order** (home → mesh → wait for temps → purge) is right. The
 setting names differ:
 
@@ -93,7 +99,7 @@ for the exact names. The macro calls themselves (`ADAPTIVE_BED_MESH_CALIBRATE`, 
 
 ## Optional — denser mesh
 
-KAMP works fine with the stock 5×5 grid, but a 9×9 gives smoother compensation. If you want it, open
+This works fine with the stock 5×5 grid, but a 9×9 gives smoother compensation. If you want it, open
 `printer.cfg` in Mainsail and update your `[bed_mesh]` section to:
 
 ```ini
@@ -109,13 +115,13 @@ fade_end: 10
 ```
 
 > **Don't add** `zero_reference_position` or `relative_reference_index` — they either aren't supported on
-> the KE or conflict with KAMP. Remove them if a config you copied has them.
+> the KE or conflict with adaptive meshing. Remove them if a config you copied has them.
 
 ---
 
 ## Optional — further tuning
 
-`KAMP_Settings.cfg` (Mainsail Machine tab, in `GuppyScreen/`) has more variables than most people ever
+`Settings.cfg` (Mainsail Machine tab, in `GuppyScreen/`) has more variables than most people ever
 touch, but they're there if you want to adjust the defaults:
 
 | Variable | Controls |
@@ -135,7 +141,7 @@ shipped.
 
 ## Done when
 
-- Your slicer's start G-code includes the KAMP macros you want (mesh, park, purge, or all three).
+- Your slicer's start G-code includes the macros you want (mesh, park, purge, or all three).
 - A print starts, and the console shows the mesh running over roughly the print's footprint — not the
   whole bed — before heating finishes.
 - A purge line (if enabled) appears right next to the print, not across the whole bed.
@@ -147,8 +153,8 @@ shipped.
 The easiest path is the [uninstaller](Resetting-and-Uninstalling). By hand:
 
 ```sh
-rm -rf /usr/data/printer_data/config/GuppyScreen/KAMP \
-       /usr/data/printer_data/config/GuppyScreen/KAMP_Settings.cfg
+rm -rf /usr/data/printer_data/config/GuppyScreen/modules \
+       /usr/data/printer_data/config/GuppyScreen/Settings.cfg
 ```
 
 Then `FIRMWARE_RESTART`. Remove `ADAPTIVE_BED_MESH_CALIBRATE`, `SMART_PARK`, and `LINE_PURGE` from
@@ -156,34 +162,15 @@ your slicer start G-code and replace with `BED_MESH_CALIBRATE` if you still want
 
 ---
 
-## Manual installation (advanced)
+## Where this code actually lives
 
-The installer does all of this for you, using its own bundled copy of KAMP that's already patched for
-the KE — you don't need any of the steps below for a normal install. This section is only for people who
-want to pull the **raw, unmodified KAMP repo** from GitHub themselves instead of using the installer's
-copy; the patch steps below (renaming the macro, uncommenting includes) apply to that raw download, not
-to anything OpenKE ships.
-
-<details>
-<summary>Manual steps</summary>
-
-1. Download the config:
-   ```sh
-   cd /tmp
-   git clone https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging.git kamp-src
-   cd /usr/data/printer_data/config
-   cp -r /tmp/kamp-src/Configuration ./KAMP
-   cp /tmp/kamp-src/Configuration/KAMP_Settings.cfg ./KAMP_Settings.cfg
-   ```
-2. Edit `KAMP/Adaptive_Meshing.cfg` for KE compatibility:
-   - rename `[gcode_macro BED_MESH_CALIBRATE]` → `[gcode_macro ADAPTIVE_BED_MESH_CALIBRATE]`
-   - delete the `rename_existing:` line
-   - in the macro body, change `_BED_MESH_CALIBRATE` → `BED_MESH_CALIBRATE`
-3. In `KAMP_Settings.cfg`, uncomment the includes for `Adaptive_Meshing.cfg`, `Line_Purge.cfg`, and
-   `Smart_Park.cfg`.
-4. Add `[include KAMP_Settings.cfg]` near the top of `printer.cfg`, then `FIRMWARE_RESTART`.
-
-</details>
+Unlike most third-party Klipper mods, this isn't a vendored copy of someone else's package anymore.
+`ADAPTIVE_BED_MESH_CALIBRATE` delegates to Klipper's own native adaptive meshing (ported onto the
+KE's older Klipper via a small, targeted patch — see `patch_bed_mesh.py`); `SMART_PARK` and
+`LINE_PURGE` are OpenKE-maintained macros (originally adapted from
+[KAMP](https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging), credited in `NOTICE.md`).
+Everything lives in [`k1/k1_mods/klipper_mods/adaptive_print_setup/`](../k1/k1_mods/klipper_mods/adaptive_print_setup/)
+if you want to see or adapt it yourself — see [Building from Source](Building-from-Source).
 
 ---
 
