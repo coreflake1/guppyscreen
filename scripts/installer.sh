@@ -697,15 +697,22 @@ chmod +x /tmp/curl
 # does. This removes the "bump PINNED_RELEASE by hand at release time" step
 # entirely: forgetting it once already meant real users silently kept pulling a
 # stale, unpatched asset after a fix had already shipped in the repo.
-if download_file "https://api.github.com/repos/coreflake1/guppyscreen/releases/latest" /tmp/latest_release.json; then
-    PINNED_RELEASE=$(jq -r '.tag_name // empty' /tmp/latest_release.json 2>/dev/null)
-    rm -f /tmp/latest_release.json
-fi
+#
+# Testers can opt into a specific tag (e.g. a nightly prerelease) by exporting
+# PINNED_RELEASE before running this script:
+#   PINNED_RELEASE=nightly-ke-next bash installer.sh
+# which skips this lookup entirely - default (unset) behavior is unchanged.
 if [ -z "$PINNED_RELEASE" ]; then
-    printf "${red}Could not determine the latest OpenKE release (network issue?). Check your connection and re-run the installer.${white}\n"
-    exit 1
+    if download_file "https://api.github.com/repos/coreflake1/guppyscreen/releases/latest" /tmp/latest_release.json; then
+        PINNED_RELEASE=$(jq -r '.tag_name // empty' /tmp/latest_release.json 2>/dev/null)
+        rm -f /tmp/latest_release.json
+    fi
+    if [ -z "$PINNED_RELEASE" ]; then
+        printf "${red}Could not determine the latest OpenKE release (network issue?). Check your connection and re-run the installer.${white}\n"
+        exit 1
+    fi
 fi
-printf "${green} Latest OpenKE release: $PINNED_RELEASE ${white}\n"
+printf "${green} Using OpenKE release: $PINNED_RELEASE ${white}\n"
 ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_RELEASE}/$ASSET_NAME.tar.gz"
 
 printf "${green} Downloading asset: $ASSET_NAME.tar.gz ${white}\n"

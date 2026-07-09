@@ -159,6 +159,29 @@ backups give you a restore point regardless.
 > `printer.cfg` and erase Klipper-side files) — that's true of any Klipper mod, not OpenKE specifically.
 > After a firmware update, re-run the installer and re-run the affected calibrations.
 
+## Testing bleeding-edge builds (`ke-next` nightly)
+
+> ⚠️ **Unstable, for testers only.** `ke-next` is the active development branch — it can contain
+> half-finished or experimental work between releases. Don't run this on a printer you rely on for
+> real prints unless you're comfortable recovering it yourself (see [Uninstall](#uninstall) below,
+> or just re-run the normal install command to go back to the latest stable release).
+
+Every push to `ke-next` builds automatically and publishes to a moving `nightly-ke-next` prerelease
+tag on GitHub. To install the latest one, fetch `installer.sh` from `ke-next` itself (not `main`) and
+pin the release tag:
+
+```sh
+PINNED_RELEASE=nightly-ke-next sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-next/scripts/installer.sh)"
+```
+
+Check which commit you're actually running from the on-screen Tune → System Info panel — the
+version string is `nightly-<commit sha>`. Cross-reference that sha against
+[the nightly-ke-next release page](https://github.com/coreflake1/guppyscreen/releases/tag/nightly-ke-next)
+or `ke-next`'s commit history to see what changed.
+
+To go back to the latest stable release, just run the normal [install command](#install) again
+(no `PINNED_RELEASE`) — it always resolves the latest actual tagged release, never a prerelease.
+
 ## Uninstall
 
 ```sh

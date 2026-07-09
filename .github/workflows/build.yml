@@ -2,7 +2,7 @@ name: guppy build
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "ke-next" ]
     tags:
       - "*"
 
@@ -49,6 +49,17 @@ jobs:
       name: set guppyscreen nightly version
       run: |
         echo "GUPPYSCREEN_VERSION=nightly-${{ github.sha }}" >> $GITHUB_ENV
+
+    # ke-next gets its own moving prerelease tag so its nightly never
+    # overwrites main's - every other ref (main, develop, and tag pushes)
+    # keeps the original shared "nightly" tag unchanged.
+    - name: set nightly channel
+      run: |
+        if [ "${{ github.ref_name }}" = "ke-next" ]; then
+          echo "NIGHTLY_TAG=nightly-ke-next" >> $GITHUB_ENV
+        else
+          echo "NIGHTLY_TAG=nightly" >> $GITHUB_ENV
+        fi
 
     - if: startsWith(github.ref, 'refs/tags/')
       name: set guppyscreen release version
@@ -115,8 +126,8 @@ jobs:
       uses: softprops/action-gh-release@v3
       with:
         prerelease: true
-        name: nightly
-        tag_name: nightly
+        name: ${{ env.NIGHTLY_TAG }}
+        tag_name: ${{ env.NIGHTLY_TAG }}
         files: ${{ matrix.asset }}.tar.gz
         fail_on_unmatched_files: true
 
