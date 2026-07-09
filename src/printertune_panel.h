@@ -6,13 +6,13 @@
 #include "limits_panel.h"
 #include "bedmesh_panel.h"
 #include "inputshaper_panel.h"
-#include "belts_calibration_panel.h"
 #include "tmc_tune_panel.h"
 #include "tmc_status_panel.h"
 #include "power_panel.h"
 #include "firmware_retraction_panel.h"
 #include "axis_twist_panel.h"
 #include "skew_correction_panel.h"
+#include "calibration_menu_panel.h"
 #include "button_container.h"
 #include "lvgl/lvgl.h"
 
@@ -40,25 +40,25 @@ class PrinterTunePanel {
   ZOffsetPanel &zoffset_panel;
   LimitsPanel limits_panel;
   InputShaperPanel inputshaper_panel;
-  BeltsCalibrationPanel belts_calibration_panel;
   TmcTunePanel tmc_tune_panel;
   TmcStatusPanel tmc_status_panel;
   PowerPanel power_panel;
   FirmwareRetractionPanel firmware_retraction_panel;
   AxisTwistPanel axis_twist_panel;
   SkewCorrectionPanel skew_correction_panel;
+  // Constructed last: takes references to several of the panels above, which
+  // it now owns the Tune-tab entry point for (Input Shaper, Axis Twist, Skew,
+  // TMC Autotune, plus Bed Mesh - Bed Mesh doubles as its own top-level tile
+  // below since viewing it is routine even though calibrating it isn't).
+  CalibrationMenuPanel calibration_menu_panel;
   ButtonContainer bedmesh_btn;
   ButtonContainer finetune_btn;
-  ButtonContainer inputshaper_btn;
-  ButtonContainer belts_calibration_btn;
   ButtonContainer limits_btn;
-  ButtonContainer tmc_tune_btn;
   ButtonContainer tmc_status_btn;
   ButtonContainer power_devices_btn;
   ButtonContainer retraction_btn;
   ButtonContainer zoffset_btn;
-  ButtonContainer axis_twist_btn;
-  ButtonContainer skew_btn;
+  ButtonContainer calibration_btn;
 
 };
 

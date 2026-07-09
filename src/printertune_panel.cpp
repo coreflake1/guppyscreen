@@ -3,23 +3,15 @@
 #include "utils.h"
 #include "spdlog/spdlog.h"
 
-#include <experimental/filesystem>
-
-namespace fs = std::experimental::filesystem;
-
 LV_IMG_DECLARE(bedmesh_img);
 LV_IMG_DECLARE(fine_tune_img);
-LV_IMG_DECLARE(inputshaper_img);
 LV_IMG_DECLARE(limit_img);
-LV_IMG_DECLARE(motor_img);
 LV_IMG_DECLARE(chart_img);
 LV_IMG_DECLARE(retract_img);
 LV_IMG_DECLARE(home_z);
-LV_IMG_DECLARE(layers_img);
-LV_IMG_DECLARE(skew_img);
+LV_IMG_DECLARE(calibration_img);
 
 #ifndef ZBOLT
-LV_IMG_DECLARE(belts_calibration_img);
 LV_IMG_DECLARE(power_devices_img);
 #else
 LV_IMG_DECLARE(print);
@@ -32,23 +24,16 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   , zoffset_panel(zoffset)
   , limits_panel(c, l)
   , inputshaper_panel(c, l)
-  , belts_calibration_panel(c, l)
   , tmc_tune_panel(c)
   , tmc_status_panel(c, l)
   , power_panel(c, l)
   , firmware_retraction_panel(c, l)
   , axis_twist_panel(c, l)
   , skew_correction_panel(c)
+  , calibration_menu_panel(c, l, bedmesh_panel, inputshaper_panel, axis_twist_panel, skew_correction_panel, tmc_tune_panel)
   , bedmesh_btn(cont, &bedmesh_img, "Bed Mesh", &PrinterTunePanel::_handle_callback, this)
   , finetune_btn(cont, &fine_tune_img, "Fine Tune", &PrinterTunePanel::_handle_callback, this)
-  , inputshaper_btn(cont, &inputshaper_img, "Input Shaper", &PrinterTunePanel::_handle_callback, this)
-#ifndef ZBOLT
-  , belts_calibration_btn(cont, &belts_calibration_img, "Belts/Shake", &PrinterTunePanel::_handle_callback, this)
-#else
-  , belts_calibration_btn(cont, &inputshaper_img, "Belts/Shake", &PrinterTunePanel::_handle_callback, this)
-#endif
   , limits_btn(cont, &limit_img, "Limits", &PrinterTunePanel::_handle_callback, this)
-  , tmc_tune_btn(cont, &motor_img, "TMC Autotune", &PrinterTunePanel::_handle_callback, this)
   , tmc_status_btn(cont, &chart_img, "TMC Metrics", &PrinterTunePanel::_handle_callback, this)
 #ifndef ZBOLT
   , power_devices_btn(cont, &power_devices_img, "Power Settings", &PrinterTunePanel::_handle_callback, this)
@@ -57,17 +42,14 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
 #endif
   , retraction_btn(cont, &retract_img, "Retraction", &PrinterTunePanel::_handle_callback, this)
   , zoffset_btn(cont, &home_z, "Z Offset", &PrinterTunePanel::_handle_callback, this)
-  , axis_twist_btn(cont, &layers_img, "Axis Twist", &PrinterTunePanel::_handle_callback, this)
-  , skew_btn(cont, &skew_img, "Skew", &PrinterTunePanel::_handle_callback, this)
+  , calibration_btn(cont, &calibration_img, "Calibration", &PrinterTunePanel::_handle_callback, this)
 {
   lv_obj_move_background(cont);
 
   lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
 
-  tmc_tune_btn.disable();
-
-  static lv_coord_t grid_main_row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(5), LV_GRID_FR(5), LV_GRID_FR(5),
+  static lv_coord_t grid_main_row_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(5), LV_GRID_FR(5),
     LV_GRID_FR(1), LV_GRID_TEMPLATE_LAST};
   static lv_coord_t grid_main_col_dsc[] = {LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1), LV_GRID_FR(1),
       LV_GRID_TEMPLATE_LAST};
@@ -80,18 +62,11 @@ PrinterTunePanel::PrinterTunePanel(KWebSocketClient &c, std::mutex &l, lv_obj_t 
   lv_obj_set_grid_cell(retraction_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
   lv_obj_set_grid_cell(limits_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 1, 1);
 
-  // row 2 - calibration (motion + bed geometry)
+  // row 2 - routine checks + rarely-touched system settings + the calibration hub
   lv_obj_set_grid_cell(bedmesh_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(inputshaper_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(axis_twist_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-  lv_obj_set_grid_cell(skew_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
-
-  // row 3 - rare / motor / system
-  lv_obj_set_grid_cell(belts_calibration_btn.get_container(), LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
-  lv_obj_set_grid_cell(power_devices_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
-  lv_obj_set_grid_cell(tmc_tune_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
-  lv_obj_set_grid_cell(tmc_status_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 3, 1);
-  // lv_obj_set_grid_cell(restart_firmware_btn.get_container(), LV_GRID_ALIGN_CENTER, 3, 1, LV_GRID_ALIGN_START, 2, 1);
+  lv_obj_set_grid_cell(power_devices_btn.get_container(), LV_GRID_ALIGN_STRETCH, 1, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+  lv_obj_set_grid_cell(tmc_status_btn.get_container(), LV_GRID_ALIGN_STRETCH, 2, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
+  lv_obj_set_grid_cell(calibration_btn.get_container(), LV_GRID_ALIGN_STRETCH, 3, 1, LV_GRID_ALIGN_STRETCH, 2, 1);
 }
 
 PrinterTunePanel::~PrinterTunePanel() {
@@ -118,18 +93,9 @@ void PrinterTunePanel::init(json &j) {
 
   tmc_status_panel.init(j);
 
-  // TODO: handle remote guppy instance
-  State *s = State::get_instance();
-  auto kp = s->get_data("/printer_info/klipper_path"_json_pointer);
-  if (!kp.is_null()) {
-    auto p = fs::path(kp.template get<std::string>()) / "klippy/extras/motor_database.cfg";
-    if (fs::exists(p)) {
-      tmc_tune_btn.enable();
-      tmc_tune_panel.init(j, p);
-    } else {
-      tmc_tune_btn.disable();
-    }
-  }
+  // TMC Autotune's motor_database.cfg detection now lives with the row itself,
+  // inside the Calibration hub.
+  calibration_menu_panel.init(j);
 }
 
 void PrinterTunePanel::handle_callback(lv_event_t *event) {
@@ -144,22 +110,10 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
       // Viewing the mesh mid-print is fine; the mutating actions (Calibrate /
       // Clear / Save) are blocked inside the panel instead.
       bedmesh_panel.foreground();
-    } else if (btn == inputshaper_btn.get_container()) {
-      spdlog::trace("tune inputshaper pressed");
-      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
-      inputshaper_panel.foreground();
-    } else if (btn == belts_calibration_btn.get_container()) {
-      spdlog::trace("tune belts pressed");
-      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
-      belts_calibration_panel.foreground();
     } else if (btn == limits_btn.get_container()) {
       spdlog::trace("limits pressed");
       KUtils::confirm_if_printing("Printer is printing.\nAdjust limits anyway?",
         [this]() { limits_panel.foreground(); });
-    } else if (btn == tmc_tune_btn.get_container()) {
-      spdlog::trace("tmc auto tune pressed");
-      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
-      tmc_tune_panel.foreground();
     } else if (btn == tmc_status_btn.get_container()) {
       spdlog::trace("tmc metrics pressed");
       tmc_status_panel.foreground();
@@ -195,33 +149,12 @@ void PrinterTunePanel::handle_callback(lv_event_t *event) {
     } else if (btn == zoffset_btn.get_container()) {
       spdlog::trace("z offset pressed");
       zoffset_panel.foreground();
-    } else if (btn == axis_twist_btn.get_container()) {
-      spdlog::trace("axis twist pressed");
-      // Detect via the config section: the v0.12.0 module has no get_status, so
-      // it never shows up as a live printer object - only configfile.settings.
-      if (!AxisTwistPanel::is_enabled()) {
-        KUtils::notify_toast(
-          "Axis Twist Compensation isn't enabled.\n"
-          "Add [axis_twist_compensation] to printer.cfg.",
-          4000);
-        return;
-      }
-      // Calibration probes the bed; never mid-print.
+    } else if (btn == calibration_btn.get_container()) {
+      spdlog::trace("calibration menu pressed");
+      // The wizard inside probes the bed and ends in a SAVE_CONFIG restart;
+      // never mid-print.
       if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
-      axis_twist_panel.foreground();
-    } else if (btn == skew_btn.get_container()) {
-      spdlog::trace("skew correction pressed");
-      // Detect via the config section (no get_status), like Axis Twist.
-      if (!SkewCorrectionPanel::is_enabled()) {
-        KUtils::notify_toast(
-          "Skew correction isn't enabled.\n"
-          "Add [skew_correction] to printer.cfg.",
-          4000);
-        return;
-      }
-      // Apply & Save runs SAVE_CONFIG (restarts Klipper); never mid-print.
-      if (KUtils::is_printing()) { KUtils::notify_locked(); return; }
-      skew_correction_panel.foreground();
+      calibration_menu_panel.foreground();
     }
   }
 }

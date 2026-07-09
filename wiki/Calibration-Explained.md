@@ -19,11 +19,16 @@ then slicer. Doing it out of order means redoing work.
 | 1. Mechanics | Loose hardware that no software can fix |
 | 2. Temperature (PID) | Inconsistent extrusion from wobbly heater temps |
 | 3. Axis Twist | First layer uneven left-to-right |
-| 4. Bed mesh + Z-offset | First layer height everywhere |
+| 4. Auto Calibration | First layer height everywhere (bed mesh + Z-offset, one guided flow) |
 | 5. Input shaper | Ghosting/ringing on fast prints |
-| 6. Pressure advance, flow, temp | Corner bulges, stringing, over/under-extrusion |
-| 7. Skew correction | Parts that aren't square |
-| 8. TMC Autotune | Loud or hot motors (optional) |
+| 6. E-Steps Calibration | Prints uniformly over- or under-extruded |
+| 7. Pressure advance, flow, temp | Corner bulges, stringing, over/under-extrusion |
+| 8. Skew correction | Parts that aren't square |
+| 9. TMC Autotune | Loud or hot motors (optional) |
+
+The screen's **Tune → Calibration** menu numbers steps 3–9 the same way, in the same order, in
+its own list (labelled 1–6 there since it only lists steps with a dedicated calibration screen —
+mechanics, PID, and pressure advance/flow are done elsewhere, so they don't get a row).
 
 **"Which one fixes my problem?"**
 
@@ -31,12 +36,12 @@ then slicer. Doing it out of order means redoing work.
 |---|---|
 | Tap targets off / need to press slightly away from what you mean | Step 0 — touch calibration |
 | First layer uneven left↔right, bed mesh didn't help | Step 3 — Axis Twist |
-| First layer uneven all over / patchy adhesion | Step 4 — Bed mesh |
-| First layer too high or too low everywhere | Step 4 — Z-offset |
+| First layer uneven all over / patchy adhesion, or too high/low everywhere | Step 4 — Auto Calibration |
 | Ghosting/echoes after sharp corners | Step 5 — Input shaper |
-| Bulging corners, blobs, gaps | Step 6 — Pressure advance + flow |
-| Parts not square / parallelogram | Step 7 — Skew correction |
-| Loud or hot motors | Step 8 — TMC Autotune |
+| Prints look uniformly too thin or over-full, not just at corners | Step 6 — E-Steps |
+| Bulging corners, blobs, gaps | Step 7 — Pressure advance + flow |
+| Parts not square / parallelogram | Step 8 — Skew correction |
+| Loud or hot motors | Step 9 — TMC Autotune |
 | Layer shift right after pause/resume | See [Troubleshooting](Troubleshooting) |
 
 ---
@@ -110,50 +115,40 @@ result corrects the probe readings so the bed mesh is accurate. Takes ~15 minute
 
 ---
 
-## Step 4 — Bed mesh + Z-offset (the big one)
+## Step 4 — Auto Calibration (bed mesh + Z-offset, the big one)
 
-This is 80% of whether prints "look good." Do both.
+This is 80% of whether prints "look good." **Tune → Calibration → Auto Calibration** on the screen
+walks you through both halves in one guided flow — the recommended path, especially right after
+changing hardware (bed, nozzle, BLTouch remount):
 
-### 4a. Bed mesh
-
-Maps the bed's hills and valleys so Z follows them everywhere, not just the centre.
-
-From the console:
-```
-BED_MESH_CALIBRATE
-SAVE_CONFIG
-```
-
-Or tap **Tune → Bed Mesh → Calibrate** on the screen. Takes 2–3 minutes.
+1. **Z-offset paper test** — the wizard homes fresh and runs the same manual paper-drag probe as the
+   standalone Z-offset tool: jog down in small steps until you feel light drag on a sheet of paper,
+   then Accept.
+2. **Bed mesh** — runs automatically right after, no input needed. Maps the bed's hills and valleys so
+   Z follows them everywhere, not just the centre.
 
 ![Bed Mesh panel](images/bed-mesh.png)
 
-If you installed KAMP (the installer default), use `ADAPTIVE_BED_MESH_CALIBRATE` in your slicer start
-G-code instead — it re-meshes just the print footprint automatically at the start of each print. See
-[Adaptive Meshing (KAMP)](Adaptive-Meshing-KAMP).
+3. **Review, then save** — both new values are shown together before anything is written. From here you
+   can Save & Restart directly, or optionally try **Refine with Load Sensor** first (see below).
 
-**Done when:** the mesh surface (3D or table view) is smooth with no wild spikes.
+If you installed KAMP (the installer default), your slicer's `ADAPTIVE_BED_MESH_CALIBRATE` start G-code
+still re-meshes just the print footprint at the start of every print, on top of whatever full mesh the
+wizard saves — see [Adaptive Meshing (KAMP)](Adaptive-Meshing-KAMP).
 
-### 4b. Z-offset — the first layer
+Prefer doing it by hand, or don't want the guided flow? Both halves are still available as separate
+tools: `BED_MESH_CALIBRATE` from the console or **Tune → Bed Mesh → Calibrate** on the screen, and the
+live baby-step readout on the print-status screen or **Tune → Z Offset** (0.01–0.05 mm nudges: lines not
+fusing/gaps = too high, lines translucent/flat = too low, squished and fused with no gaps = correct).
 
-Set the nozzle-to-bed gap by watching the first layer go down:
-
-1. Start a **first-layer test** (a single-layer square, available in many slicer model libraries).
-2. Tap the **Z-offset readout** on the print-status screen (or **Tune → Z Offset**) and nudge in
-   0.01–0.05 mm steps while watching:
-   - **Lines not fusing / gaps:** too high — lower (negative)
-   - **Lines translucent or flat:** too low — raise (positive)
-   - **Squished together and fused, no gaps:** correct
-3. The value saves automatically.
-
-> **Why not use the strain-sensor auto Z-offset?** The KE *can* auto-set Z-offset with its nozzle
-> load sensor, but it drifts run-to-run by up to ~0.08 mm (tested: range 83 µm, stddev 32 µm), where a
-> consistent first layer needs stability to ±0.01–0.02 mm. That's a hardware limitation of Creality's
-> sensor choice. The BLTouch you also have is there for exactly this reason — accurate probing. Use the
-> **manual baby-step** instead. It's the reliable path.
->
-> One extra caveat: the auto routine saves immediately and can overwrite your saved bed mesh with a
-> temporary adaptive one — always check your saved mesh if you ever do run it.
+> **What about the strain-sensor auto Z-offset?** The KE's nozzle load sensor can also propose a
+> Z-offset value. Its repeatability has measured very differently across sessions — an ~83 µm/32 µm
+> stddev spread one time, a tight ~21 µm spread another — so treat any single number as printer- and
+> session-dependent, not a fixed spec. That's exactly why the wizard treats it as an optional
+> **"Refine with Load Sensor"** step after the paper test, never a replacement for it: it shows both
+> values side by side and always makes you pick — it's never auto-applied. It also self-saves internally
+> every time it runs, so the wizard snapshots your config first and can fully discard the sensor attempt
+> if you'd rather keep the paper-test value.
 
 **Done when:** the first layer is uniform with no gaps, and it stays that way print after print.
 
@@ -185,18 +180,45 @@ The **Stop** button on this panel is a general emergency stop, not a "cancel thi
 
 ---
 
-## Step 6 — Pressure advance, flow & temperature (slicer side)
+## Step 6 — E-Steps Calibration
+
+Fixes the *amount* of filament extruded being wrong everywhere — not the corner-specific bulges/gaps
+that pressure advance fixes next, but consistent over- or under-extrusion across an entire print (walls
+look thicker or thinner than sliced, single-wall prints too fat or too thin).
+
+**On the screen:** Tune → Calibration → **E-Steps Calibration**. It's a guided macro (not a separate
+panel) — a prompt walks you through the mark-extrude-measure procedure:
+
+1. It heats the hotend (this is a direct-drive extruder, so there's no cold/disconnected test) and tells
+   you where to put a piece of tape on the filament, above the extruder gears.
+2. Tap **Extrude** in the prompt — it pushes a measured length through and tells you what to measure
+   next: the gap left between the extruder and your tape mark.
+3. Type the result into the console: `CALIBRATE_ESTEPS_APPLY MEASURED=<gap in mm>`. It computes and
+   saves the corrected `rotation_distance` for you — no manual math or re-entering values.
+4. Run `CALIBRATE_ESTEPS` again to verify; repeat until the extruded length matches what you asked for
+   (within ~0.5 mm).
+
+If you don't respond within 2 minutes at any point, it auto-cancels and cools the hotend down on its
+own — nothing sits parked hot indefinitely. If the result keeps varying between repeats rather than
+converging, that's an extruder hardware issue (skipping steps, loose grub screw, worn gears), not
+something calibration can fix.
+
+**Done when:** the extruded length matches what you commanded within about 0.5 mm.
+
+Do this before dialing in pressure advance and flow (Step 7) — those assume the extruder is already
+moving the amount of filament it thinks it is.
+
+---
+
+## Step 7 — Pressure advance, flow & temperature (slicer side)
 
 The last 10%. These fix corner bulges, blobs, gaps, stringing, and over/under-extrusion — but only
 after the first layer and motion quality are solid. Tuning these first wastes time.
 
 - **Flow:** start with 0.98 (a modest under-extrusion offset that reduces over-fill) and adjust from
-  your first real print. This is a quick approximation — if you want the more thorough version, Klipper
-  has its own extruder-calibration procedure (measuring exactly how much filament actually comes out vs.
-  what you asked for, then correcting `rotation_distance`). That's standard Klipper knowledge, not
-  something specific to this screen — see
-  [Klipper's rotation_distance guide](https://www.klipper3d.org/Rotation_Distance.html) if you want to
-  go that deep. Most people never need to; the flow ratio above is enough.
+  your first real print. If you did Step 6 (E-Steps), your baseline extrusion accuracy is already
+  handled — flow ratio here is just a final, per-filament fudge factor on top of that, not a substitute
+  for it.
 - **Pressure advance:** print a PA tower or line, find the cleanest corners, dial it in. The on-screen
   **Tune → Fine Tune** lets you adjust PA live while printing.
 - **Retraction (stringing):** if you're getting fine hair-like strings between parts, that's usually a
@@ -210,7 +232,7 @@ after the first layer and motion quality are solid. Tuning these first wastes ti
 
 ---
 
-## Step 7 — Skew correction (only if parts aren't square)
+## Step 8 — Skew correction (only if parts aren't square)
 
 If functional parts come out as slight parallelograms, print a calibration square, measure three lengths
 with calipers, and enter them on the screen: **Tune → Skew**. Full guide: [Skew Correction](Skew-Correction).
@@ -219,7 +241,7 @@ with calipers, and enter them on the screen: **Tune → Skew**. Full guide: [Ske
 
 ---
 
-## Step 8 — TMC Autotune (optional)
+## Step 9 — TMC Autotune (optional)
 
 Quieter, cooler stepper motors. **Tune → TMC Autotune** — select your motor type, choose Performance or
 Silent, tap **Save/Restart**. It tunes the stepper drivers and reapplies the settings every boot. Doesn't affect
@@ -239,10 +261,11 @@ be harmful — then set it back to a safe default.
 
 | You changed… | Redo |
 |---|---|
-| Nozzle / hotend | Z-offset (+ PID if you swapped the heater too) |
-| Bed surface, springs, or anything affecting bed height | Z-offset, bed mesh |
-| X gantry / anything that could tilt the X axis | Axis Twist, then re-check first layer |
+| Nozzle / hotend | Z-offset (+ PID if you swapped the heater too) — Auto Calibration covers this |
+| Bed surface, springs, or anything affecting bed height | Auto Calibration (Z-offset + bed mesh together) |
+| X gantry / anything that could tilt the X axis | **Axis Twist first**, then Auto Calibration to get a fresh, twist-corrected mesh — doing it the other way round means redoing the mesh anyway, see [Axis Twist Compensation](Axis-Twist-Compensation) |
 | Moving mass on an axis (belts, carriage, bed rails) | Input shaper for **that axis only** |
+| Extruder gear, hobbed bolt, or hotend melt zone | E-Steps |
 | Frame squareness | Skew |
 | A heater element | PID |
 
