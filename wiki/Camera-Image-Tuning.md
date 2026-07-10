@@ -21,6 +21,44 @@ You don't need to be a programmer — if you can paste a command into a terminal
 
 ---
 
+## Using a different (non-Nebula) camera
+
+Everything on this page is specifically for the Creality Nebula camera the KE ships with — hardcoded
+`/dev/video4`, tuned value ranges. If you want to swap in your own USB webcam instead, here's what's
+actually confirmed, what isn't, and why: **investigated 2026-07-10, no generic webcam was available to
+fully test — if you try this, please report back what you find (works / doesn't / partially).**
+
+**The stock camera pipeline (`auto_uvc.sh`, unrelated to OpenKE) auto-detects *any* camera, but only
+under all of these conditions:**
+
+- **It must support MJPG format.** The detection script explicitly checks
+  (`v4l2-ctl --list-framesizes MJPG`) and refuses to start anything if that comes back empty. Most modern
+  webcams support MJPG; not all do (some only do raw YUYV).
+- **It must be plugged into one of two specific physical USB ports.** The udev rule that triggers
+  everything only watches those two ports by physical path — not by camera brand/model. A camera on a
+  different port won't be noticed automatically, no matter how standard it is.
+- **Only one camera at a time.** If the Nebula (or any camera) is already running, the stock script
+  refuses to start a second one.
+- **Unconfirmed:** whether Creality's own closed-source camera app (`cam_app`) correctly handles a
+  genuinely different (but properly UVC-compliant) camera's data. We only ever confirmed it works with
+  the Nebula itself. We could not test this specific step, because the one webcam available for testing
+  failed at an earlier, more fundamental level — it was old enough to use a pre-USB-Video-Class Logitech
+  protocol, and never even got recognized as a camera by the printer's kernel at all.
+
+**Bottom line if you have a normal modern webcam (anything from roughly the last 10-15 years):** it should
+get recognized by the system and, if it's plugged into the right port and supports MJPG, should stream
+automatically with zero setup — but the last unknown above is genuinely untested. If it doesn't work
+automatically, the Creality Helper Script's third-party "USB Camera Support" feature is an alternative
+that avoids `cam_app` entirely (works on any USB port, doesn't depend on `cam_app`'s behavior) — but it
+has its own tradeoffs: no automatic detection after boot (you'd need to restart its service after plugging
+in), no MJPG pre-check of its own, and it still refuses to run at all if a Nebula/Creality camera is
+present.
+
+Either way, the camera-tuning macros on this page are Nebula-specific (`/dev/video4`, tuned ranges) and
+won't apply to a different camera without editing the device path and value ranges yourself.
+
+---
+
 ## Using it (if you installed via OpenKE)
 
 Nothing to set up — from the **Klipper console** (Mainsail/Fluidd), just run:
