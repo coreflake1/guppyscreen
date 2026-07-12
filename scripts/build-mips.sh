@@ -75,12 +75,34 @@ cd "$WORKDIR"
 # --- guppyscreen ---
 echo "=== Building guppyscreen for MIPS (GUPPY_SMALL_SCREEN=1) ==="
 make clean
-make -j"$JOBS" \
-    CROSS_COMPILE="$CROSS_COMPILE" \
-    GUPPY_SMALL_SCREEN=1 \
-    GUPPYSCREEN_VERSION="$GUPPYSCREEN_VERSION" \
-    GUPPY_THEME="$GUPPY_THEME" \
+# Pre-create every object directory before the parallel build starts. Each
+# compile rule's own `mkdir -p $(dir $@)` normally suffices, but on a truly
+# fresh build/obj tree (right after `clean`'s rm -rf) dozens of parallel jobs
+# race to create overlapping parent directories, and this container's
+# overlay2 storage occasionally loses that race - "opening dependency file:
+# No such file or directory" for a handful of unrelated .o files, differing
+# each run. Priming serially first removes the race instead of chasing it.
+mkdir -p build/bin
+find . -maxdepth 6 -type d \
+  \( -path './.git' -o -path './build' -o -path './libhv/build-mips' -o -path './spdlog/build-mips' \) -prune -o -type d -print \
+  | sed 's|^\./||' \
+  | xargs -I{} mkdir -p "build/obj/{}"
+
+MAKE_ARGS=(
+    CROSS_COMPILE="$CROSS_COMPILE"
+    GUPPY_SMALL_SCREEN=1
+    GUPPYSCREEN_VERSION="$GUPPYSCREEN_VERSION"
+    GUPPY_THEME="$GUPPY_THEME"
     EVDEV_CALIBRATE=1
+)
+# Belt-and-suspenders on top of the directory priming above: if a handful of
+# objects still lose the mkdir race on the first pass, retrying `make`
+# without a further `clean` only has to build those stragglers, at which
+# point the same race is vanishingly unlikely to recur.
+if ! make -j"$JOBS" "${MAKE_ARGS[@]}"; then
+  echo "=== first pass failed, retrying remaining objects ==="
+  make -j"$JOBS" "${MAKE_ARGS[@]}"
+fi
 
 # --- guppybeep (hardware-PWM buzzer player) ---
 echo "=== Building guppybeep (buzzer) for MIPS ==="
