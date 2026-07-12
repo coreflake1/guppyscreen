@@ -45,6 +45,15 @@ fi
 ## override existing guppyscreen
 tar xf /tmp/guppyscreen.tar.gz -C $GUPPY_DIR/..
 
+## Re-sync helper scripts (installer.sh does this on a fresh install, but an
+## in-place OTA update never re-runs the installer, so new/changed .py/.cfg
+## helper scripts were never reaching GuppyScreen/scripts here - only the
+## binary itself got updated. Same source, same destination as installer.sh.
+K1_CONFIG_DIR=/usr/data/printer_data/config
+mkdir -p $K1_CONFIG_DIR/GuppyScreen/scripts
+cp $GUPPY_DIR/scripts/*.cfg $K1_CONFIG_DIR/GuppyScreen
+cp $GUPPY_DIR/scripts/*.py $K1_CONFIG_DIR/GuppyScreen/scripts
+
 if [ -f $CUSTOM_UPGRADE_SCRIPT ]; then
     echo "Running custom_upgrade.sh for release $latest_version"
     $CUSTOM_UPGRADE_SCRIPT

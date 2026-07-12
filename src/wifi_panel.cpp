@@ -3,36 +3,22 @@
 #include "config.h"
 #include "spdlog/spdlog.h"
 
+#include <algorithm>
 #include <sstream>
 #include <iostream>
 #include <vector>
 #include <utility>
-#include <algorithm>
 #include <thread>
 #include <chrono>
 
 LV_IMG_DECLARE(back);
-
-static void draw_part_event_cb(lv_event_t *e)
-{
-  lv_obj_t *obj = lv_event_get_target(e);
-  lv_obj_draw_part_dsc_t *dsc = lv_event_get_draw_part_dsc(e);
-  if (dsc->part == LV_PART_ITEMS) {
-    uint32_t row = dsc->id / lv_table_get_col_cnt(obj);
-    uint32_t col = dsc->id - row * lv_table_get_col_cnt(obj);
-
-    if (col == 1 || col == 2) {
-      dsc->label_dsc->align = LV_TEXT_ALIGN_CENTER;
-    }
-  }
-}
 
 WifiPanel::WifiPanel(std::mutex &l)
   : lv_lock(l)
   , cont(lv_obj_create(lv_scr_act()))
   , spinner(lv_spinner_create(cont, 1000, 60))
   , top_cont(lv_obj_create(cont))
-  , wifi_table(lv_table_create(top_cont))
+  , wifi_list_cont(lv_obj_create(top_cont))
   , wifi_right(lv_obj_create(top_cont))
   , prompt_cont(wifi_right)
   , wifi_label(lv_label_create(prompt_cont))
@@ -45,6 +31,10 @@ WifiPanel::WifiPanel(std::mutex &l)
   , pm_btn(lv_btn_create(pm_cont))
   , pm_label(lv_label_create(pm_btn))
   , pm_hint(lv_label_create(pm_cont))
+  , static_ip_panel(l)
+  , network_detail_panel(l,
+      [this]() { open_static_ip_for_current(); },
+      [this]() { forget_current_network(); })
 {
   lv_obj_set_size(cont, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_pad_all(cont, 0, 0);
@@ -65,27 +55,19 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_set_style_border_width(top_cont, 0, 0);
   lv_obj_set_width(top_cont, LV_PCT(100));
 
-  lv_obj_set_height(wifi_table, LV_PCT(90));
-  // lv_obj_remove_style(wifi_table, NULL, LV_PART_ITEMS | LV_STATE_PRESSED);
-  lv_obj_add_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
-
-  auto half_screen_width = lv_disp_get_physical_hor_res(NULL) / 2;
-  int small_col_width = 60;
-  int padding = 20;
-  int large_col_width = half_screen_width - (2 * small_col_width) - padding;
-
-  lv_table_set_col_width(wifi_table, 0, large_col_width);
-  lv_table_set_col_width(wifi_table, 1, small_col_width);
-  lv_table_set_col_width(wifi_table, 2, small_col_width);
-
-  lv_obj_add_event_cb(wifi_table, &WifiPanel::_handle_callback, LV_EVENT_VALUE_CHANGED, this);
-  lv_obj_add_event_cb(wifi_table, &WifiPanel::_handle_callback, LV_EVENT_SIZE_CHANGED, this);
-  lv_obj_add_event_cb(wifi_table, draw_part_event_cb, LV_EVENT_DRAW_PART_BEGIN, NULL);
-
-  lv_obj_set_scroll_dir(wifi_table, LV_DIR_TOP | LV_DIR_BOTTOM);
+  // The list gets more than half the row now that the right-hand panel no
+  // longer needs to reserve space for a screen-dominating Low Latency pill -
+  // see pm_cont below.
+  lv_obj_set_flex_grow(wifi_list_cont, 3);
+  lv_obj_set_height(wifi_list_cont, LV_PCT(90));
+  lv_obj_set_flex_flow(wifi_list_cont, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_all(wifi_list_cont, 0, 0);
+  lv_obj_set_style_border_width(wifi_list_cont, 0, 0);
+  lv_obj_set_scroll_dir(wifi_list_cont, LV_DIR_VER);
+  lv_obj_add_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_set_style_border_width(wifi_right, 0, 0);
-  lv_obj_set_flex_grow(wifi_right, 1);
+  lv_obj_set_flex_grow(wifi_right, 2);
   lv_obj_add_flag(wifi_right, LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_CLICKABLE);
 
   lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
@@ -93,6 +75,9 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_border_width(prompt_cont, 0, 0);
 
+  lv_obj_set_width(wifi_label, LV_PCT(92));
+  lv_label_set_long_mode(wifi_label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_align(wifi_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(wifi_label, LV_ALIGN_TOP_MID, 0, 10);
 
   // pw_row: flex row holding the password textarea and the eye toggle button
@@ -131,37 +116,53 @@ WifiPanel::WifiPanel(std::mutex &l)
   lv_obj_add_event_cb(prompt_cont, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
   lv_obj_add_event_cb(wifi_label, &WifiPanel::_handle_kb_input, LV_EVENT_CLICKED, this);
 
-  // "Low Latency" control: a single tappable button in the right column, under
-  // the connection/IP info, plus a hint line. The button toggles its own ON/OFF
-  // label; checked = Low Latency ON, unchecked = stock. When ON it drives a
-  // whole bundle (see KUtils::set_wifi_low_latency): WiFi power-save / idle radio
-  // sleep / background roam-scans all off, plus Bluetooth stopped to free the
-  // shared 2.4GHz radio - for lower, steadier latency.
+  // "Low Latency" control: a compact link-style row, not the screen-dominant
+  // pill this used to be - it's an advanced, set-once radio-tuning setting,
+  // not part of the everyday connect flow, so it no longer competes with the
+  // connection status for the right panel's primary visual weight. Same
+  // underlying toggle (pm_btn, CHECKABLE) and handler as before.
+  lv_obj_add_flag(pm_cont, LV_OBJ_FLAG_FLOATING);
   lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_size(pm_cont, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  lv_obj_set_size(pm_cont, LV_PCT(92), LV_SIZE_CONTENT);
   lv_obj_set_style_border_width(pm_cont, 0, 0);
   lv_obj_set_style_bg_opa(pm_cont, LV_OPA_TRANSP, 0);
   lv_obj_set_style_pad_all(pm_cont, 0, 0);
-  lv_obj_set_style_pad_row(pm_cont, 6, 0);
+  lv_obj_set_style_pad_row(pm_cont, 2, 0);
   lv_obj_set_flex_flow(pm_cont, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(pm_cont, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_align(pm_cont, LV_ALIGN_CENTER, 0, 20);
+  // Anchored to the TOP of the panel, not CENTER/BOTTOM - the floating Back
+  // button is a full 110px-wide box (button_container.cpp) sitting in the
+  // bottom-right corner, and both earlier placements (BOTTOM_MID, then a
+  // CENTER+45 guess) still landed pm_cont's ~177px-wide box squarely across
+  // Back's actual x/y footprint - confirmed by computing the real
+  // coordinates, not by eyeballing a screenshot a second time. Anchoring to
+  // the top, right under the (max 3-line) status text, keeps this entirely
+  // above Back's top edge regardless of wifi_right's exact height.
+  lv_obj_align(pm_cont, LV_ALIGN_TOP_MID, 0, 90);
 
   lv_obj_add_flag(pm_btn, LV_OBJ_FLAG_CHECKABLE);
-  lv_obj_set_width(pm_btn, 210);
-  lv_obj_set_height(pm_btn, LV_SIZE_CONTENT);
-  lv_obj_set_style_pad_ver(pm_btn, 10, 0);
+  lv_obj_set_size(pm_btn, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+  // Both states need the transparent/no-border override - LV_STATE_CHECKED
+  // otherwise falls back to the theme's default checked-button styling
+  // (a solid accent-colored pill), which is exactly the screen-dominating
+  // look this control is being demoted away from.
+  for (lv_state_t state : {LV_STATE_DEFAULT, LV_STATE_CHECKED}) {
+    lv_obj_set_style_bg_opa(pm_btn, LV_OPA_TRANSP, LV_PART_MAIN | state);
+    lv_obj_set_style_shadow_width(pm_btn, 0, LV_PART_MAIN | state);
+    lv_obj_set_style_border_width(pm_btn, 0, LV_PART_MAIN | state);
+  }
+  lv_obj_set_style_pad_all(pm_btn, 2, 0);
   lv_label_set_text(pm_label, "Low Latency: OFF");
-  lv_obj_set_style_text_font(pm_label, &lv_font_montserrat_16, 0);
+  lv_obj_set_style_text_font(pm_label, &lv_font_montserrat_12, 0);
+  lv_obj_set_style_text_decor(pm_label, LV_TEXT_DECOR_UNDERLINE, 0);
   lv_obj_center(pm_label);
 
-  lv_label_set_text(pm_hint, "on = steadier WiFi\n(no power-save / roam / BT)");
-  lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_12, 0);
+  lv_obj_set_width(pm_hint, LV_PCT(100));
+  lv_label_set_long_mode(pm_hint, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_align(pm_hint, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_text(pm_hint, "steadier WiFi - no power-save/roam/BT");
+  lv_obj_set_style_text_font(pm_hint, &lv_font_montserrat_10, 0);
   lv_obj_set_style_text_color(pm_hint, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
-  // Match the button width and left-align both lines so they sit flush under
-  // the button's left edge (cleaner than centered).
-  lv_obj_set_width(pm_hint, 210);
-  lv_obj_set_style_text_align(pm_hint, LV_TEXT_ALIGN_LEFT, 0);
 
   {
     auto v = Config::get_instance()->get_json("/wifi_low_latency");
@@ -208,7 +209,7 @@ void WifiPanel::handle_back_btn(lv_event_t *e) {
   lv_event_code_t code = lv_event_get_code(e);
   if (code == LV_EVENT_CLICKED) {
     spdlog::trace("wifi panel bg");
-    lv_obj_add_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_background(cont);
   }
@@ -233,70 +234,127 @@ void WifiPanel::handle_pm_toggle(lv_event_t *e) {
   spdlog::debug("wifi low-latency toggled: {}", low_latency);
 }
 
-void WifiPanel::handle_callback(lv_event_t *e) {
-  lv_event_code_t code = lv_event_get_code(e);
+void WifiPanel::rebuild_wifi_rows() {
+  wifi_rows.clear();
+  lv_obj_clean(wifi_list_cont);
 
-  if (code == LV_EVENT_VALUE_CHANGED) {
-    uint16_t row;
-    uint16_t col;
-
-    lv_table_get_selected_cell(wifi_table, &row, &col);
-    if (row >= (uint16_t)wifi_name_db.size() || col > 1) {
-      return;
-    }
-
-    selected_network = lv_table_get_cell_value(wifi_table, row, 0);
-    if (col == 1 && list_networks.count(selected_network)) {
-      auto nid = list_networks.find(selected_network)->second;
-      wpa_event.send_command(fmt::format("REMOVE_NETWORK {}", nid));
-      wpa_event.send_command("SAVE_CONFIG");
-      cur_network.clear();
-      selected_network.clear();
-      lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
-      lv_label_set_text(wifi_label, "Scanning for networks...");
-      wpa_event.send_command("SCAN");
-      return;
-    }
-
-    if (cur_network.length() > 0 && cur_network == selected_network) {
-      auto ip = KUtils::interface_ip(KUtils::get_wifi_interface());
-      lv_label_set_text(wifi_label, fmt::format("Connected to network {}\nIP: {}",
-        selected_network,
-        ip).c_str());
-      lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-
-      if (col == 1) {
-        wpa_event.send_command("DISCONNECT");
-        cur_network.clear();
-        selected_network.clear();
-        lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
-        lv_label_set_text(wifi_label, "Scanning for networks...");
-        wpa_event.send_command("SCAN");
-      }
-
-    } else if (list_networks.count(selected_network)) {
-      auto nid = list_networks.find(selected_network)->second;
-      lv_label_set_text(wifi_label, fmt::format("Connecting to {} ...", selected_network).c_str());
-      lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-      wpa_event.send_command(fmt::format("SELECT_NETWORK {}", nid));
-      wpa_event.send_command("SAVE_CONFIG");
-      if (selected_network != cur_network) {
-        wpa_event.send_command("REASSOCIATE");
-      }
+  std::vector<std::pair<std::string, WifiEntry>> known, other;
+  for (const auto &kv : wifi_name_db) {
+    if (list_networks.count(kv.first)) {
+      known.push_back(kv);
     } else {
-      entering_password = true;
-      lv_label_set_text(wifi_label, fmt::format("Enter password for {}", selected_network).c_str());
-      lv_obj_clear_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-      lv_obj_add_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
-      lv_event_send(password_input, LV_EVENT_FOCUSED, NULL);
+      other.push_back(kv);
     }
-
-    lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
   }
+  auto by_signal_desc = [](const std::pair<std::string, WifiEntry> &a,
+                            const std::pair<std::string, WifiEntry> &b) {
+    return a.second.signal > b.second.signal;
+  };
+  std::sort(known.begin(), known.end(), by_signal_desc);
+  std::sort(other.begin(), other.end(), by_signal_desc);
+
+  auto make_group_label = [&](const char *text) {
+    lv_obj_t *l = lv_label_create(wifi_list_cont);
+    lv_label_set_text(l, text);
+    lv_obj_set_style_text_font(l, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_text_color(l, lv_palette_lighten(LV_PALETTE_GREY, 1), 0);
+    lv_obj_set_style_pad_top(l, 8, 0);
+    lv_obj_set_style_pad_bottom(l, 2, 0);
+    lv_obj_set_style_pad_left(l, 8, 0);
+  };
+
+  if (!known.empty()) {
+    make_group_label("KNOWN NETWORKS");
+    for (auto &kv : known) {
+      bool connected = (kv.first == cur_network);
+      auto nid_it = list_networks.find(kv.first);
+      std::string nid = nid_it != list_networks.end() ? nid_it->second : "";
+      wifi_rows.push_back(std::make_unique<WifiRowItem>(
+        wifi_list_cont, kv.first, kv.second.signal, connected, /*saved=*/true, nid,
+        [this](const std::string &ssid) { handle_row_activated(ssid); },
+        [this](const std::string &ssid, const std::string &nid) { confirm_remove_network(ssid, nid); }));
+    }
+  }
+  if (!other.empty()) {
+    make_group_label("OTHER NETWORKS IN RANGE");
+    for (auto &kv : other) {
+      wifi_rows.push_back(std::make_unique<WifiRowItem>(
+        wifi_list_cont, kv.first, kv.second.signal, /*connected=*/false, /*saved=*/false, "",
+        [this](const std::string &ssid) { handle_row_activated(ssid); },
+        [this](const std::string &ssid, const std::string &nid) { confirm_remove_network(ssid, nid); }));
+    }
+  }
+}
+
+void WifiPanel::handle_row_activated(const std::string &ssid) {
+  if (!cur_network.empty() && ssid == cur_network) {
+    auto it = wifi_name_db.find(ssid);
+    int signal = it != wifi_name_db.end() ? it->second.signal : -100;
+    bool secured = it != wifi_name_db.end() ? it->second.secured : true;
+    std::string signal_text = signal >= -50 ? "Excellent" : signal >= -60 ? "Good"
+                             : signal >= -70 ? "Fair" : "Weak";
+    std::string security_text = secured ? "Secured (WPA/WPA2)" : "Open (unsecured)";
+    auto ip = KUtils::interface_ip(KUtils::get_wifi_interface());
+    network_detail_panel.foreground(ssid, signal_text, security_text, ip);
+    return;
+  }
+
+  selected_network = ssid;
+  if (list_networks.count(ssid)) {
+    auto nid = list_networks.find(ssid)->second;
+    lv_label_set_text(wifi_label, fmt::format("Connecting to {} ...", ssid).c_str());
+    lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
+    wpa_event.send_command(fmt::format("SELECT_NETWORK {}", nid));
+    wpa_event.send_command("SAVE_CONFIG");
+    wpa_event.send_command("REASSOCIATE");
+  } else {
+    entering_password = true;
+    lv_label_set_text(wifi_label, fmt::format("Enter password for {}", ssid).c_str());
+    lv_obj_clear_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_event_send(password_input, LV_EVENT_FOCUSED, NULL);
+  }
+  lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
+}
+
+void WifiPanel::open_static_ip_for_current() {
+  if (cur_network.empty()) return;
+  static_ip_panel.foreground(cur_network);
+}
+
+void WifiPanel::forget_current_network() {
+  if (cur_network.empty()) return;
+  auto it = list_networks.find(cur_network);
+  if (it == list_networks.end()) return;
+  confirm_remove_network(cur_network, it->second);
+}
+
+void WifiPanel::confirm_remove_network(const std::string &ssid, const std::string &nid) {
+  static const char *btns[] = {"Remove", "Cancel", ""};
+  std::string msg = fmt::format("Forget network \"{}\"?\nThis deletes its saved password.", ssid);
+  lv_obj_t *mbox = lv_msgbox_create(NULL, NULL, msg.c_str(), btns, false);
+  lv_obj_add_event_cb(mbox, [](lv_event_t *ev) {
+    lv_obj_t *obj = lv_obj_get_parent(lv_event_get_target(ev));
+    auto *self = static_cast<WifiPanel *>(lv_event_get_user_data(ev));
+    bool confirmed = lv_msgbox_get_active_btn(obj) == 0;
+    std::string nid = self->pending_remove_nid;
+    self->pending_remove_nid.clear();
+    lv_msgbox_close(obj);
+    if (!confirmed) return;
+
+    self->wpa_event.send_command(fmt::format("REMOVE_NETWORK {}", nid));
+    self->wpa_event.send_command("SAVE_CONFIG");
+    self->cur_network.clear();
+    self->selected_network.clear();
+    self->network_detail_panel.hide();
+    lv_obj_add_flag(self->prompt_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(self->spinner, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(self->wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(self->wifi_label, "Scanning for networks...");
+    self->wpa_event.send_command("SCAN");
+  }, LV_EVENT_VALUE_CHANGED, this);
+  pending_remove_nid = nid;
+  KUtils::style_lock_mbox(mbox, 90);
 }
 
 void WifiPanel::handle_wpa_event(const std::string &event) {
@@ -308,8 +366,10 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
     spdlog::trace("got scan result event");
     std::istringstream f(wpa_event.send_command("SCAN_RESULTS"));
     std::string line;
-    wifi_name_db.clear();
-    uint32_t index = 0;
+    // Networks actually reported by THIS scan - merged into wifi_name_db
+    // below rather than replacing it outright, and anything missing gets
+    // aged out gradually instead of vanishing after a single noisy scan.
+    std::map<std::string, WifiEntry> seen_this_scan;
 
     bool found = find_current_network();
     spdlog::trace("cur_network {}", cur_network);
@@ -326,35 +386,46 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
       auto wifi_parts = KUtils::split(line, '\t');
       spdlog::trace("wifi parts {}", fmt::join(wifi_parts, ", "));
       if (wifi_parts.size() == 5) {
-        auto inserted = wifi_name_db.insert({wifi_parts[4], std::stoi(wifi_parts[2])});
-        if (inserted.second) {
-          lv_table_set_cell_value(wifi_table, index, 0, wifi_parts[4].c_str());
-          if (cur_network == wifi_parts[4]) {
-            spdlog::trace("adding symbol with ok");
-            lv_table_set_cell_value(wifi_table, index, 1, LV_SYMBOL_CLOSE);
-            lv_table_set_cell_value(wifi_table, index, 2, LV_SYMBOL_WIFI);
-            auto ip = KUtils::interface_ip(KUtils::get_wifi_interface());
-            lv_label_set_text(wifi_label, fmt::format("Connected to network {}\nIP: {}",
-              cur_network,
-              ip).c_str());
-            lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-          } else if (list_networks.count(wifi_parts[4])) {
-            lv_table_set_cell_value(wifi_table, index, 1, LV_SYMBOL_CLOSE);
-            lv_table_set_cell_value(wifi_table, index, 2, LV_SYMBOL_WIFI);
-          } else {
-            spdlog::trace("adding symbol");
-            lv_table_set_cell_value(wifi_table, index, 1, "");
-            lv_table_set_cell_value(wifi_table, index, 2, LV_SYMBOL_WIFI);
-          }
-
-          index++;
-        }
+        WifiEntry entry;
+        entry.signal = std::stoi(wifi_parts[2]);
+        entry.secured = wifi_parts[3].find("WPA") != std::string::npos
+                      || wifi_parts[3].find("WEP") != std::string::npos;
+        seen_this_scan[wifi_parts[4]] = entry;
       }
     }
-    lv_obj_scroll_to_y(wifi_table, 0, LV_ANIM_OFF);
-    lv_obj_clear_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
+
+    for (const auto &kv : seen_this_scan) {
+      auto &e = wifi_name_db[kv.first];
+      e.signal = kv.second.signal;
+      e.secured = kv.second.secured;
+      e.missed = 0;
+    }
+    static constexpr int MAX_MISSED_SCANS = 3;
+    for (auto it = wifi_name_db.begin(); it != wifi_name_db.end();) {
+      if (seen_this_scan.count(it->first)) {
+        ++it;
+        continue;
+      }
+      if (++it->second.missed > MAX_MISSED_SCANS) {
+        it = wifi_name_db.erase(it);
+      } else {
+        ++it;
+      }
+    }
+
+    if (!cur_network.empty()) {
+      auto ip = KUtils::interface_ip(KUtils::get_wifi_interface());
+      lv_label_set_text(wifi_label, fmt::format("Connected to network {}\nIP: {}",
+        cur_network, ip).c_str());
+      lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    rebuild_wifi_rows();
+    lv_obj_scroll_to_y(wifi_list_cont, 0, LV_ANIM_OFF);
+    lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+
     size_t current_count = wifi_name_db.size();
     bool grew = current_count > last_scan_count;
     last_scan_count = current_count;
@@ -378,43 +449,16 @@ void WifiPanel::handle_wpa_event(const std::string &event) {
 
     if (find_current_network()) {
       spdlog::trace("cur_network {}", cur_network);
-      std::vector<std::pair<std::string, int>> pairs;
-      for (auto it = wifi_name_db.begin(); it != wifi_name_db.end(); ++it) {
-        pairs.push_back(*it);
-      }
-
-      std::sort(pairs.begin(), pairs.end(), [=](std::pair<std::string, int> &a,
-        std::pair<std::string, int> &b)
-        {
-          return a.second > b.second;
-        });
-
       std::lock_guard<std::mutex> lock(lv_lock);
 
-      uint32_t index = 0;
-      for (const auto &wifi : pairs) {
-        lv_table_set_cell_value(wifi_table, index, 0, wifi.first.c_str());
-        if (cur_network == wifi.first) {
-          spdlog::trace("adding symbol with ok");
-          lv_table_set_cell_value(wifi_table, index, 1, LV_SYMBOL_CLOSE);
-          lv_table_set_cell_value(wifi_table, index, 2, LV_SYMBOL_WIFI);
-          lv_label_set_text(wifi_label,
-            fmt::format("Connected to {}\nGetting IP...", cur_network).c_str());
-          lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
-          lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
-        } else if (list_networks.count(wifi.first)) {
-          lv_table_set_cell_value(wifi_table, index, 1, LV_SYMBOL_CLOSE);
-          lv_table_set_cell_value(wifi_table, index, 2, LV_SYMBOL_WIFI);
-        } else {
-          spdlog::trace("adding symbol");
-          lv_table_set_cell_value(wifi_table, index, 1, "");
-          lv_table_set_cell_value(wifi_table, index, 2, LV_SYMBOL_WIFI);
-        }
-        index++;
-      }
+      lv_label_set_text(wifi_label,
+        fmt::format("Connected to {}\nGetting IP...", cur_network).c_str());
+      lv_obj_add_flag(pw_row, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_clear_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
 
-      lv_obj_scroll_to_y(wifi_table, 0, LV_ANIM_OFF);
-      lv_obj_clear_flag(wifi_table, LV_OBJ_FLAG_HIDDEN);
+      rebuild_wifi_rows();
+      lv_obj_scroll_to_y(wifi_list_cont, 0, LV_ANIM_OFF);
+      lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
       lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
 
       auto iface = KUtils::get_wifi_interface();
@@ -434,6 +478,13 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
   if (code == LV_EVENT_FOCUSED) {
     lv_keyboard_set_textarea(kb, password_input);
     lv_obj_clear_flag(kb, LV_OBJ_FLAG_HIDDEN);
+    // The keyboard covers most of the screen's width - hiding the (not
+    // interactable while typing anyway) network list avoids the hard,
+    // no-scroll clip through a row that a full-width keyboard otherwise
+    // produces (confirmed live 2026-07-12), and hiding Back mirrors the
+    // same pattern used for the octet keyboard in StaticIpPanel.
+    lv_obj_add_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(back_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_DEFOCUSED || code == LV_EVENT_CANCEL) {
     entering_password = false;
     lv_keyboard_set_textarea(kb, NULL);
@@ -444,6 +495,8 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     lv_textarea_set_password_mode(password_input, true);
     lv_label_set_text(lv_obj_get_child(eye_btn, 0), LV_SYMBOL_EYE_CLOSE);
     lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(back_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_READY) {
     const char *password = lv_textarea_get_text(password_input);
     if (password == NULL || password[0] == 0) {
@@ -462,6 +515,8 @@ void WifiPanel::handle_kb_input(lv_event_t *e)
     lv_textarea_set_password_mode(password_input, true);
     lv_label_set_text(lv_obj_get_child(eye_btn, 0), LV_SYMBOL_EYE_CLOSE);
     lv_obj_clear_flag(pm_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(wifi_list_cont, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(back_btn.get_container(), LV_OBJ_FLAG_HIDDEN);
   } else if (code == LV_EVENT_CLICKED) {
     lv_obj_t *target = lv_event_get_target(e);
     if (target != kb && target != password_input && target != eye_btn && target != pw_row) {

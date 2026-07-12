@@ -14,11 +14,13 @@
 #include <iomanip>
 #include <fstream>
 #include <sys/ioctl.h>
+#include <sys/wait.h>
 #include <linux/if.h>
 #include <ifaddrs.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <experimental/filesystem>
 #include <regex>
@@ -683,6 +685,22 @@ namespace KUtils {
     set_bluetooth_running(!on);
 
     return have_wl;
+  }
+
+  std::pair<int, std::string> exec_capture(const std::string &cmd) {
+    std::string full_cmd = cmd + " 2>&1";
+    FILE *pipe = popen(full_cmd.c_str(), "r");
+    if (!pipe) {
+      return {-1, "failed to launch command"};
+    }
+    std::string output;
+    char buf[256];
+    while (fgets(buf, sizeof(buf), pipe) != nullptr) {
+      output += buf;
+    }
+    int status = pclose(pipe);
+    int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    return {exit_code, output};
   }
 
   std::map<std::string, std::map<std::string, std::string>> parse_macros(json &m) {

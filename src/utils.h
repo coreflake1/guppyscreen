@@ -101,6 +101,16 @@ namespace KUtils {
   // (non-Broadcom hardware / simulator). Returns true if the command was run.
   bool set_wifi_low_latency(bool on);
 
+  // Runs `cmd` via popen (stdout+stderr combined into one stream) and blocks
+  // until it exits, returning {exit_code, combined_output}. Blocking - the
+  // only precedent for shelling out in this codebase (set_wifi_low_latency,
+  // set_bluetooth_running) is fire-and-forget system() with no output
+  // capture, so callers on the LVGL thread must run this on a background
+  // std::thread and re-acquire their panel's lv_lock before touching any
+  // LVGL object with the result (see wifi_panel.cpp's wait_for_connectivity
+  // for the established pattern).
+  std::pair<int, std::string> exec_capture(const std::string &cmd);
+
   template<typename T, typename U> void sort_map_values(std::map<T, U> v,
     std::vector<U> &out_vect,
     std::function<bool(U &, U &)> sorter) {

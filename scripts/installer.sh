@@ -97,6 +97,14 @@ uninstall_guppy() {
         printf "${green}Removed songs.conf${white}\n"
     fi
 
+    # Remove static-IP state (also lives at the config-dir top level, written
+    # by static_ip.py rather than shipped as a file - never covered by the
+    # GuppyScreen dir removal above).
+    if [ -f "$K1_CONFIG_DIR_U/static_ip.json" ] || [ -f "$K1_CONFIG_DIR_U/static_ip_dhcp_snapshot.json" ]; then
+        rm -f "$K1_CONFIG_DIR_U/static_ip.json" "$K1_CONFIG_DIR_U/static_ip_dhcp_snapshot.json"
+        printf "${green}Removed static IP config${white}\n"
+    fi
+
     # Remove Klipper symlinks
     rm -f "$KLIPPY_EXTRA_DIR_U/guppy_module_loader.py"
     rm -f "$KLIPPY_EXTRA_DIR_U/guppy_config_helper.py"
