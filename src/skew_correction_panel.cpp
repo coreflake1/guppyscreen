@@ -84,7 +84,6 @@ SkewCorrectionPanel::SkewCorrectionPanel(KWebSocketClient &websocket_client)
 
   apply_btn = lv_btn_create(btnrow);
   lv_obj_set_size(apply_btn, 190, 44);
-  lv_obj_set_style_bg_color(apply_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *al = lv_label_create(apply_btn);
   lv_label_set_text(al, LV_SYMBOL_OK "  Apply & Save");
   lv_obj_center(al);

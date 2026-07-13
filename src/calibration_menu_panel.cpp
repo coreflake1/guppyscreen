@@ -54,10 +54,12 @@ static lv_obj_t *make_row(lv_obj_t *parent, const void *icon, const char *label,
 
   if (number != nullptr) {
     // Between the 46px icon and the 14px row label in visual weight.
-    lv_obj_t *badge = lv_obj_create(row);
+    // Plain lv_btn (non-clickable) so it picks up the theme's live
+    // bg_color_primary automatically, instead of baking in a color snapshot
+    // that goes stale on the next theme change.
+    lv_obj_t *badge = lv_btn_create(row);
     lv_obj_set_size(badge, 26, 26);
     lv_obj_set_style_radius(badge, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(badge, lv_palette_main(LV_PALETTE_BLUE), 0);
     lv_obj_set_style_border_width(badge, 0, 0);
     lv_obj_clear_flag(badge, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);

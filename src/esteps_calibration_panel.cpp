@@ -72,7 +72,6 @@ EstepsCalibrationPanel::EstepsCalibrationPanel(KWebSocketClient &websocket_clien
 
   start_btn = lv_btn_create(intro_cont);
   lv_obj_set_size(start_btn, 220, 46);
-  lv_obj_set_style_bg_color(start_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *sb_lbl = lv_label_create(start_btn);
   lv_label_set_text(sb_lbl, LV_SYMBOL_OK "  Start");
   lv_obj_set_style_text_font(sb_lbl, &lv_font_montserrat_16, 0);
@@ -150,7 +149,6 @@ EstepsCalibrationPanel::EstepsCalibrationPanel(KWebSocketClient &websocket_clien
   extrude_btn = lv_btn_create(mark_act);
   lv_obj_set_flex_grow(extrude_btn, 1);
   lv_obj_set_height(extrude_btn, 44);
-  lv_obj_set_style_bg_color(extrude_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *ex_lbl = lv_label_create(extrude_btn);
   lv_label_set_text(ex_lbl, LV_SYMBOL_OK "  Extrude");
   lv_obj_center(ex_lbl);
@@ -225,7 +223,6 @@ EstepsCalibrationPanel::EstepsCalibrationPanel(KWebSocketClient &websocket_clien
   measure_apply_btn = lv_btn_create(measure_act);
   lv_obj_set_flex_grow(measure_apply_btn, 1);
   lv_obj_set_height(measure_apply_btn, 44);
-  lv_obj_set_style_bg_color(measure_apply_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *ap_lbl = lv_label_create(measure_apply_btn);
   lv_label_set_text(ap_lbl, LV_SYMBOL_OK "  Apply");
   lv_obj_center(ap_lbl);
@@ -266,7 +263,6 @@ EstepsCalibrationPanel::EstepsCalibrationPanel(KWebSocketClient &websocket_clien
 
   verify_again_btn = lv_btn_create(result_cont);
   lv_obj_set_size(verify_again_btn, 240, 40);
-  lv_obj_set_style_bg_color(verify_again_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *va_lbl = lv_label_create(verify_again_btn);
   lv_label_set_text(va_lbl, LV_SYMBOL_REFRESH "  Verify Again");
   lv_obj_set_style_text_font(va_lbl, &lv_font_montserrat_14, 0);

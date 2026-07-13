@@ -70,7 +70,6 @@ NetworkDetailPanel::NetworkDetailPanel(std::mutex &l,
   // 2026-07-12). Narrowing keeps this clear of Back's footprint regardless
   // of exact vertical position, rather than fine-tuning y-offsets to dodge it.
   lv_obj_set_size(configure_btn, 320, 42);
-  lv_obj_set_style_bg_color(configure_btn, lv_palette_main(LV_PALETTE_BLUE), LV_PART_MAIN);
   {
     lv_obj_t *l = lv_label_create(configure_btn);
     lv_label_set_text(l, "Configure Static IP");

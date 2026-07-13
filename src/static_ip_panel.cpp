@@ -276,7 +276,6 @@ StaticIpPanel::StaticIpPanel(std::mutex &l)
   lv_obj_set_style_text_font(status_label, &lv_font_montserrat_12, 0);
 
   lv_obj_set_size(save_btn, 140, 36);
-  lv_obj_set_style_bg_color(save_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   {
     lv_obj_t *l = lv_label_create(save_btn);
     lv_label_set_text(l, LV_SYMBOL_OK "  Save");
@@ -344,10 +343,16 @@ void StaticIpPanel::handle_back_btn(lv_event_t *e) {
 
 void StaticIpPanel::set_manual_mode(bool manual) {
   manual_mode = manual;
-  lv_obj_set_style_bg_color(manual_mode_btn,
-    manual ? lv_palette_main(LV_PALETTE_BLUE) : lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
-  lv_obj_set_style_bg_color(dhcp_mode_btn,
-    !manual ? lv_palette_main(LV_PALETTE_BLUE) : lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+  // Selected button: clear any local override so it falls back to the
+  // theme's own live bg_color_primary (tracks theme changes with no
+  // restart). Unselected button: explicit grey override.
+  if (manual) {
+    lv_obj_remove_local_style_prop(manual_mode_btn, LV_STYLE_BG_COLOR, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(dhcp_mode_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+  } else {
+    lv_obj_remove_local_style_prop(dhcp_mode_btn, LV_STYLE_BG_COLOR, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(manual_mode_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+  }
 
   for (lv_obj_t *const *group : {ip_octets, netmask_octets, gateway_octets, dns_octets}) {
     for (int i = 0; i < 4; i++) {

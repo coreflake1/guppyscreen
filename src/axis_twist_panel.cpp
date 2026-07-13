@@ -71,7 +71,6 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
 
   start_btn = lv_btn_create(intro_cont);
   lv_obj_set_size(start_btn, 220, 46);
-  lv_obj_set_style_bg_color(start_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *sb_lbl = lv_label_create(start_btn);
   lv_label_set_text(sb_lbl, LV_SYMBOL_OK "  Start Calibration");
   lv_obj_set_style_text_font(sb_lbl, &lv_font_montserrat_16, 0);
@@ -165,7 +164,6 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
   accept_btn = lv_btn_create(act);
   lv_obj_set_flex_grow(accept_btn, 1);
   lv_obj_set_height(accept_btn, 44);
-  lv_obj_set_style_bg_color(accept_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *ac_lbl = lv_label_create(accept_btn);
   lv_label_set_text(ac_lbl, LV_SYMBOL_OK "  Accept");
   lv_obj_set_style_text_font(ac_lbl, &lv_font_montserrat_16, 0);
@@ -193,7 +191,6 @@ AxisTwistPanel::AxisTwistPanel(KWebSocketClient &websocket_client, std::mutex &l
 
   save_btn = lv_btn_create(done_cont);
   lv_obj_set_size(save_btn, 240, 46);
-  lv_obj_set_style_bg_color(save_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *sv_lbl = lv_label_create(save_btn);
   lv_label_set_text(sv_lbl, LV_SYMBOL_SAVE "  Save & Restart");
   lv_obj_set_style_text_font(sv_lbl, &lv_font_montserrat_16, 0);

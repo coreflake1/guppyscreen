@@ -98,7 +98,6 @@ RecalibrationWizardPanel::RecalibrationWizardPanel(KWebSocketClient &websocket_c
 
   start_btn = lv_btn_create(intro_cont);
   lv_obj_set_size(start_btn, 220, 46);
-  lv_obj_set_style_bg_color(start_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *sb_lbl = lv_label_create(start_btn);
   lv_label_set_text(sb_lbl, LV_SYMBOL_OK "  Start");
   lv_obj_set_style_text_font(sb_lbl, &lv_font_montserrat_16, 0);
@@ -189,7 +188,6 @@ RecalibrationWizardPanel::RecalibrationWizardPanel(KWebSocketClient &websocket_c
   accept_btn = lv_btn_create(act);
   lv_obj_set_flex_grow(accept_btn, 1);
   lv_obj_set_height(accept_btn, 44);
-  lv_obj_set_style_bg_color(accept_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *ac_lbl = lv_label_create(accept_btn);
   lv_label_set_text(ac_lbl, LV_SYMBOL_OK "  Accept");
   lv_obj_set_style_text_font(ac_lbl, &lv_font_montserrat_16, 0);
@@ -235,7 +233,6 @@ RecalibrationWizardPanel::RecalibrationWizardPanel(KWebSocketClient &websocket_c
 
   save_btn = lv_btn_create(done_cont);
   lv_obj_set_size(save_btn, 240, 40);
-  lv_obj_set_style_bg_color(save_btn, lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
   lv_obj_t *sv_lbl = lv_label_create(save_btn);
   lv_label_set_text(sv_lbl, LV_SYMBOL_SAVE "  Save & Restart");
   lv_obj_set_style_text_font(sv_lbl, &lv_font_montserrat_14, 0);
@@ -573,10 +570,16 @@ void RecalibrationWizardPanel::finish_sensor_reading() {
         ? "Close agreement - sensor reading (green) is usually the more precise pick."
         : "Bigger gap than normal (0.1mm) - paper test (green) is the safer pick.").c_str());
 
-  lv_obj_set_style_bg_color(keep_paper_btn,
-    sensor_recommended ? lv_palette_darken(LV_PALETTE_GREY, 2) : lv_palette_main(LV_PALETTE_GREEN), LV_PART_MAIN);
-  lv_obj_set_style_bg_color(use_sensor_btn,
-    sensor_recommended ? lv_palette_main(LV_PALETTE_GREEN) : lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+  // Recommended button: clear any local override so it falls back to the
+  // theme's own live bg_color_primary (tracks theme changes with no
+  // restart). The other button: explicit grey override.
+  if (sensor_recommended) {
+    lv_obj_set_style_bg_color(keep_paper_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+    lv_obj_remove_local_style_prop(use_sensor_btn, LV_STYLE_BG_COLOR, LV_PART_MAIN);
+  } else {
+    lv_obj_remove_local_style_prop(keep_paper_btn, LV_STYLE_BG_COLOR, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(use_sensor_btn, lv_palette_darken(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+  }
 
   show_stage(SENSOR_CHOICE);
 }
