@@ -1051,12 +1051,21 @@ section_defined_elsewhere() {   # $1 = literal header, e.g. "[axis_twist_compens
 
 # True if some ACTIVE config file (outside our managed GuppyScreen/ dir) reads
 # this section by name via a quoted printer[...] lookup, e.g.
-# printer["gcode_macro M600"]. Checked across EVERY active file, not just
-# whichever one defines the section - Klipper merges all [include]d files
-# into one config, so a real setup can easily have the section's definition
-# in one file and the macro that reads it in a completely different one
-# (this is a normal, common layout, not an edge case). Used by
-# replace_conflicting_cfg to decide whether a section is safe to comment out.
+# printer["gcode_macro M600"], OR - for a [gcode_macro NAME] section
+# specifically - calls it directly as a bare gcode command elsewhere (e.g.
+# some other macro's body containing a plain "SET_GCODE_OFFSET X=0" line).
+# The bare-call form is arguably the more dangerous one to miss: a printer[]
+# lookup just gates conditional logic, but a macro that calls a command which
+# no longer exists fails hard ("Unknown command") the moment it runs, not at
+# Klipper startup. Found live on a real printer during on-device verification
+# (Helper-Script/timelapse.cfg calls SET_GCODE_OFFSET directly - a completely
+# separate file from save-zoffset.cfg, which defines it).
+# Checked across EVERY active file, not just whichever one defines the
+# section - Klipper merges all [include]d files into one config, so a real
+# setup can easily have the section's definition in one file and the macro
+# that reads/calls it in a completely different one (this is a normal,
+# common layout, not an edge case). Used by replace_conflicting_cfg to decide
+# whether a section is safe to comment out.
 section_referenced_elsewhere() {   # $1 = bare section name, e.g. "gcode_macro M600"
     _refbare="$1"
     _reflst="/tmp/.ke_active_ref.$$"
@@ -1066,6 +1075,17 @@ section_referenced_elsewhere() {   # $1 = bare section name, e.g. "gcode_macro M
         [ -f "$_rf" ] || continue
         if grep -qE "[\"']${_refbare}[\"']" "$_rf" 2>/dev/null; then _refret=0; break; fi
     done < "$_reflst"
+    case "$_refbare" in
+        "gcode_macro "*)
+            _refcmd="${_refbare#gcode_macro }"
+            if [ "$_refret" -ne 0 ]; then
+                while IFS= read -r _rf; do
+                    [ -f "$_rf" ] || continue
+                    if grep -qE "^[[:space:]]*${_refcmd}([[:space:]]|\$)" "$_rf" 2>/dev/null; then _refret=0; break; fi
+                done < "$_reflst"
+            fi
+            ;;
+    esac
     rm -f "$_reflst"
     return $_refret
 }
@@ -1137,11 +1157,12 @@ install_cfg_guarded() {   # $1 = src path, $2 = dest filename, $3 = label
 # replace it: back up the conflicting file, comment out just the conflicting sections,
 # and install our version in their place. Only ever mutates if NOTHING comes back
 # "unsafe" (i.e. some macro ANYWHERE in the active config - not just the same file -
-# reads printer["<section>"] / printer['<section>'] at runtime, via
-# section_referenced_elsewhere - a sign of a genuinely working, self-contained
-# subsystem rather than a stray duplicate; blindly commenting there would leave that
-# macro referencing something that no longer exists, even if the reader lives in a
-# completely different [include]d file than the definition). Always asks first.
+# reads printer["<section>"] / printer['<section>'] at runtime, OR (for a gcode_macro)
+# calls it directly as a bare command, via section_referenced_elsewhere - a sign of a
+# genuinely working, self-contained subsystem rather than a stray duplicate; blindly
+# commenting there would leave that macro referencing/calling something that no
+# longer exists, even if the reader lives in a completely different [include]d file
+# than the definition). Always asks first.
 replace_conflicting_cfg() {   # $1=src path, $2=dest filename, $3=label, $4=backup-tag
     _rc_src="$1"; _rc_dest="$2"; _rc_label="$3"; _rc_tag="$4"
     _rc_secs=$(grep -oE '^\[[^]]+\]' "$_rc_src" 2>/dev/null | sort -u)
