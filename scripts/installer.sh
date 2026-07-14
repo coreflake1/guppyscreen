@@ -17,6 +17,58 @@ ASSET_NAME="guppyscreen"
 # third-party repo's unpinned main branch, or on this branch's own history.
 CURL_BOOTSTRAP_URL="https://raw.githubusercontent.com/coreflake1/guppyscreen/d5a502942bde7ad04f45d8ce64f1259adf49d9bf/scripts/vendor/curl-mipsel"
 
+# Download with retries; only succeeds if the destination ends up non-empty.
+# A silent wget failure (bad network, flaky DNS) used to leave a 0-byte file
+# that the next step would try to extract, crash on, and then get papered
+# over by an unconditional "[OK]" — leaving the installed thing broken while
+# the installer claimed success. Defined this early (before any of its call
+# sites, including Moonraker's own bootstrap) so every download in the script
+# can share the same protection instead of only the ones added later.
+#
+# Some on-device wget builds can't complete a TLS handshake with github.com's
+# release-asset redirects (works fine for raw.githubusercontent.com, fails
+# with "TLS error from peer (alert code 80)") — the same issue the
+# "bootstrap for ssl support" step below works around for the GuppyScreen
+# asset itself. Fall back to that same static curl binary here too.
+download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
+    _url="$1"; _dest="$2"; _tries="${3:-3}"
+    _n=0
+    while [ "$_n" -lt "$_tries" ]; do
+        # User-Agent is required by the GitHub API (a request without one gets a
+        # flat 403) and harmless for the other download targets this helper hits.
+        wget -q --no-check-certificate --header="User-Agent: OpenKE-Installer" "$_url" -O "$_dest"
+        [ -s "$_dest" ] && return 0
+        _n=$((_n + 1))
+        printf "${yellow}  Download failed (attempt ${_n}/${_tries}), retrying...${white}\n"
+        sleep 2
+    done
+
+    printf "${yellow}  wget could not fetch it — trying the SSL-capable curl fallback...${white}\n"
+    if [ ! -x /tmp/curl ]; then
+        wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
+        chmod +x /tmp/curl
+    fi
+    [ -x /tmp/curl ] && /tmp/curl -s -L -H "User-Agent: OpenKE-Installer" "$_url" -o "$_dest"
+    [ -s "$_dest" ] && return 0
+    return 1
+}
+
+# Poll Moonraker's own API until it responds or we give up. Starting a service
+# and declaring success without checking it actually came up is exactly the
+# failure mode this whole helper section exists to avoid.
+wait_for_moonraker() {   # $1 = max tries (default 10), 1s apart
+    _mr_tries="${1:-10}"
+    _mr_n=0
+    while [ "$_mr_n" -lt "$_mr_tries" ]; do
+        if curl -s localhost:7125/printer/info 2>/dev/null | grep -q '"result"'; then
+            return 0
+        fi
+        _mr_n=$((_mr_n + 1))
+        sleep 1
+    done
+    return 1
+}
+
 uninstall_guppy() {
     printf "${green}=== Uninstalling GuppyScreen ===${white}\n"
 
@@ -222,11 +274,16 @@ if [ ! -d "$MOONRAKER_INSTALL_DIR" ] || [ ! -f "$MOONRAKER_INIT" ]; then
     fi
 
     printf "${green}  Downloading Moonraker...${white}\n"
-    wget -q --no-check-certificate \
-        "https://raw.githubusercontent.com/coreflake1/guppyscreen/670d99bea9a801bef7eb863e984146ef4c6b942c/scripts/vendor/moonraker.tar.gz" \
-        -O /tmp/moonraker.tar.gz
+    if ! download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/670d99bea9a801bef7eb863e984146ef4c6b942c/scripts/vendor/moonraker.tar.gz" /tmp/moonraker.tar.gz; then
+        printf "${red}  [FAIL] Could not download Moonraker — check your network and re-run the installer.${white}\n"
+        exit 1
+    fi
     printf "${green}  Installing Moonraker...${white}\n"
-    tar xf /tmp/moonraker.tar.gz -C /usr/data/
+    if ! tar xf /tmp/moonraker.tar.gz -C /usr/data/; then
+        printf "${red}  [FAIL] Moonraker archive was corrupt/incomplete — check your network and re-run the installer.${white}\n"
+        rm -f /tmp/moonraker.tar.gz
+        exit 1
+    fi
     rm -f /tmp/moonraker.tar.gz
 
     printf "${green}  Installing compat wrappers (sudo/systemctl/supervisorctl)...${white}\n"
@@ -409,10 +466,33 @@ MOONRAKER_CONF_EOF
 
     printf "${green}  Starting Moonraker...${white}\n"
     /etc/init.d/S56moonraker_service start
-    sleep 3
-    printf "${green}  [OK] Moonraker installed and started${white}\n"
+    if wait_for_moonraker; then
+        printf "${green}  [OK] Moonraker installed and started${white}\n"
+    else
+        printf "${red}  [FAIL] Moonraker was installed but never responded on port 7125.${white}\n"
+        printf "${red}  Check /usr/data/printer_data/logs/moonraker.log and re-run the installer if needed.${white}\n"
+        exit 1
+    fi
 else
-    printf "${green}  [OK] Moonraker detected${white}\n"
+    # Detected via the init/binary being present, which says nothing about
+    # whether the service is actually up right now (e.g. a crashed service
+    # after a bad shutdown, or a leftover Helper-Script config Moonraker
+    # refuses to start on) - same check the fresh-install branch above already
+    # does before declaring success, applied here too instead of trusting
+    # file presence alone.
+    if wait_for_moonraker; then
+        printf "${green}  [OK] Moonraker detected${white}\n"
+    else
+        printf "${yellow}  Moonraker is installed but not responding — attempting to restart...${white}\n"
+        /etc/init.d/S56moonraker_service restart >/dev/null 2>&1 || true
+        if wait_for_moonraker; then
+            printf "${green}  [OK] Moonraker restarted and responding${white}\n"
+        else
+            printf "${red}  [FAIL] Moonraker is installed but not responding on port 7125.${white}\n"
+            printf "${red}  Check /usr/data/printer_data/logs/moonraker.log, then re-run the installer.${white}\n"
+            exit 1
+        fi
+    fi
 fi
 
 # Patch an already-installed Moonraker service that predates the umask fix above.
@@ -430,40 +510,6 @@ fi
 ## ============================================================================
 ## OPTIONAL: Mainsail + Nginx (browser UI — not required for GuppyScreen)
 ## ============================================================================
-
-# Download with retries; only succeeds if the destination ends up non-empty.
-# A silent wget failure (bad network, flaky DNS) used to leave a 0-byte file
-# that the next step would try to extract, crash on, and then get papered
-# over by an unconditional "[OK]" — leaving nginx serving an empty Mainsail
-# dir (browser sees 403 Forbidden) while the installer claimed success.
-#
-# Some on-device wget builds can't complete a TLS handshake with github.com's
-# release-asset redirects (works fine for raw.githubusercontent.com, fails
-# with "TLS error from peer (alert code 80)") — the same issue the
-# "bootstrap for ssl support" step below works around for the GuppyScreen
-# asset itself. Fall back to that same static curl binary here too.
-download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
-    _url="$1"; _dest="$2"; _tries="${3:-3}"
-    _n=0
-    while [ "$_n" -lt "$_tries" ]; do
-        # User-Agent is required by the GitHub API (a request without one gets a
-        # flat 403) and harmless for the other download targets this helper hits.
-        wget -q --no-check-certificate --header="User-Agent: OpenKE-Installer" "$_url" -O "$_dest"
-        [ -s "$_dest" ] && return 0
-        _n=$((_n + 1))
-        printf "${yellow}  Download failed (attempt ${_n}/${_tries}), retrying...${white}\n"
-        sleep 2
-    done
-
-    printf "${yellow}  wget could not fetch it — trying the SSL-capable curl fallback...${white}\n"
-    if [ ! -x /tmp/curl ]; then
-        wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
-        chmod +x /tmp/curl
-    fi
-    [ -x /tmp/curl ] && /tmp/curl -s -L -H "User-Agent: OpenKE-Installer" "$_url" -o "$_dest"
-    [ -s "$_dest" ] && return 0
-    return 1
-}
 
 NGINX_INIT=/etc/init.d/S50nginx
 MAINSAIL_IDX=/usr/data/mainsail/index.html
@@ -493,7 +539,16 @@ if [ "$_nginx_ok" -eq 0 ] || [ "$_mainsail_ok" -eq 0 ]; then
             printf "${green}  Installing Nginx...${white}\n"
             tar xf /tmp/nginx.tar.gz -C /usr/data/
             rm -f /tmp/nginx.tar.gz
-
+            # Same idea as Mainsail's index.html check below — verify the
+            # extraction actually produced the binary the init script depends
+            # on, rather than assuming a `tar xf` on a corrupt/truncated
+            # archive would have been caught elsewhere.
+            if [ ! -f /usr/data/nginx/sbin/nginx ]; then
+                printf "${red}  [FAIL] Nginx extraction failed (no sbin/nginx) — re-run the installer to retry.${white}\n"
+                _nginx_ok=2
+            fi
+        fi
+        if [ "$_nginx_ok" -eq 0 ]; then
             cat > /etc/init.d/S50nginx << 'NGINX_INIT_EOF'
 #!/bin/sh
 #
@@ -703,10 +758,6 @@ fi
 # kill pip cache to free up overlayfs
 rm -rf /root/.cache
 
-## bootstrap for ssl support
-wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
-chmod +x /tmp/curl
-
 # Resolve the latest published stable release dynamically instead of a hardcoded
 # pin. GitHub's /releases/latest API skips prereleases/drafts, so the nightly
 # builds from plain pushes to main don't count — only an actual tagged release
@@ -733,9 +784,20 @@ ASSET_URL="https://github.com/coreflake1/guppyscreen/releases/download/${PINNED_
 
 printf "${green} Downloading asset: $ASSET_NAME.tar.gz ${white}\n"
 
-# download/extract latest guppyscreen
-/tmp/curl -s -L $ASSET_URL -o /tmp/guppyscreen.tar.gz
-tar xf /tmp/guppyscreen.tar.gz -C /usr/data/
+# download/extract latest guppyscreen — this is the actual app binary the rest
+# of the installer depends on. A silent failure here (0-byte download, corrupt
+# extract) used to leave an upgrade's OLD binary in place while the later
+# "does it exist"/"does it start" checks below still passed against that
+# stale binary, so the installer would report full success having changed
+# nothing. Same failure mode the Moonraker download fix above addresses.
+if ! download_file "$ASSET_URL" /tmp/guppyscreen.tar.gz; then
+    printf "${red}Could not download the GuppyScreen release asset. Check your connection and re-run the installer.${white}\n"
+    exit 1
+fi
+if ! tar xf /tmp/guppyscreen.tar.gz -C /usr/data/; then
+    printf "${red}Failed to extract the GuppyScreen release asset (corrupt download?). Re-run the installer.${white}\n"
+    exit 1
+fi
 
 # substitute paths in guppyconfig.json
 if [ -f "$K1_GUPPY_DIR/debian/guppyconfig.json" ]; then
@@ -987,6 +1049,27 @@ section_defined_elsewhere() {   # $1 = literal header, e.g. "[axis_twist_compens
     return $_ret
 }
 
+# True if some ACTIVE config file (outside our managed GuppyScreen/ dir) reads
+# this section by name via a quoted printer[...] lookup, e.g.
+# printer["gcode_macro M600"]. Checked across EVERY active file, not just
+# whichever one defines the section - Klipper merges all [include]d files
+# into one config, so a real setup can easily have the section's definition
+# in one file and the macro that reads it in a completely different one
+# (this is a normal, common layout, not an edge case). Used by
+# replace_conflicting_cfg to decide whether a section is safe to comment out.
+section_referenced_elsewhere() {   # $1 = bare section name, e.g. "gcode_macro M600"
+    _refbare="$1"
+    _reflst="/tmp/.ke_active_ref.$$"
+    active_cfgs | sort -u | grep -v "/GuppyScreen/" > "$_reflst"
+    _refret=1
+    while IFS= read -r _rf; do
+        [ -f "$_rf" ] || continue
+        if grep -qE "[\"']${_refbare}[\"']" "$_rf" 2>/dev/null; then _refret=0; break; fi
+    done < "$_reflst"
+    rm -f "$_reflst"
+    return $_refret
+}
+
 # Back up an existing klippy/extras file once before we overwrite it — e.g. a TMC
 # Autotune or axis_twist module a user already installed via the Creality Helper
 # Script or by hand — so their original is recoverable from the backup dir.
@@ -1053,10 +1136,12 @@ install_cfg_guarded() {   # $1 = src path, $2 = dest filename, $3 = label
 # on by exact macro name - instead of skipping forever on a conflict, offer to safely
 # replace it: back up the conflicting file, comment out just the conflicting sections,
 # and install our version in their place. Only ever mutates if NOTHING comes back
-# "unsafe" (i.e. some OTHER macro in that same file reads printer["<section>"] /
-# printer['<section>'] at runtime - a sign of a genuinely working, self-contained
-# subsystem rather than a stray duplicate; blindly commenting there would leave those
-# other macros referencing something that no longer exists). Always asks first.
+# "unsafe" (i.e. some macro ANYWHERE in the active config - not just the same file -
+# reads printer["<section>"] / printer['<section>'] at runtime, via
+# section_referenced_elsewhere - a sign of a genuinely working, self-contained
+# subsystem rather than a stray duplicate; blindly commenting there would leave that
+# macro referencing something that no longer exists, even if the reader lives in a
+# completely different [include]d file than the definition). Always asks first.
 replace_conflicting_cfg() {   # $1=src path, $2=dest filename, $3=label, $4=backup-tag
     _rc_src="$1"; _rc_dest="$2"; _rc_label="$3"; _rc_tag="$4"
     _rc_secs=$(grep -oE '^\[[^]]+\]' "$_rc_src" 2>/dev/null | sort -u)
@@ -1105,23 +1190,36 @@ replace_conflicting_cfg() {   # $1=src path, $2=dest filename, $3=label, $4=back
         IFS="$_rc_oldifs"
         _rc_pat=$(printf '%s' "$_rc_sec" | sed 's/[][]/\\&/g')
         _rc_bare=$(printf '%s' "$_rc_sec" | sed 's/^\[//; s/\]$//')
-        active_cfgs | sort -u | grep -v "/GuppyScreen/" | while IFS= read -r _rc_f; do
+        # Checked once against every active file (not just whichever file
+        # defines the section) - a config that splits a macro's definition
+        # and its consumer across two separate [include]d files is a normal
+        # Klipper layout, and must not be misclassified as safe just because
+        # the defining file, in isolation, looks clean.
+        if section_referenced_elsewhere "$_rc_bare"; then
+            _rc_this_unsafe=1
+        else
+            _rc_this_unsafe=0
+        fi
+        _rc_deflst="/tmp/.ke_rc_def.$$"
+        active_cfgs | sort -u | grep -v "/GuppyScreen/" > "$_rc_deflst"
+        while IFS= read -r _rc_f; do
             [ -f "$_rc_f" ] || continue
             grep -qE "^[[:space:]]*$_rc_pat" "$_rc_f" 2>/dev/null || continue
-            if grep -qE "[\"']$_rc_bare[\"']" "$_rc_f" 2>/dev/null; then
+            if [ "$_rc_this_unsafe" -eq 1 ]; then
                 echo "$_rc_sec|$_rc_f" >> "$_rc_unsafe"
             else
                 echo "$_rc_sec|$_rc_f" >> "$_rc_safe"
             fi
-        done
+        done < "$_rc_deflst"
+        rm -f "$_rc_deflst"
         IFS='
 '
     done
     IFS="$_rc_oldifs"
 
     if [ -s "$_rc_unsafe" ]; then
-        printf "${yellow}  Found sections that are defined AND read by other macros in the\n"
-        printf "${yellow}  same file - that looks like a working, self-contained setup rather\n"
+        printf "${yellow}  Found sections that are read by a macro somewhere in your active\n"
+        printf "${yellow}  config - that looks like a working, self-contained setup rather\n"
         printf "${yellow}  than a stray duplicate, so nothing was changed:${white}\n"
         while IFS='|' read -r _rc_sec _rc_f; do
             printf "${yellow}    %s in %s${white}\n" "$_rc_sec" "$_rc_f"
@@ -1376,7 +1474,15 @@ else
             if grep -q "enable_object_processing" "$MK_CONF"; then
                 : # already set
             elif grep -q "^\[file_manager\]" "$MK_CONF"; then
-                printf "${yellow}  moonraker.conf has [file_manager] but no enable_object_processing — add 'enable_object_processing: True' under it for Exclude Object/adaptive mesh.${white}\n"
+                # [file_manager] already exists (true for this installer's own
+                # fresh-install template, and for virtually any pre-existing
+                # Moonraker/Helper-Script conf) — insert the option under the
+                # existing header instead of just printing a note, or Exclude
+                # Object/adaptive mesh silently never get their Moonraker-side
+                # gcode preprocessing on the single most common path.
+                cp "$MK_CONF" "$BACKUP_DIR/moonraker.conf.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+                sed -i '/^\[file_manager\]/a enable_object_processing: True' "$MK_CONF"
+                printf "${green}  Enabled object processing in moonraker.conf${white}\n"
             else
                 cp "$MK_CONF" "$BACKUP_DIR/moonraker.conf.bak-$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
                 printf '\n[file_manager]\nenable_object_processing: True\n' >> "$MK_CONF"
