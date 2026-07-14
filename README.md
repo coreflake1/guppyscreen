@@ -27,11 +27,14 @@ It bundles three things people usually hunt down separately:
 
 - 🖨️ **Print control & status** — temps, fans, LED, movement/homing, file browser (incl. USB sticks), Spoolman
 - 🟦 **Interactive 3D bed mesh** — rotate / zoom / pan colour height map (plus a table view)
-- 🎯 **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset baby-stepping, input-shaper & belt graphs
+- 🎯 **Guided Calibration hub** — a single numbered menu, in the order you actually need them: Axis
+  Twist, a combined Z-offset + bed mesh Recalibration Wizard, Input Shaper, E-Steps Calibration, Skew
+  Correction, TMC Autotune
 - 🎚️ **Fine-tune mid-print** — speed, flow, Z-offset, pressure advance (firmware retraction is its own panel)
 - 📷 **Camera** — persistent image tuning (contrast/saturation) on the stock camera
 - 🔔 **Buzzer beeps & songs** — real-pitch `M300`, `PLAY_TUNE` jingles (editable `songs.conf`), soft touchscreen click
-- 🔌 **Power-loss recovery**, **WiFi low-latency** toggle, on-screen notifications
+- 🔌 **Power-loss recovery**, reworked **WiFi** (grouped network list, Network Details, a rebuilt Static
+  IP screen) with a low-latency toggle, on-screen notifications
 - 🔒 **Print-state safety locks** — anything that could ruin a running job is blocked or asks first
 - 📐 Tuned **480×272** layout, with the screen mounted the right way up
 

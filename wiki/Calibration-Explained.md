@@ -66,11 +66,9 @@ saved automatically and survives reboots.
 
 Software can't fix loose hardware — it can only paper over it.
 
-- **Belts:** firm. A plucked belt should "thunk", not flap. Slack belts cause layer shift and ringing.
-  Don't trust your ear alone if you can help it — **Tune → Belts/Shake** on the screen has a **Shake
-  Belts** button that measures the actual resonance response of the left and right sides, which is far
-  more precise than plucking. If one side's graph looks noticeably different from the other, that belt
-  is looser. See [Belts/Shake](Using-GuppyKE#beltsshake) in the screen reference.
+- **Belts:** firm. A plucked belt should "thunk", not flap, and both sides should sound about the same
+  pitch — a noticeably lower/duller thunk on one side usually means that belt is looser. Slack belts
+  cause layer shift and ringing.
 - **Gantry:** square. The X bar should be parallel to the bed, not tilted.
 - **Bed level (rough, by hand):** if your bed screws are wildly uneven, the BLTouch probe and bed mesh
   can usually compensate — but a bed that's *very* far off makes the mesh work harder than it needs to,

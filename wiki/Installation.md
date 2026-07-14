@@ -90,6 +90,7 @@ What's on offer:
 | **Screws Tilt Adjust** | adds the `SCREWS_TILT_CALCULATE` bed-levelling helper | — |
 | **Creality Nebula camera** | image tuning that **sticks across reboots** | [guide](Camera-Image-Tuning) |
 | **Creality macros** | M600 filament change, **Save Z-Offset** (persists z-offset), useful macros (backup/PID/bed-level), Exclude Object | — |
+| **E-Steps Calibration** | guided mark-extrude-measure rotation-distance wizard | [guide](Calibration-Explained) |
 | **Pause/Resume layer-shift fix** | stops the bed crashing into the rail on resume (`y_park` 222→220) | [guide](Pause-Park-Layer-Shift-Fix) |
 
 > Some of these still need a **one-time calibration / slicer setup** afterward (the installer can't do the
@@ -99,17 +100,28 @@ What's on offer:
 > stock `y_park = 222`).
 
 > **About the Creality macros:** these used to come from the Creality Helper Script. **Save Z-Offset**,
-> **M600**, and **useful macros** redefine sections a stock or Helper-Script config may already own
-> (`[save_variables]`, `[filament_switch_sensor filament_sensor]`, `SET_GCODE_OFFSET`, `[idle_timeout]`,
-> the backup/restore/reload-camera macros). To avoid a duplicate-section crash, the installer checks
-> first — if none of those sections exist yet, you get OpenKE's own versions outright. If they're already
-> defined elsewhere (e.g. an existing Helper-Script setup), it **offers to safely replace them**: it
-> checks whether the existing sections are read by some *other* macro in that same file (a sign of a
-> genuinely working, self-contained setup, not a stray duplicate) — if so it leaves everything untouched;
+> **M600**, **useful macros**, and **E-Steps Calibration** redefine sections a stock or Helper-Script
+> config may already own (`[save_variables]`, `[filament_switch_sensor filament_sensor]`,
+> `SET_GCODE_OFFSET`, `[idle_timeout]`, the backup/restore/reload-camera macros, extruder
+> `rotation_distance` helpers). To avoid a duplicate-section crash, the installer checks first — if none
+> of those sections exist yet, you get OpenKE's own versions outright. If they're already defined
+> elsewhere (e.g. an existing Helper-Script setup), it **offers to safely replace them**: it checks
+> whether the existing sections are read *anywhere else in your active config* — not just the same
+> file, since a real setup can easily have a macro's definition in one `[include]`d file and whatever
+> reads or calls it in a completely different one — including a plain, unquoted gcode-command call from
+> another macro's body, not just a `printer[...]` lookup. If any reference turns up, it's a sign of a
+> genuinely working, self-contained setup, not a stray duplicate, and it leaves everything untouched;
 > otherwise, with your confirmation, it backs up the old file, comments out just the conflicting sections,
 > and installs OpenKE's version in their place. Say no to the prompt (or it detects a working setup) and
 > your existing macros keep running exactly as they were. Exclude Object also flips
-> `enable_object_processing` on in `moonraker.conf` when safe.
+> `enable_object_processing` on in `moonraker.conf` when safe — including inserting it under an existing
+> `[file_manager]` section, not just when that section is missing entirely.
+>
+> **Moonraker and Nginx are vendored by OpenKE directly** (a real clone of the official upstream
+> Moonraker, and the same nginx binary the community K1/KE lineage has used for a while) — the installer
+> no longer fetches either from the Creality Helper Script's repo at install time. Mainsail is also
+> registered with Moonraker's `update_manager` automatically, so it shows up in Mainsail's own "Machine
+> Update" panel instead of needing to be updated by hand.
 
 > **Restarting after changes:** the installer restarts Klipper for you. On the KE, the *first* restart
 > after a config change occasionally shuts down with a `serialqueue … NoneType` error — this is a harmless
@@ -118,14 +130,15 @@ What's on offer:
 > than one restart. See [Troubleshooting](Troubleshooting).
 
 **Coexists with the Creality Helper Script.** If you already set any of these up — by hand or via the
-Helper Script — the installer **detects it** and, for M600/Save Z-Offset/useful macros specifically,
-**offers to safely swap in OpenKE's own version** (see above) rather than just leaving the old one in
-place forever; everything else it skips adding a config section you already have (no duplicate-section
-crash), and it backs up any Klipper-extras module it overwrites (e.g. an existing TMC Autotune) to
-`/usr/data/guppyify-backup/` first. The everyday macros — `M600`/filament, Save Z-Offset, useful macros,
-`[exclude_object]` — are now **shipped by OpenKE** (the **Creality macros** option), so a fresh printer
-gets them outright; on a printer that already has them (e.g. an existing Helper-Script setup), M600,
-Save Z-Offset, and useful macros offer the safe-replace prompt, Exclude Object is skipped. Either way
+Helper Script — the installer **detects it** and, for M600/Save Z-Offset/useful macros/E-Steps
+Calibration specifically, **offers to safely swap in OpenKE's own version** (see above) rather than just
+leaving the old one in place forever; everything else it skips adding a config section you already have
+(no duplicate-section crash), and it backs up any Klipper-extras module it overwrites (e.g. an existing
+TMC Autotune) to `/usr/data/guppyify-backup/` first. The everyday macros — `M600`/filament, Save
+Z-Offset, useful macros, E-Steps Calibration, `[exclude_object]` — are now **shipped by OpenKE** (the
+**Creality macros** and **E-Steps Calibration** options), so a fresh printer gets them outright; on a
+printer that already has them (e.g. an existing Helper-Script setup), M600, Save Z-Offset, useful
+macros, and E-Steps Calibration offer the safe-replace prompt, Exclude Object is skipped. Either way
 it's safe to run on top of
 an existing setup — nothing is changed without either a clean "nothing conflicts" state or your explicit
 yes at the prompt.

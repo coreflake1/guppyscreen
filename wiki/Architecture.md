@@ -23,7 +23,7 @@
 Panels are gated by print state (`print_stats/state` is `printing` or `paused`):
 
 - **Blocked with a toast** mid-print (nothing useful to do): Homing, Extrude, Bed Mesh, Input Shaper,
-  Belts/Shake, TMC Autotune.
+  TMC Autotune.
 - **Confirm-with-override** mid-print: Console (per command), Macros (per run), Limits, Power.
 - **Always available** (designed for mid-print use): Fine Tune, Fan, LED, Print Status, file browsing.
 

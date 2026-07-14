@@ -356,16 +356,15 @@ behavior as the category list.
 
 ## Tune tab
 
-A **4-column × 3-row grid of icon buttons**. Tapping a button opens its sub-panel full-screen. Nothing
-is adjusted inline on this tab.
+An **8-tile grid of icon buttons** (4 columns × 2 rows). Tapping a button opens its sub-panel
+full-screen. Nothing is adjusted inline on this tab itself.
 
 ![Tune tab grid](images/tune-tab-grid.png)
 
 | Row | Col 1 | Col 2 | Col 3 | Col 4 |
 |---|---|---|---|---|
 | 1 | Fine Tune | Z Offset | Retraction | Limits |
-| 2 | Bed Mesh | Input Shaper | Axis Twist | Skew |
-| 3 | Belts/Shake | Power Settings | TMC Autotune | TMC Metrics |
+| 2 | Bed Mesh | Power Settings | TMC Metrics | Calibration |
 
 ### Fine Tune
 
@@ -487,7 +486,68 @@ actually works.
 - **Back** here returns you to the Table view, not out of Bed Mesh entirely — tap it again from the
   table to actually leave the panel.
 
-### Input Shaper
+### Power Settings
+
+![Power Settings panel](images/power-settings.png)
+
+| Section | What it does |
+|---|---|
+| **Power devices** | On/off buttons for any smart plugs or relays configured in Moonraker. **If none are configured, this section doesn't appear at all** — no placeholder text, it's just not there. |
+| **Power Loss Recovery** | Resume a print that was interrupted by a power cut. **Not automatic** — after power comes back, you have to open this screen yourself. It reads Creality's own saved print-state file to find something to resume, so it isn't a GuppyKE-invented feature; if that file is missing or stale, there's nothing to offer. Three things you might see here: (1) if a print is currently running, "A print is running. If power is lost, reopen this screen to resume." — that's the reminder of what to do; (2) if nothing is recoverable, "No interrupted print to recover."; (3) if something is recoverable, a **Resume** button (reheats and returns to the saved position — a real resume, not a restart) and a **Dismiss** button (clears the prompt without printing). If the saved position turns out invalid, it safely restarts the file from the beginning instead of crashing. |
+
+### TMC Metrics
+
+![TMC Metrics panel](images/tmc-metrics.png)
+
+The panel itself says it best: **"TMC Metrics is experimental and disabled by default."** There's a
+toggle at the top — it's off unless you turn it on (turning it on/off loads or unloads a separate
+Klipper diagnostics module, so there's a real reason it isn't always running).
+
+⚠️ **This is not just a read-only diagnostics screen.** Once enabled, each stepper shows a live graph
+(`sg_result`, `i_rms` in mA, and two other computed values — the panel doesn't explain what these mean
+beyond their names; the app's own advice is "refer to the TMC driver datasheet") plus **four adjustable
+values**: `toff` (0–15), `tbl` (0–3), `hstrt` (0–7), `hend` (0–15) — these are raw TMC chopper-timing
+register names. Tapping +/- on any of them sends the change to the driver **immediately, live** — it is
+not a preview you confirm afterward. There's no indication these persist across a restart on their own.
+
+Given the app's own "experimental" label and that these are low-level hardware timing values, don't
+adjust them unless you specifically know what you're doing (per the driver datasheet) — this isn't
+needed for normal printing or normal troubleshooting. If you suspect a driver issue, **TMC Autotune**
+(inside the **Calibration** hub below) is the supported way to tune your drivers.
+
+### Calibration
+
+![Calibration menu](images/calibration-menu.png)
+
+A single hub for every calibration routine, reached from the **Calibration** tile. Replaces what used
+to be four separate Tune-tab tiles (Input Shaper, Axis Twist, Skew, TMC Autotune) plus a since-retired
+Belts/Shake screen (mechanically dead-ended and no longer reachable from anywhere in the app). Opens as
+a numbered, scrollable list matching the order the [Calibration Explained](Calibration-Explained) guide
+recommends doing these in, followed by an unordered **Other** section for routine (non-calibration)
+tools:
+
+| # | Step | Opens |
+|---|---|---|
+| 1 | **Axis Twist** | Axis Twist Compensation wizard |
+| 2 | **Z-Offset & Bed Mesh** | The guided Recalibration Wizard |
+| 3 | **Input Shaper** | Input Shaper calibration |
+| 4 | **E-Steps Calibration** | The guided E-Steps wizard |
+| 5 | **Skew Correction** | Skew Correction |
+| 6 | **TMC Autotune** *(optional)* | TMC Autotune |
+| — | **Bed Mesh** *(Other)* | The same Bed Mesh panel as the Tune-tab tile above — view or re-mesh standalone without redoing the whole wizard |
+
+Tapping **Axis Twist** or **Skew Correction** when their Klipper config section isn't present shows a
+toast instead of opening the panel, same as before when they were their own tiles. Tapping any row
+while a print is running shows the usual "locked during print" notice instead of opening it.
+
+#### Z-Offset & Bed Mesh (Recalibration Wizard)
+
+The guided, combined replacement for doing Z-offset and bed-mesh calibration as two separate manual
+steps: paper-test (or BLTouch) Z-offset → automatic bed mesh → review/save, with an optional
+load-cell-assisted refine step along the way. Full walkthrough:
+[Calibration Explained](Calibration-Explained).
+
+#### Input Shaper
 
 ![Input Shaper panel](images/input-shaper.png)
 
@@ -515,14 +575,30 @@ Typical flow:
 > 💡 For the **Y axis** test: move the accelerometer to the **bed** (it must be on whatever moves for
 > that axis). Tape or zip-tie it on for the 1-minute test.
 
-### Axis Twist
+#### Axis Twist
 
 ![Axis Twist intro screen](images/axis-twist.png)
 
 Launches the 5-point calibration wizard for Axis Twist Compensation. Fixes first layers that are
 uneven left-to-right despite re-meshing. Full guide: [Axis Twist Compensation](Axis-Twist-Compensation).
 
-### Skew
+#### E-Steps Calibration
+
+![E-Steps Calibration panel](images/esteps-calibration.png)
+
+A guided version of the classic mark-extrude-measure rotation-distance calibration:
+
+1. Heats the extruder to a safe temperature for you.
+2. Marks the filament, then tap **Extrude** to push a fixed length through.
+3. Measure how far the mark actually moved (calipers or a ruler) and type it in on the numeric keypad.
+4. The panel computes and applies the corrected `rotation_distance` for you — no manual math.
+
+Auto-cancels if left idle for 2 minutes (e.g. mid-measurement) rather than leaving the extruder primed
+indefinitely. If the corrected value keeps changing significantly between repeat runs, that points to a
+hardware issue (extruder gears/tension), not something this calibration itself can fix. Full guide:
+[Calibration Explained](Calibration-Explained).
+
+#### Skew
 
 ![Skew Correction panel](images/skew-correction.png)
 
@@ -534,33 +610,7 @@ Corrects parts that come out as slight parallelograms instead of squares.
 
 Full guide: [Skew Correction](Skew-Correction).
 
-### Belts/Shake
-
-![Belts/Shake panel](images/belts-shake.png)
-
-Checks mechanical resonance to help compare left vs. right belt tension. Matched tension = cleaner
-prints. Two different buttons here do different things:
-
-- **Shake Belts** — the actual test. Homes automatically if needed, then runs a frequency sweep and
-  renders a graph above the controls comparing the belts' resonance response.
-- **Excite Frequency Control** — a slider (1.0–140.0 Hz) plus an axis dropdown (X/Y), paired with the
-  **Excitate** button. This does something different from Shake Belts: it continuously vibrates the
-  chosen axis at exactly the frequency you set, so you can listen or feel for a difference between the
-  belts by ear/touch, rather than reading a graph. If one belt sounds different when plucked or excited
-  this way, tighten the looser one.
-- **Stop** is a general emergency stop, same as elsewhere in the app — not specific to stopping the
-  shake/excite test.
-
-### Power Settings
-
-![Power Settings panel](images/power-settings.png)
-
-| Section | What it does |
-|---|---|
-| **Power devices** | On/off buttons for any smart plugs or relays configured in Moonraker. **If none are configured, this section doesn't appear at all** — no placeholder text, it's just not there. |
-| **Power Loss Recovery** | Resume a print that was interrupted by a power cut. **Not automatic** — after power comes back, you have to open this screen yourself. It reads Creality's own saved print-state file to find something to resume, so it isn't a GuppyKE-invented feature; if that file is missing or stale, there's nothing to offer. Three things you might see here: (1) if a print is currently running, "A print is running. If power is lost, reopen this screen to resume." — that's the reminder of what to do; (2) if nothing is recoverable, "No interrupted print to recover."; (3) if something is recoverable, a **Resume** button (reheats and returns to the saved position — a real resume, not a restart) and a **Dismiss** button (clears the prompt without printing). If the saved position turns out invalid, it safely restarts the file from the beginning instead of crashing. |
-
-### TMC Autotune
+#### TMC Autotune
 
 ![TMC Autotune panel](images/tmc-autotune.png)
 
@@ -571,28 +621,8 @@ Quieter, cooler, sometimes smoother steppers. Select motor type and a goal, tap 
 
 Settings are saved and reapplied every boot.
 
-> The button is **greyed out** until the TMC Autotune module is installed (the installer does this
-> during the print-quality mods step). Full guide: [TMC Autotune](TMC-Autotune).
-
-### TMC Metrics
-
-![TMC Metrics panel](images/tmc-metrics.png)
-
-The panel itself says it best: **"TMC Metrics is experimental and disabled by default."** There's a
-toggle at the top — it's off unless you turn it on (turning it on/off loads or unloads a separate
-Klipper diagnostics module, so there's a real reason it isn't always running).
-
-⚠️ **This is not just a read-only diagnostics screen.** Once enabled, each stepper shows a live graph
-(`sg_result`, `i_rms` in mA, and two other computed values — the panel doesn't explain what these mean
-beyond their names; the app's own advice is "refer to the TMC driver datasheet") plus **four adjustable
-values**: `toff` (0–15), `tbl` (0–3), `hstrt` (0–7), `hend` (0–15) — these are raw TMC chopper-timing
-register names. Tapping +/- on any of them sends the change to the driver **immediately, live** — it is
-not a preview you confirm afterward. There's no indication these persist across a restart on their own.
-
-Given the app's own "experimental" label and that these are low-level hardware timing values, don't
-adjust them unless you specifically know what you're doing (per the driver datasheet) — this isn't
-needed for normal printing or normal troubleshooting. If you suspect a driver issue, **TMC Autotune**
-(a separate, better-documented tile on this same grid) is the supported way to tune your drivers.
+> The row is **disabled** until the TMC Autotune module is installed (the installer does this during
+> the print-quality mods step). Full guide: [TMC Autotune](TMC-Autotune).
 
 ---
 
@@ -631,14 +661,72 @@ Opens from Settings → **WIFI**.
 
 ![WiFi panel](images/wifi-panel.png)
 
-| Control | What it does |
-|---|---|
-| **Network list** | Scans and shows available networks. Tap one to connect (prompts for password). Rescans automatically on open; tap the scan button to refresh. Your **current** network and any **previously-saved** networks show a small **✕** next to them — but it does two different things depending on which: on the currently-connected network, ✕ just **disconnects** (credentials stay saved); on any other saved-but-not-connected network, ✕ **permanently forgets** it (removes the saved credentials). |
-| **IP address** | Your printer's current local IP — shown once layer-3 is confirmed. Handy for accessing Mainsail from a new device. |
-| **Password entry** | Has an **eye-toggle** button to reveal/hide what you're typing. |
-| **Low Latency** | A toggle-style button (not a switch) that reads "Low Latency: ON/OFF". Disables WiFi power-save, idle sleep, background roam scans, and **Bluetooth**. The KE's WiFi and Bluetooth share one 2.4 GHz radio and antenna — leaving BT on (it's unused) makes WiFi yield to it periodically and stutter. Low Latency eliminates that. Persists across reboots. Turn off to re-enable Bluetooth. |
+Networks are grouped into two lists — **KNOWN NETWORKS** (anything with a saved password) and **OTHER
+NETWORKS IN RANGE** — each row showing 4 signal-strength bars derived from the scan's RSSI. Rescans
+automatically on open; scan results are merged across scans (a network has to miss 3 scans in a row
+before it's dropped) so the list doesn't visibly reshuffle or shrink between scans the way a
+clear-and-redraw would.
+
+Each row's tap targets are different depending on what it is — this was a deliberate fix (an earlier
+layout packed a status icon and an edit icon into two adjacent narrow columns, and a mistap between
+them could delete a saved password instead of opening network settings):
+
+| Row type | Tapping the row body | Extra affordance |
+|---|---|---|
+| **Connected network** | Opens [Network Details](#network-details-panel) | A chevron (**›**) on the right — purely a visual hint, the whole row does the same thing |
+| **Known, not connected** | Reconnects to it | A separately-spaced **✕** box — tap to **forget** it (asks you to confirm first; this deletes the saved password) |
+| **Not known (in range only)** | Prompts for a password to connect | *(none)* |
+
+**Password entry** has an **eye-toggle** button to reveal/hide what you're typing.
+
+**Low Latency** is a compact link near the bottom (not a screen-dominating control) that reads "Low
+Latency: ON/OFF". Disables WiFi power-save, idle sleep, background roam scans, and **Bluetooth**. The
+KE's WiFi and Bluetooth share one 2.4 GHz radio and antenna — leaving BT on (it's unused) makes WiFi
+yield to it periodically and stutter. Low Latency eliminates that. Persists across reboots. Turn off to
+re-enable Bluetooth.
 
 > If Mainsail feels laggy, the camera stutters, or tap response feels slow — enable **Low Latency** first.
+
+---
+
+## Network Details panel
+
+Reached by tapping the connected network's row (or its chevron) in the WiFi panel.
+
+![Network Details panel](images/network-details-panel.png)
+
+An info card (**Signal**, **Security**, **IP address**) for the connected network, plus two clearly
+labelled buttons:
+
+- **Configure Static IP** — opens the [Static IP panel](#static-ip-panel) below.
+- **Forget This Network** (red outline) — deletes the saved password for this network. Same destructive
+  action as the ✕ on a known-but-unconnected row in the WiFi panel, just reached from here instead.
+
+**Back** returns to the WiFi panel.
+
+---
+
+## Static IP panel
+
+Reached from Network Details → **Configure Static IP**.
+
+![Static IP panel](images/static-ip-panel.png)
+
+Titled **"Static IP - `<network name>`"** — the config applies to that specific saved network, not
+globally. **DHCP** / **Manual** is a plain view switch at the top (tapping between them doesn't change
+anything on its own — it just shows different controls).
+
+**Manual** view: 4 address rows — **IP**, **Netmask**, **Gateway**, **DNS** — each entered as **4
+separate tap-sized octet boxes** (not one free-text field). Typing an invalid value (outside 0–255)
+flags that box red immediately, in place, rather than only failing when you try to save.
+
+- **✓ Save** is pinned outside the scrollable field area, so it's always reachable and can never scroll
+  out of view.
+- Already have a static config? A **Revert to DHCP** button appears — a separate, explicit action (with
+  its own Revert/Cancel confirmation) rather than something that happens as a side effect of switching
+  back to the DHCP tab.
+
+**Back** returns to Network Details.
 
 ---
 

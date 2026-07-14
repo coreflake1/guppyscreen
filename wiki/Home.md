@@ -44,11 +44,13 @@ your problem:
 - Print status & control, with MCU temp on the print screen (plus chamber temp, if you've configured a
   chamber sensor)
 - **Interactive 3D bed mesh** — colour height map you can rotate/zoom/pan (plus a table view)
-- **On-screen calibration suite** — Axis Twist wizard, Skew Correction, TMC Autotune, live Z-offset
-  baby-stepping (down to 0.001 mm), input-shaper & belt graphs
-- **Fine-tune mid-print** — speed, flow, Z-offset, pressure advance, firmware retraction
+- **Guided Calibration hub** — a single numbered menu, in the order you actually need them: Axis Twist,
+  a combined Z-offset + bed mesh Recalibration Wizard, Input Shaper, E-Steps Calibration, Skew
+  Correction, TMC Autotune
+- **Fine-tune mid-print** — speed, flow, Z-offset (down to 0.001 mm), pressure advance, firmware retraction
 - File browser (incl. USB sticks), macro/console shell, Spoolman, TMC metrics
-- **WiFi Low-Latency toggle** — snappier Mainsail/screen (power-save off, roam off, Bluetooth off)
+- **Reworked WiFi** — grouped network list, a Network Details screen, a rebuilt Static IP screen, and a
+  Low-Latency toggle (snappier Mainsail/screen — power-save off, roam off, Bluetooth off)
 - **Buzzer beeps & songs** — real-pitch `M300`, `PLAY_TUNE` jingles, and a soft touchscreen click ([Beeps & songs](Buzzer-and-Sounds))
 - **Print-state safety locks** — anything that could wreck a running job is blocked or asks first
 - Power-loss recovery, and a 480×272 layout tuned for the KE (screen the right way up)
