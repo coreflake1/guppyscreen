@@ -40,10 +40,23 @@ else
     asset_url=`jq -r --arg n "$ASSET_NAME" '[.[] | select(.prerelease == false)][0].assets[] | select(.name == $n).browser_download_url' /tmp/guppy-releases.json`
     echo "Downloading latest version $latest_version, $asset_url"
     $CURL -L "$asset_url" -o /tmp/guppyscreen.tar.gz
+    _curl_rc=$?
+    # A mid-transfer failure (TLS reset, dropped connection, ...) can still
+    # leave a partial file on disk, and this had NO check at all before -
+    # straight into tar on whatever showed up. Same class of bug found and
+    # fixed in installer.sh's download_file() against a real v1.4.0 report;
+    # this script has its own separate download path with the same gap.
+    if [ "$_curl_rc" -ne 0 ] || [ ! -s /tmp/guppyscreen.tar.gz ]; then
+        echo "Download failed or produced an empty/corrupt file - aborting before touching the existing install."
+        exit 1
+    fi
 fi
 
 ## override existing guppyscreen
-tar xf /tmp/guppyscreen.tar.gz -C $GUPPY_DIR/..
+if ! tar xf /tmp/guppyscreen.tar.gz -C $GUPPY_DIR/..; then
+    echo "Failed to extract the downloaded update (corrupt download?) - aborting, existing install untouched."
+    exit 1
+fi
 
 ## Re-sync helper scripts (installer.sh does this on a fresh install, but an
 ## in-place OTA update never re-runs the installer, so new/changed .py/.cfg
