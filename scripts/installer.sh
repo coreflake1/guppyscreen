@@ -37,7 +37,13 @@ download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
         # User-Agent is required by the GitHub API (a request without one gets a
         # flat 403) and harmless for the other download targets this helper hits.
         wget -q --no-check-certificate --header="User-Agent: OpenKE-Installer" "$_url" -O "$_dest"
-        [ -s "$_dest" ] && return 0
+        _dl_rc=$?
+        # Must check wget's own exit status, not just "did a file appear" - a
+        # mid-transfer TLS reset can still leave a partial, non-empty file on
+        # disk (wget writes as it streams), which silently passed `-s` alone
+        # and made this whole retry/fallback dance never actually fire - found
+        # via a real user hitting exactly this on v1.4.0's release download.
+        [ "$_dl_rc" -eq 0 ] && [ -s "$_dest" ] && return 0
         _n=$((_n + 1))
         printf "${yellow}  Download failed (attempt ${_n}/${_tries}), retrying...${white}\n"
         sleep 2
@@ -48,8 +54,11 @@ download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
         wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
         chmod +x /tmp/curl
     fi
-    [ -x /tmp/curl ] && /tmp/curl -s -L -H "User-Agent: OpenKE-Installer" "$_url" -o "$_dest"
-    [ -s "$_dest" ] && return 0
+    if [ -x /tmp/curl ]; then
+        /tmp/curl -s -L -H "User-Agent: OpenKE-Installer" "$_url" -o "$_dest"
+        _dl_rc=$?
+        [ "$_dl_rc" -eq 0 ] && [ -s "$_dest" ] && return 0
+    fi
     return 1
 }
 
