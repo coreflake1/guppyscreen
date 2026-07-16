@@ -30,13 +30,16 @@ This project builds on the work of:
 - [prestonbrown/guppyscreen](https://github.com/prestonbrown/guppyscreen) — 3D bed mesh feature
 - [Moonraker](https://github.com/Arksine/moonraker), [Mainsail](https://github.com/mainsail-crew/mainsail),
   [Klippain-shaketune](https://github.com/Frix-x/klippain-shaketune)
-- [nginx](https://nginx.org/) — vendored MIPS binary (1.17.7), serves the optional Mainsail web UI
+- [nginx](https://nginx.org/) — vendored MIPS binary (1.29.3), serves the optional Mainsail web UI.
+  Cross-compiled from real nginx source by `scripts/build-nginx-mipsel.sh`, not a copied prebuilt
+  binary — see [`docs/VENDORING.md`](../docs/VENDORING.md) for how to rebuild it against a newer
+  version.
 - [Guilouz/Creality-Helper-Script](https://github.com/Guilouz/Creality-Helper-Script) — the
   `useful-macros.cfg`/`M600-support.cfg`/`save-zoffset.cfg` templates are modeled on theirs. Moonraker
   and Nginx were originally fetched from their repo at install time too, but are now vendored directly
-  by OpenKE instead (a real clone of the official upstream Moonraker, and the same nginx binary already
-  in production — not rebuilds, just no longer install-time-dependent on that repo staying online). As
-  of this vendoring, the installer has no remaining runtime dependency on Guilouz's repo for anything.
+  by OpenKE instead (a real clone of the official upstream Moonraker, and a from-source rebuild of
+  nginx — no longer install-time-dependent on that repo staying online). As of this vendoring, the
+  installer has no remaining runtime dependency on Guilouz's repo for anything.
 - [kyleisah/Klipper-Adaptive-Meshing-Purging](https://github.com/kyleisah/Klipper-Adaptive-Meshing-Purging) —
   `Smart_Park.cfg`/`Line_Purge.cfg` are still adapted from KAMP (GPL-3.0); the adaptive-mesh macro itself
   is now original OpenKE code delegating to Klipper's own native adaptive meshing, no longer vendored KAMP
