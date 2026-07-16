@@ -24,24 +24,10 @@ The GitHub Wiki maps a file like `Calibration-Explained.md` to the page URL `…
 - **`_Sidebar.md`** is the left-hand navigation. **`Home.md`** is the wiki landing page.
 - Use dashes in filenames; spaces in the page title (the `# H1`) are fine.
 
-## Publishing — manual method (works today)
+## Publishing — CI (enabled; this is how it actually happens)
 
-```sh
-# one-time: clone the wiki repo (must have at least one page created via the Wiki tab first)
-git clone https://github.com/coreflake1/guppyscreen.wiki.git /tmp/guppyke-wiki
-
-# each publish:
-cp wiki/*.md /tmp/guppyke-wiki/
-cd /tmp/guppyke-wiki
-git add -A && git commit -m "Sync wiki from main@<short-sha>" && git push
-```
-
-> GitHub requires the wiki to have **one initial page** (create any page once from the Wiki tab) before
-> `.wiki.git` exists to clone.
-
-## Publishing — opt-in CI (recommended once the wiki exists)
-
-Drop this in `.github/workflows/wiki.yml` to auto-sync on every push to `main` that touches `wiki/`:
+`.github/workflows/wiki.yml` auto-syncs `wiki/` to the live GitHub Wiki on every push to **`main`**
+that touches `wiki/**`:
 
 ```yaml
 name: Publish wiki
@@ -63,5 +49,21 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-It's intentionally **not enabled yet** — turn it on after the Wiki tab has its first page, and after a
-manual sync has confirmed the pages render correctly. Until then, use the manual method above.
+**Wiki edits made on `ke-next` (or any other branch) don't reach the public Wiki tab until that
+branch actually merges into `main`** — normally at the next release cut. Nothing needs to be run by
+hand; just make sure `wiki/` changes are actually included in that merge.
+
+## Publishing — manual method (fallback only)
+
+Only needed if the CI workflow is ever broken/disabled, or for a one-off sync outside of a `main`
+push:
+
+```sh
+# one-time: clone the wiki repo (must have at least one page created via the Wiki tab first)
+git clone https://github.com/coreflake1/guppyscreen.wiki.git /tmp/guppyke-wiki
+
+# each publish:
+cp wiki/*.md /tmp/guppyke-wiki/
+cd /tmp/guppyke-wiki
+git add -A && git commit -m "Sync wiki from main@<short-sha>" && git push
+```
