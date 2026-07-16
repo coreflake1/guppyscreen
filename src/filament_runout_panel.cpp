@@ -19,14 +19,24 @@ static const int RUNOUT_LOAD_FEED = 300;
 static const char *RUNOUT_BTNS_IDLE[]    = {"Load", "Continue", "Cancel", ""};
 static const char *RUNOUT_BTNS_LOADING[] = {"Stop", "Continue", "Cancel", ""};
 
-FilamentRunoutPanel::FilamentRunoutPanel(KWebSocketClient &websocket_client, std::mutex &lock)
+FilamentRunoutPanel::FilamentRunoutPanel(KWebSocketClient &websocket_client, std::mutex &lock,
+  std::function<bool()> is_prompt_visible)
   : NotifyConsumer(lock)
   , ws(websocket_client)
   , mbox(NULL)
   , baselined(false)
   , last_detected(true)
+  , is_prompt_visible_fn(std::move(is_prompt_visible))
 {
   ws.register_notify_update(this);
+  // Needed for the M600 hand-off: a "!! " reported here while M600's own
+  // prompt still isn't visible and filament's still missing means its
+  // sequence failed partway through (see class comment in the header).
+  ws.register_method_callback(
+    "notify_gcode_response",
+    "FilamentRunoutPanel",
+    [this](json &d) { consume(d); }
+  );
 
 #ifdef SIMULATOR
   // no printer in the sim: pop the dialog once so it can be inspected
@@ -147,6 +157,24 @@ void FilamentRunoutPanel::finish_load() {
 void FilamentRunoutPanel::consume(json &j) {
   std::lock_guard<std::mutex> lock(lv_lock);
 
+  // notify_gcode_response lines arrive here too (params[0] is a plain string,
+  // not a status-update object - distinguish on that). Only meaningful while
+  // waiting on M600: a reported "!! " error while its own prompt still isn't
+  // up and filament's still missing means M600's sequence (retract/move/
+  // unload, before it reaches its own prompt_show) genuinely failed - step in
+  // as the fallback. Any other gcode response is irrelevant here.
+  auto &resp_line = j["/params/0"_json_pointer];
+  if (resp_line.is_string()) {
+    if (pending_m600_fallback && !filament_present() && !is_prompt_visible_fn()) {
+      std::string resp = resp_line.get<std::string>();
+      if (resp.rfind("!! ", 0) == 0) {
+        pending_m600_fallback = false;
+        show();
+      }
+    }
+    return;
+  }
+
   // A Cancel is in flight: as soon as the printer actually leaves printing/
   // paused, the cancel has taken effect, so tear down the "Cancelling print..."
   // dialog. (Closing here rather than from the button event also avoids the
@@ -155,8 +183,16 @@ void FilamentRunoutPanel::consume(json &j) {
     close();
   }
 
+  // M600's own prompt made it on screen - its job is done, stop watching for
+  // a fallback regardless of what happens to the dialog afterward (e.g. the
+  // user tapping M600's own Ignore button later shouldn't re-trigger this).
+  if (pending_m600_fallback && is_prompt_visible_fn()) {
+    pending_m600_fallback = false;
+  }
+
   if (!baselined) {
-    // discover the sensor + its current reading from full state, fire nothing
+    // discover the sensor + its current reading, and whether M600 is
+    // installed (see class comment in the header), from full state.
     auto ps = State::get_instance()->get_data("/printer_state"_json_pointer);
     if (ps.is_object()) {
       for (auto &el : ps.items()) {
@@ -166,7 +202,8 @@ void FilamentRunoutPanel::consume(json &j) {
           if (el.value()["filament_detected"].is_boolean()) {
             last_detected = el.value()["filament_detected"].template get<bool>();
           }
-          break;
+        } else if (el.key() == "gcode_macro M600") {
+          has_m600_macro = true;
         }
       }
     }
@@ -193,7 +230,17 @@ void FilamentRunoutPanel::consume(json &j) {
   last_detected = det;
   // runout: only matters mid-print and while the sensor is enabled
   if (!det && enabled && printing_or_paused()) {
-    show();
+    if (has_m600_macro) {
+      // M600's own runout_gcode will pause and show its own prompt for this
+      // same event - give it the chance instead of stacking a second dialog
+      // (see class comment in the header). consume() steps in as a fallback
+      // only if M600's sequence genuinely fails partway through.
+      pending_m600_fallback = true;
+    } else {
+      show();
+    }
+  } else if (det) {
+    pending_m600_fallback = false;  // filament's back; nothing left to watch for
   }
 }
 

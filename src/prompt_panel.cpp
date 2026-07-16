@@ -25,7 +25,7 @@ PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
 {
   // PROMPT PANEL
   lv_obj_center(prompt_cont);
-  lv_obj_set_size(prompt_cont, lv_pct(60), lv_pct(90));
+  lv_obj_set_size(prompt_cont, lv_pct(92), lv_pct(90));
   lv_obj_set_style_border_width(prompt_cont, 2, 0);
   lv_obj_set_style_border_color(prompt_cont, lv_palette_main(LV_PALETTE_GREY), 0);
   lv_obj_set_style_radius(prompt_cont, 16, 0);
@@ -46,10 +46,14 @@ PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
   lv_obj_set_grid_cell(footer_cont, LV_GRID_ALIGN_STRETCH, 0, 1, LV_GRID_ALIGN_END, 2, 1);
 
   // HEADER
+  // Larger than the body text (which uses the default font) so the title
+  // actually reads as a title - previously both were the same size, no
+  // visual hierarchy at all between "what this is" and "what it says".
   lv_label_set_long_mode(header, LV_LABEL_LONG_SCROLL_CIRCULAR);
+  lv_obj_set_style_text_font(header, &lv_font_montserrat_20, 0);
   lv_obj_set_style_text_align(header, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_pad_all(header, 0, 0);
-  lv_obj_set_style_pad_bottom(header, 4, 0);
+  lv_obj_set_style_pad_bottom(header, 8, 0);
   lv_obj_set_style_border_width(header, 2, 0);
   lv_obj_set_style_border_side(header, LV_BORDER_SIDE_BOTTOM, 0);
   lv_obj_set_style_border_color(header, lv_palette_main(LV_PALETTE_GREY), 0);
@@ -66,8 +70,17 @@ PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
   lv_obj_set_style_border_width(body_cont, 2, 0);
   lv_obj_set_style_border_side(body_cont, LV_BORDER_SIDE_BOTTOM, 0);
   lv_obj_set_style_border_color(body_cont, lv_palette_main(LV_PALETTE_GREY), 0);
+  // Main axis SPACE_EVENLY, not START: body_cont's height is whatever's left
+  // over in prompt_cont's fixed-height grid after the header/footer take
+  // their own content height, and that leftover varies with how much text/
+  // how many buttons a given prompt has. Top-packing (START) let all of that
+  // leftover space silently pool below the buttons as dead space at the
+  // bottom of the card. SPACE_EVENLY splits it into 3 equal gaps - above the
+  // text, between the text and the buttons, and below the buttons (down to
+  // body_cont's own bottom border) - so the gap above the button row matches
+  // the gap below it exactly, not just "some breathing room somewhere."
   lv_obj_set_flex_flow(body_cont, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(body_cont, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
+  lv_obj_set_flex_align(body_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START);
 
 #ifdef DEBUG_BOXES
   lv_obj_set_style_border_width(body_cont, 2, 0);
@@ -76,8 +89,13 @@ PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
 #endif
 
   // BODY TEXT
+  // Centered to match style_lock_mbox's convention (title+body+buttons all
+  // centered) - this panel is a bespoke layout (an arbitrary, dynamically-
+  // sized button count can't use a plain lv_msgbox's fixed btnmatrix) but
+  // should still look like the rest of the app's dialogs, not a one-off.
   lv_obj_set_width(body, LV_PCT(100));
   lv_obj_set_style_pad_all(body, 0, 0);
+  lv_obj_set_style_text_align(body, LV_TEXT_ALIGN_CENTER, 0);
   lv_label_set_long_mode(body, LV_LABEL_LONG_WRAP);
 
 #ifdef DEBUG_BOXES
@@ -87,11 +105,22 @@ PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
 #endif
 
   // BUTTONS
+  // Secondary buttons: a single row, all equal width via flex_grow (set per-
+  // button in consume(), same treatment applied to footer_cont's buttons
+  // below - keeps both rows visually consistent), label wraps to 2 lines
+  // inside the button if needed. Deliberately NOT wrap-to-next-row: this
+  // renders arbitrary Klipper action:prompt content (any macro, not just
+  // M600), and a predictable equal-width grid looks intentional regardless
+  // of label length, instead of an uneven layout where one long label gets
+  // pushed to its own stretched-full-width row under a normal two-up row
+  // above it. Tradeoff: many buttons (5+) would get uncomfortably narrow
+  // rather than wrapping to a second row - acceptable for realistic prompt
+  // button counts.
   lv_obj_set_style_pad_all(button_cont, 0, 0);
   lv_obj_set_style_pad_top(button_cont, 4, 0);
   lv_obj_set_style_pad_column(button_cont, 8, 0);
   lv_obj_set_style_pad_row(button_cont, 8, 0);
-  lv_obj_set_flex_flow(button_cont, LV_FLEX_FLOW_ROW_WRAP);
+  lv_obj_set_flex_flow(button_cont, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(button_cont, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
   lv_obj_set_size(button_cont, LV_PCT(100), LV_SIZE_CONTENT);
   lv_obj_clear_flag(button_cont, LV_OBJ_FLAG_SCROLLABLE);
@@ -103,11 +132,14 @@ PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
 #endif
 
   // FOOTER
+  // Same equal-width grid treatment as the secondary buttons above (grown in
+  // consume()) - keeps both button rows visually consistent instead of one
+  // filling the row edge-to-edge and the other left-packed with dead space.
   lv_obj_set_height(footer_cont, LV_SIZE_CONTENT);
   lv_obj_set_width(footer_cont, LV_PCT(100));
   lv_obj_set_flex_flow(footer_cont, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(footer_cont,
-    LV_FLEX_ALIGN_START,
+    LV_FLEX_ALIGN_SPACE_EVENLY,
     LV_FLEX_ALIGN_CENTER,
     LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_all(footer_cont, 0, 0);
@@ -156,6 +188,10 @@ void PromptPanel::foreground() {
 void PromptPanel::background() {
   lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
   lv_obj_move_background(prompt_cont);
+}
+
+bool PromptPanel::is_visible() const {
+  return !lv_obj_has_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
 }
 
 void PromptPanel::on_button_click(lv_event_t *e) {
@@ -252,6 +288,14 @@ void PromptPanel::consume(json &j) {
     auto *lbl = lv_label_create(b);
     lv_label_set_text(lbl, label.c_str());
     lv_obj_center(lbl);
+
+    // Equal-width grid (see button_cont/footer_cont's own comments above):
+    // grow to share the row, wrap the label to 2 lines within the button
+    // instead of letting a long label force it onto its own row.
+    lv_obj_set_flex_grow(b, 1);
+    lv_label_set_long_mode(lbl, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(lbl, LV_PCT(100));
+    lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
 
     b->user_data = new std::string(gcode);
     lv_obj_add_event_cb(b, PromptPanel::on_button_click, LV_EVENT_CLICKED, this);

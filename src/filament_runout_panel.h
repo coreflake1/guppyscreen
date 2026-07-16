@@ -5,6 +5,7 @@
 #include "websocket_client.h"
 #include "notify_consumer.h"
 
+#include <functional>
 #include <mutex>
 #include <string>
 
@@ -13,9 +14,19 @@
 // in stoppable chunks and toggles its label Load <-> Stop while feeding; the
 // others are Continue (re-checks the sensor, then RESUME) and Cancel
 // (CANCEL_PRINT).
+//
+// If the M600 macro (Creality macros' filament-change support) is installed,
+// its own runout_gcode already pauses and shows a Klipper action:prompt for
+// the same runout event this panel watches - showing both stacks two dialogs
+// on top of each other. When M600 is present, this panel stays quiet and
+// waits: only if M600's sequence genuinely fails partway through (a reported
+// "!! " gcode error while its own prompt still isn't up and filament's still
+// missing) does this panel step in as a fallback, so a real failure never
+// leaves the screen with nothing to tap.
 class FilamentRunoutPanel : public NotifyConsumer {
  public:
-  FilamentRunoutPanel(KWebSocketClient &ws, std::mutex &lock);
+  FilamentRunoutPanel(KWebSocketClient &ws, std::mutex &lock,
+    std::function<bool()> is_prompt_visible);
   ~FilamentRunoutPanel();
 
   void consume(json &j);
@@ -47,6 +58,14 @@ class FilamentRunoutPanel : public NotifyConsumer {
   bool baselined;
   std::string fil_key;               // "filament_switch_sensor <name>" or ""
   bool last_detected;
+
+  // M600 hand-off: set true if a "gcode_macro M600" object exists at baseline
+  // (see class comment above). While true, a runout sets pending_m600_fallback
+  // instead of showing immediately, and consume() only shows this panel's own
+  // dialog if M600's own prompt genuinely never shows up.
+  bool has_m600_macro = false;
+  bool pending_m600_fallback = false;
+  std::function<bool()> is_prompt_visible_fn;
 
   bool load_active = false;          // chunked feed in progress
   bool load_stop = false;            // set to halt the feed after the in-flight chunk

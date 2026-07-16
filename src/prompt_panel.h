@@ -17,6 +17,10 @@ class PromptPanel : public NotifyConsumer {
         void consume(json &j);
         void foreground();
         void background();
+        // True while a Klipper action:prompt is on screen (between prompt_show
+        // and prompt_end) - lets other panels avoid popping their own dialog on
+        // top of one Klipper's own macros are already showing.
+        bool is_visible() const;
 
     private:
         static void on_button_click(lv_event_t *e);

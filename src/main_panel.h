@@ -36,6 +36,7 @@ class MainPanel : public NotifyConsumer {
   void subscribe();
   PrinterTunePanel& get_tune_panel();
   void enable_spoolman();
+  bool is_prompt_visible() const { return prompt_panel.is_visible(); }
   
   void create_panel();
   void create_sensors(json &temp_sensors);

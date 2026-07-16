@@ -38,7 +38,7 @@ GuppyScreen::GuppyScreen()
   , main_panel(ws, lv_lock, spoolman_panel)
   , init_panel(main_panel, main_panel.get_tune_panel().get_bedmesh_panel(), lv_lock)
   , notification_manager(ws, lv_lock)
-  , filament_runout_panel(ws, lv_lock)
+  , filament_runout_panel(ws, lv_lock, [this]() { return main_panel.is_prompt_visible(); })
 {
   main_panel.create_panel();
 }
