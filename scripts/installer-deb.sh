@@ -215,6 +215,22 @@ if [ "$ARCH" = "aarch64" ]; then
     fi
 
     curl -s -L $ASSET_URL -o /tmp/guppyscreen.tar.gz
+    # This script has no download-verification at all (unlike installer.sh's
+    # download_file()) - check at least that something non-empty arrived
+    # before wiping anything, so a failed download can't turn a working
+    # install into a broken one. A prior corrupt/truncated extraction can
+    # leave one of these directories mistyped as a plain file on disk, which
+    # tar refuses to overwrite ("File exists" / "Not a directory") -
+    # permanently blocking every future install/upgrade attempt otherwise.
+    # Same fix as installer.sh's GuppyScreen asset extraction (found on a
+    # real user's printer, 2026-07-16). These are entirely packaged content
+    # the archive fully recreates every run - deliberately NOT touching
+    # guppyconfig.json, which must survive an upgrade.
+    if [ ! -s /tmp/guppyscreen.tar.gz ]; then
+        echo "Could not download the GuppyScreen release asset. Check your connection and re-run the installer."
+        exit 1
+    fi
+    rm -rf "$GUPPY_DIR/k1_mods" "$GUPPY_DIR/scripts" "$GUPPY_DIR/themes" "$GUPPY_DIR/debian"
     tar xf /tmp/guppyscreen.tar.gz -C ${HOME}
 
     has_moonraker

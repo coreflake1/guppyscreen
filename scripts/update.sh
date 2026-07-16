@@ -53,6 +53,15 @@ else
 fi
 
 ## override existing guppyscreen
+# A prior corrupt/truncated extraction can leave one of these directories
+# mistyped as a plain file on disk, which tar refuses to overwrite ("File
+# exists" / "Not a directory") - permanently blocking every future update
+# otherwise, even once the download itself succeeds cleanly. Same fix as
+# installer.sh's GuppyScreen asset extraction (found on a real user's printer,
+# 2026-07-16). These four are entirely packaged content the archive fully
+# recreates every run - deliberately NOT touching guppyconfig.json/thumbnails/
+# etc, which must survive an update.
+rm -rf "$GUPPY_DIR/k1_mods" "$GUPPY_DIR/scripts" "$GUPPY_DIR/themes" "$GUPPY_DIR/debian"
 if ! tar xf /tmp/guppyscreen.tar.gz -C $GUPPY_DIR/..; then
     echo "Failed to extract the downloaded update (corrupt download?) - aborting, existing install untouched."
     exit 1

@@ -288,6 +288,15 @@ if [ ! -d "$MOONRAKER_INSTALL_DIR" ] || [ ! -f "$MOONRAKER_INIT" ]; then
         exit 1
     fi
     printf "${green}  Installing Moonraker...${white}\n"
+    # This whole block only runs when Moonraker isn't already properly
+    # installed (missing dir OR missing init script - see the gate above), so
+    # there's never a healthy install to preserve here. Wipe any stale/partial
+    # leftover first - a prior corrupt/truncated extraction can leave a
+    # directory mistyped as a plain file, which tar refuses to overwrite
+    # ("File exists" / "Not a directory"), permanently blocking every future
+    # re-run otherwise (same class of bug found in the GuppyScreen asset
+    # extraction below, 2026-07-16).
+    rm -rf "$MOONRAKER_INSTALL_DIR"
     if ! tar xf /tmp/moonraker.tar.gz -C /usr/data/; then
         printf "${red}  [FAIL] Moonraker archive was corrupt/incomplete — check your network and re-run the installer.${white}\n"
         rm -f /tmp/moonraker.tar.gz
@@ -546,6 +555,15 @@ if [ "$_nginx_ok" -eq 0 ] || [ "$_mainsail_ok" -eq 0 ]; then
         fi
         if [ "$_nginx_ok" -eq 0 ]; then
             printf "${green}  Installing Nginx...${white}\n"
+            # This block only runs when nginx's init script is missing (see
+            # the gate above), so there's never a healthy install to preserve
+            # here. Wipe any stale/partial leftover first - a prior corrupt/
+            # truncated extraction can leave a directory mistyped as a plain
+            # file, which tar refuses to overwrite ("File exists" / "Not a
+            # directory"), permanently blocking every future re-run otherwise
+            # (same class of bug found in the GuppyScreen asset extraction
+            # above, 2026-07-16).
+            rm -rf /usr/data/nginx
             tar xf /tmp/nginx.tar.gz -C /usr/data/
             rm -f /tmp/nginx.tar.gz
             # Same idea as Mainsail's index.html check below — verify the
@@ -693,6 +711,16 @@ NGINX_CONF_EOF
                 _mainsail_ok=2
             else
                 printf "${green}  Installing Mainsail...${white}\n"
+                # Same class of bug as the tar sites above: Python's
+                # zipfile.extractall() also refuses to create a directory
+                # where a plain file already exists (raises FileExistsError/
+                # NotADirectoryError, uncaught here), so a prior corrupt/
+                # partial extraction blocks every future re-run identically
+                # forever. Wiped only now, after a confirmed-successful
+                # download - not before attempting it - so a download failure
+                # can't turn a partially-there install into a fully-gone one.
+                rm -rf /usr/data/mainsail
+                mkdir -p /usr/data/mainsail
                 python3 -c "import zipfile; zipfile.ZipFile('/tmp/mainsail.zip').extractall('/usr/data/mainsail/')"
                 rm -f /tmp/mainsail.zip
                 # zipfile.extractall() falls back to the umask-masked default
@@ -803,6 +831,20 @@ if ! download_file "$ASSET_URL" /tmp/guppyscreen.tar.gz; then
     printf "${red}Could not download the GuppyScreen release asset. Check your connection and re-run the installer.${white}\n"
     exit 1
 fi
+# A prior corrupt/truncated extraction (e.g. from before download_file's retry+
+# curl-fallback existed, or from a run where even the fallback failed) can
+# leave one of these directories mistyped as a plain file on disk. tar refuses
+# to overwrite a type mismatch ("File exists" / "Not a directory") and, since
+# nothing ever cleaned that up, every future re-run failed identically forever
+# - even once the download itself started succeeding cleanly (hit for real by
+# a user on 2026-07-16: wget failed, curl fallback fetched a valid tarball,
+# extraction still died on a stale './guppyscreen/debian' left as a file).
+# These four are entirely packaged content the archive fully recreates every
+# run - safe to wipe unconditionally. Deliberately NOT touching anything else
+# under $K1_GUPPY_DIR (guppyconfig.json, thumbnails/, etc.) - those are
+# runtime state that must survive an upgrade, and plain-file entries (the
+# guppyscreen/guppybeep binaries) overwrite fine on their own without this.
+rm -rf "$K1_GUPPY_DIR/k1_mods" "$K1_GUPPY_DIR/scripts" "$K1_GUPPY_DIR/themes" "$K1_GUPPY_DIR/debian"
 if ! tar xf /tmp/guppyscreen.tar.gz -C /usr/data/; then
     printf "${red}Failed to extract the GuppyScreen release asset (corrupt download?). Re-run the installer.${white}\n"
     exit 1
