@@ -1045,11 +1045,11 @@ ln -sf $K1_GUPPY_DIR/k1_mods/respawn/librc.so.1 /lib/librc.so.1
 ##   print-quality mods (adaptive mesh + purge + park, Axis Twist Compensation, TMC Autotune, Skew),
 ##   Creality Nebula camera (persistent image tuning),
 ##   E-Steps Calibration (guided CALIBRATE_ESTEPS / CALIBRATE_ESTEPS_APPLY macros),
-##   Pause/Resume layer-shift fix (PAUSE y_park 222 -> 220).
+##   Pause/Resume/Cancel layer-shift fix (PAUSE y_park + CANCEL_PRINT's own Y222, both -> 220).
 ## Adaptive print setup/Skew/ATC/camera config install via the existing [include GuppyScreen/*.cfg]
 ## glob (no printer.cfg section edits); only Axis Twist touches Klipper core
 ## (probe.py), via an idempotent, backed-up patch. The layer-shift fix sed-edits
-## gcode_macro.cfg (backed up first, guarded on the 222 line existing).
+## gcode_macro.cfg (backed up first, guarded on each pattern existing independently).
 ## ============================================================================
 MODS_DIR=$K1_GUPPY_DIR/k1_mods/klipper_mods
 GUPPY_CFG_DIR=$K1_CONFIG_DIR/GuppyScreen
@@ -1501,8 +1501,16 @@ else
         fi
     fi
 
-    # --- Pause/Resume layer-shift fix (PAUSE y_park 222 -> 220) ---
-    if want "Pause/Resume layer-shift fix (y_park 222->220)"; then
+    # --- Pause/Resume/Cancel layer-shift fix (y_park 222 -> 220) ---
+    # Y's endstop only exists at the front (position_max=223), so a fast park
+    # move to Y222 can drive the bed into the mechanical end of the rail and
+    # skip steps - confirmed on real hardware for PAUSE (2026-06-13). CANCEL_PRINT
+    # has its own separate, hardcoded copy of the exact same unsafe Y value
+    # (`G1 F3000X0Y222`, not the `{% set y_park %}` variable PAUSE uses) that
+    # was never touched by this fix - found 2026-07-16 tracing a real "Cancel
+    # did nothing" report that happened to occur right as a runout triggered a
+    # CANCEL_PRINT mid-print. Patched here too, same guarded/backed-up pattern.
+    if want "Pause/Resume/Cancel layer-shift fix (y_park 222->220)"; then
         GM="$K1_CONFIG_DIR/gcode_macro.cfg"
         if [ -f "$GM" ] && grep -q "{% set y_park = 222 %}" "$GM"; then
             [ ! -f "$BACKUP_DIR/gcode_macro.cfg.bak-ypark" ] && cp "$GM" "$BACKUP_DIR/gcode_macro.cfg.bak-ypark"
@@ -1510,6 +1518,13 @@ else
             printf "${green}  Applied layer-shift fix (PAUSE y_park 222 -> 220)${white}\n"
         else
             printf "${yellow}  Layer-shift fix: y_park=222 not found in gcode_macro.cfg (already fixed or different config); skipped.${white}\n"
+        fi
+        if [ -f "$GM" ] && grep -q "G1 F3000X0Y222" "$GM"; then
+            [ ! -f "$BACKUP_DIR/gcode_macro.cfg.bak-ypark" ] && cp "$GM" "$BACKUP_DIR/gcode_macro.cfg.bak-ypark"
+            sed -i 's/G1 F3000X0Y222/G1 F3000X0Y220/' "$GM"
+            printf "${green}  Applied layer-shift fix (CANCEL_PRINT Y222 -> Y220)${white}\n"
+        else
+            printf "${yellow}  Layer-shift fix: CANCEL_PRINT's Y222 park not found in gcode_macro.cfg (already fixed or different config); skipped.${white}\n"
         fi
     fi
 

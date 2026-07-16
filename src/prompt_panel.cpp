@@ -163,7 +163,23 @@ void PromptPanel::on_button_click(lv_event_t *e) {
   auto pcmd = static_cast<std::string *>(btn->user_data);
   auto panel = static_cast<PromptPanel *>(lv_event_get_user_data(e));
   if (pcmd && !pcmd->empty()) {
-    panel->ws.gcode_script(*pcmd);
+    // Previously fire-and-forget with no response handling at all: a Klipper-
+    // side rejection of the button's gcode (e.g. a macro erroring out) was
+    // completely invisible - the button just looked like it did nothing, no
+    // different from a real failure. Surface it as a toast instead. This
+    // callback runs on the websocket thread, not the LVGL thread, so it must
+    // take lv_lock before touching any LVGL object (same pattern as
+    // FilamentRunoutPanel::send_load_chunk).
+    panel->ws.gcode_script(*pcmd, [panel](json &j) {
+      if (j.contains("error")) {
+        std::string msg = "Command failed";
+        if (j["error"].contains("message") && j["error"]["message"].is_string()) {
+          msg = j["error"]["message"].template get<std::string>();
+        }
+        std::lock_guard<std::mutex> lock(panel->lv_lock);
+        KUtils::notify_toast(msg);
+      }
+    });
     // consider `delete pcmd; btn->user_data = nullptr;` if one‐shot
   }
 }
@@ -172,6 +188,41 @@ void PromptPanel::consume(json &j) {
   auto &v = j["/params/0"_json_pointer];
   if (!v.is_string()) return;
   auto resp = v.get<std::string>();
+
+  // Klipper reports errors via notify_gcode_response in TWO different shapes,
+  // confirmed empirically against a real device (2026-07-16), and NEITHER is
+  // redundant with on_button_click's own RPC-response error check above:
+  //   - "!! <json>"  - genuine command-level runtime errors (e.g. cold
+  //     extrude) - these ALSO populate printer.gcode.script's own RPC
+  //     response with an "error" field, so this is a harmless duplicate toast
+  //     for those specifically.
+  //   - "// {<json>}" - a totally unrecognized/mistyped gcode command (e.g. a
+  //     typo'd macro name). This one is NOT a duplicate: Moonraker's RPC
+  //     response for this case is plain {"result":"ok"} with no error field
+  //     at all - this is the ONLY signal that ever surfaces it. Plain "// "
+  //     informational text (e.g. "// Purging filament...") is NOT JSON and
+  //     must not trigger a toast - checking for "// {" specifically (not just
+  //     "// ") is what distinguishes a structured error notice from ordinary
+  //     human-readable chatter.
+  bool is_error_notice = resp.rfind("!! ", 0) == 0;
+  if (!is_error_notice && resp.rfind("// {", 0) == 0) {
+    is_error_notice = true;
+  }
+  if (is_error_notice) {
+    std::string msg = resp.substr(3);
+    try {
+      auto ej = json::parse(msg);
+      if (ej.contains("msg") && ej["msg"].is_string()) {
+        msg = ej["msg"].template get<std::string>();
+      }
+    } catch (...) {
+      // not JSON - show the raw text as-is
+    }
+    std::lock_guard<std::mutex> guard(lv_lock);
+    KUtils::notify_toast(msg);
+    return;
+  }
+
   if (resp.rfind("// action:", 0) != 0) return;
   auto cmd = resp.substr(10);
 
