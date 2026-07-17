@@ -144,11 +144,15 @@ http {
         proxy_request_buffering off;
         access_log off;
         error_log off;
-        gzip on;
-        gzip_vary on;
-        gzip_proxied any;
-        gzip_comp_level 4;
-        gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml;
+        # No gzip directives here: the self-built nginx.tar.gz vendored in
+        # this repo is compiled with --without-http_gzip_module (confirmed
+        # via nginx -V on a real device) - any gzip directive is a fatal
+        # config-parse error ("unknown directive"), and nginx refuses to
+        # start at all. Found for real 2026-07-18: the previous version of
+        # this config (written when nginx.conf was hand-maintained
+        # separately from what actually got built) had gzip on, which
+        # silently stopped Mainsail from working entirely once this config
+        # got regenerated onto a real gzip-less nginx build.
 
         location / { try_files $uri $uri/ /index.html; }
         location = /index.html { add_header Cache-Control "no-store, no-cache, must-revalidate"; }
@@ -208,6 +212,18 @@ http {
     }
 }
 NGINX_CONF_EOF
+}
+
+# Confirms nginx is actually serving after a start/restart, rather than just
+# assuming so - a fatal config error (nginx logs "[emerg] ... test failed"
+# and exits immediately) used to look identical to success in this script's
+# own output, since neither call site ever checked (hit for real 2026-07-18:
+# a gzip directive nginx's own compiled-in modules don't support killed it
+# outright, but the installer still printed "[OK]").
+nginx_started_ok() {
+    /usr/data/nginx/sbin/nginx -t -c /usr/data/nginx/nginx/nginx.conf >/dev/null 2>&1 || return 1
+    sleep 1
+    pgrep -x nginx >/dev/null 2>&1
 }
 
 # Poll Moonraker's own API until it responds or we give up. Starting a service
@@ -744,6 +760,15 @@ else
                 fi
                 if [ "$_need_sfd" -eq 1 ]; then
                     download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/d49c2809996fab04ddac4bfbcda70d70bfba3140/scripts/vendor/wheels/streaming_form_data-1.16.0-cp38-cp38-linux_mips.whl" "$_wheel_dir/streaming_form_data-1.16.0-cp38-cp38-linux_mips.whl" || _wheel_ok=0
+                    # streaming-form-data 1.16.0 unconditionally declares
+                    # "Requires-Dist: smart-open>=6.0" in its own wheel
+                    # metadata (needed for an S3Target feature Moonraker
+                    # never actually uses, but pip enforces it regardless) -
+                    # without this in --find-links too, pip fails with
+                    # "no matching distribution" for smart-open specifically
+                    # (hit for real 2026-07-18). Pure Python (py3-none-any) -
+                    # no cross-compilation needed, just vendored directly.
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/PLACEHOLDER_SHA_2/scripts/vendor/wheels/smart_open-6.0.0-py3-none-any.whl" "$_wheel_dir/smart_open-6.0.0-py3-none-any.whl" || _wheel_ok=0
                 fi
                 if [ "$_wheel_ok" -eq 1 ]; then
                     /etc/init.d/S56moonraker_service stop 2>/dev/null
@@ -824,7 +849,11 @@ if [ "$_nginx_ok" -eq 1 ] && [ -x /usr/data/nginx/sbin/nginx ]; then
                 # UI access entirely (hit for real 2026-07-18).
                 write_nginx_conf
                 /etc/init.d/S50nginx start
-                printf "${green}  [OK] Nginx upgraded to $_nginx_vendored_version (backup at $BACKUP_DIR)${white}\n"
+                if nginx_started_ok; then
+                    printf "${green}  [OK] Nginx upgraded to $_nginx_vendored_version (backup at $BACKUP_DIR)${white}\n"
+                else
+                    printf "${red}  [FAIL] Nginx did not start after the upgrade - check /usr/data/nginx/nginx/nginx.conf ('nginx -t' for details). Restore from $BACKUP_DIR if needed.${white}\n"
+                fi
             fi
         fi
     fi
@@ -841,7 +870,11 @@ if [ "$_nginx_ok" -eq 1 ] && [ -x /usr/data/nginx/sbin/nginx ]; then
         printf "${yellow}  Nginx config doesn't look like OpenKE's Mainsail config - regenerating...${white}\n"
         write_nginx_conf
         /etc/init.d/S50nginx restart
-        printf "${green}  [OK] Nginx config regenerated${white}\n"
+        if nginx_started_ok; then
+            printf "${green}  [OK] Nginx config regenerated${white}\n"
+        else
+            printf "${red}  [FAIL] Nginx did not start after regenerating its config - check /usr/data/nginx/nginx/nginx.conf ('nginx -t' for details).${white}\n"
+        fi
     fi
 fi
 
@@ -950,6 +983,10 @@ NGINX_INIT_EOF
         if [ "$_nginx_ok" -ne 2 ]; then
             printf "${green}  Starting Nginx...${white}\n"
             /etc/init.d/S50nginx start
+            if ! nginx_started_ok; then
+                printf "${red}  [FAIL] Nginx did not start - check /usr/data/nginx/nginx/nginx.conf ('nginx -t' for details).${white}\n"
+                _nginx_ok=2
+            fi
         fi
         if [ "$_nginx_ok" -ne 2 ] && [ "$_mainsail_ok" -ne 2 ]; then
             _ip=$(ip route get 1 2>/dev/null | awk 'NR==1{for(i=1;i<=NF;i++) if ($i=="src") {print $(i+1); exit}}')
