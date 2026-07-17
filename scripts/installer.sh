@@ -580,7 +580,7 @@ if [ "$_nginx_ok" -eq 0 ] || [ "$_mainsail_ok" -eq 0 ]; then
     if [ "$confirm_mainsail" != "n" ] && [ "$confirm_mainsail" != "N" ]; then
         if [ "$_nginx_ok" -eq 0 ]; then
             printf "${green}  Downloading Nginx...${white}\n"
-            if ! download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/f9c23043bf19ebb091dd6fcec71d28d3459883ec/scripts/vendor/nginx.tar.gz" /tmp/nginx.tar.gz; then
+            if ! download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/8f1167e97ce5dd2d5fc20c315f4cdb9176a2cfdb/scripts/vendor/nginx.tar.gz" /tmp/nginx.tar.gz; then
                 printf "${red}  [FAIL] Could not download Nginx — check your network and re-run the installer.${white}\n"
                 _nginx_ok=2
             fi
