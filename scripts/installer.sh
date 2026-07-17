@@ -222,8 +222,18 @@ NGINX_CONF_EOF
 # outright, but the installer still printed "[OK]").
 nginx_started_ok() {
     /usr/data/nginx/sbin/nginx -t -c /usr/data/nginx/nginx/nginx.conf >/dev/null 2>&1 || return 1
-    sleep 1
-    pgrep -x nginx >/dev/null 2>&1
+    # A single 1s sleep was a false negative on a real device (2026-07-18) -
+    # nginx was actually up and serving (confirmed via a real HTTP request
+    # once it finished starting), just not quite fast enough for one check.
+    # Poll instead of guessing a fixed delay, matching wait_for_moonraker's
+    # own pattern elsewhere in this script.
+    _ngx_n=0
+    while [ "$_ngx_n" -lt 5 ]; do
+        pgrep -x nginx >/dev/null 2>&1 && return 0
+        _ngx_n=$((_ngx_n + 1))
+        sleep 1
+    done
+    return 1
 }
 
 # Poll Moonraker's own API until it responds or we give up. Starting a service
