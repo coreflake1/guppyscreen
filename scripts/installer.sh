@@ -25,37 +25,69 @@ CURL_BOOTSTRAP_URL="https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf
 # sites, including Moonraker's own bootstrap) so every download in the script
 # can share the same protection instead of only the ones added later.
 #
-# Some on-device wget builds can't complete a TLS handshake with github.com's
-# release-asset redirects (works fine for raw.githubusercontent.com, fails
-# with "TLS error from peer (alert code 80)") — the same issue the
-# "bootstrap for ssl support" step below works around for the GuppyScreen
-# asset itself. Fall back to that same static curl binary here too.
+# github.com/api.github.com specifically (NOT raw.githubusercontent.com or the
+# githubusercontent.com-hosted release-asset CDN redirect targets, which both
+# work fine) are unreachable via this device's wget - confirmed via direct
+# testing (2026-07-18) that it's github.com's own TLS frontend that fails
+# ("TLS error from peer (alert code 80)"), not the redirected-to asset -
+# hitting the actual CDN redirect target directly with wget succeeds cleanly.
+# This device's wget is BusyBox's built-in applet, whose minimal TLS client
+# only speaks TLS 1.2 with a small, old cipher list and doesn't send (or
+# malforms) SNI; github.com sits behind a multi-tenant CDN edge (Fastly) that
+# needs valid SNI to route to the right cert/backend, and terminates
+# non-conforming clients with a generic alert instead of a clean protocol
+# error. This is deterministic, not flaky - it will never succeed on this
+# device, so retrying wget against github.com/api.github.com is pure wasted
+# time (~6s of guaranteed failure every run); skip straight to the curl
+# fallback for those two hosts specifically instead. The "bootstrap for ssl
+# support" step below (CURL_BOOTSTRAP_URL, on raw.githubusercontent.com -
+# unaffected by any of this) provides that fallback binary.
 download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
     _url="$1"; _dest="$2"; _tries="${3:-3}"
-    _n=0
-    while [ "$_n" -lt "$_tries" ]; do
-        # User-Agent is required by the GitHub API (a request without one gets a
-        # flat 403) and harmless for the other download targets this helper hits.
-        wget -q --no-check-certificate --header="User-Agent: OpenKE-Installer" "$_url" -O "$_dest"
-        _dl_rc=$?
-        # Must check wget's own exit status, not just "did a file appear" - a
-        # mid-transfer TLS reset can still leave a partial, non-empty file on
-        # disk (wget writes as it streams), which silently passed `-s` alone
-        # and made this whole retry/fallback dance never actually fire - found
-        # via a real user hitting exactly this on v1.4.0's release download.
-        [ "$_dl_rc" -eq 0 ] && [ -s "$_dest" ] && return 0
-        _n=$((_n + 1))
-        printf "${yellow}  Download failed (attempt ${_n}/${_tries}), retrying...${white}\n"
-        sleep 2
-    done
 
-    printf "${yellow}  wget could not fetch it — trying the SSL-capable curl fallback...${white}\n"
+    # Progress feedback only when attached to a real terminal - avoids
+    # spamming carriage-return progress lines into a redirected log file.
+    if [ -t 2 ]; then
+        _wget_q=""
+        _curl_progress="--progress-bar"
+    else
+        _wget_q="-q"
+        _curl_progress="-s"
+    fi
+
+    case "$_url" in
+        https://github.com/*|https://api.github.com/*) _skip_wget=1 ;;
+        *) _skip_wget=0 ;;
+    esac
+
+    if [ "$_skip_wget" -eq 0 ]; then
+        _n=0
+        while [ "$_n" -lt "$_tries" ]; do
+            # User-Agent is required by the GitHub API (a request without one gets a
+            # flat 403) and harmless for the other download targets this helper hits.
+            wget $_wget_q --no-check-certificate --header="User-Agent: OpenKE-Installer" "$_url" -O "$_dest"
+            _dl_rc=$?
+            # Must check wget's own exit status, not just "did a file appear" - a
+            # mid-transfer TLS reset can still leave a partial, non-empty file on
+            # disk (wget writes as it streams), which silently passed `-s` alone
+            # and made this whole retry/fallback dance never actually fire - found
+            # via a real user hitting exactly this on v1.4.0's release download.
+            [ "$_dl_rc" -eq 0 ] && [ -s "$_dest" ] && return 0
+            _n=$((_n + 1))
+            printf "${yellow}  Download failed (attempt ${_n}/${_tries}), retrying...${white}\n"
+            sleep 2
+        done
+        printf "${yellow}  wget could not fetch it — trying the SSL-capable curl fallback...${white}\n"
+    else
+        printf "${yellow}  This host is known to reject this device's wget over TLS — using curl directly...${white}\n"
+    fi
+
     if [ ! -x /tmp/curl ]; then
         wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
         chmod +x /tmp/curl
     fi
     if [ -x /tmp/curl ]; then
-        /tmp/curl -s -L -H "User-Agent: OpenKE-Installer" "$_url" -o "$_dest"
+        /tmp/curl $_curl_progress -L -H "User-Agent: OpenKE-Installer" "$_url" -o "$_dest"
         _dl_rc=$?
         [ "$_dl_rc" -eq 0 ] && [ -s "$_dest" ] && return 0
     fi
