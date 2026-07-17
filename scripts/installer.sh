@@ -98,6 +98,118 @@ download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
     return 1
 }
 
+# The vendored nginx.tar.gz ships its own stock nginx.conf (a generic
+# "listen 80, serve html/index.html" default) - this OpenKE-specific config
+# (port 4409, Mainsail's proxy rules to Moonraker/webcams) always has to be
+# written as a separate step right after extracting the tarball, on BOTH the
+# fresh-install path and the upgrade path. A single shared function instead
+# of two copies of this heredoc is what stops those two call sites from ever
+# drifting apart again - the upgrade path originally forgot this entirely
+# (extracted the tarball and stopped), silently reverting a real printer's
+# Mainsail to the stock default config and breaking web UI access entirely
+# (found immediately by the user after testing the upgrade path, 2026-07-18).
+write_nginx_conf() {
+    cat > /usr/data/nginx/nginx/nginx.conf << 'NGINX_CONF_EOF'
+worker_processes  1;
+events { worker_connections 1024; }
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile        on;
+    keepalive_timeout  65;
+    proxy_connect_timeout 1600;
+    proxy_send_timeout 1600;
+    proxy_read_timeout 1600;
+    send_timeout 1600;
+
+    map $http_upgrade $connection_upgrade {
+        default upgrade;
+        '' close;
+    }
+    upstream apiserver {
+        ip_hash;
+        server 127.0.0.1:7125;
+    }
+    upstream mjpgstreamer1 { ip_hash; server 127.0.0.1:8080; keepalive 8; }
+    upstream mjpgstreamer2 { ip_hash; server 127.0.0.1:8081; keepalive 8; }
+    upstream mjpgstreamer3 { ip_hash; server 127.0.0.1:8082; keepalive 8; }
+    upstream mjpgstreamer4 { ip_hash; server 127.0.0.1:8083; keepalive 8; }
+
+    server {
+        listen 4409 default_server;
+        root /usr/data/mainsail;
+        index index.html;
+        server_name _;
+        client_max_body_size 0;
+        proxy_request_buffering off;
+        access_log off;
+        error_log off;
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 4;
+        gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml;
+
+        location / { try_files $uri $uri/ /index.html; }
+        location = /index.html { add_header Cache-Control "no-store, no-cache, must-revalidate"; }
+
+        location /websocket {
+            proxy_pass http://apiserver/websocket;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_read_timeout 86400;
+        }
+        location ~ ^/(printer|api|access|machine|server)/ {
+            proxy_pass http://apiserver$request_uri;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Scheme $scheme;
+        }
+        location /webcam/ {
+            postpone_output 0;
+            proxy_buffering off;
+            proxy_ignore_headers X-Accel-Buffering;
+            access_log off; error_log off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_pass http://mjpgstreamer1/;
+        }
+        location /webcam2/ {
+            postpone_output 0; proxy_buffering off;
+            proxy_ignore_headers X-Accel-Buffering;
+            access_log off; error_log off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_pass http://mjpgstreamer2/;
+        }
+        location /webcam3/ {
+            postpone_output 0; proxy_buffering off;
+            proxy_ignore_headers X-Accel-Buffering;
+            access_log off; error_log off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_pass http://mjpgstreamer3/;
+        }
+        location /webcam4/ {
+            postpone_output 0; proxy_buffering off;
+            proxy_ignore_headers X-Accel-Buffering;
+            access_log off; error_log off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_pass http://mjpgstreamer4/;
+        }
+    }
+}
+NGINX_CONF_EOF
+}
+
 # Poll Moonraker's own API until it responds or we give up. Starting a service
 # and declaring success without checking it actually came up is exactly the
 # failure mode this whole helper section exists to avoid.
@@ -612,10 +724,16 @@ else
                 mkdir -p "$_wheel_dir"
                 _wheel_ok=1
                 if [ "$_need_pillow" -eq 1 ]; then
-                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/wheels/pillow-10.4.0-cp38-cp38-linux_mipsel.whl" "$_wheel_dir/pillow.whl" || _wheel_ok=0
+                    # pip's --find-links resolver parses the package
+                    # name/version/ABI/platform straight out of the wheel's
+                    # FILENAME - a renamed generic "pillow.whl" doesn't match
+                    # anything and pip reports "no matching distribution"
+                    # even though the file downloaded fine (hit for real
+                    # 2026-07-18). Must keep the canonical wheel filename.
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/wheels/pillow-10.4.0-cp38-cp38-linux_mipsel.whl" "$_wheel_dir/pillow-10.4.0-cp38-cp38-linux_mipsel.whl" || _wheel_ok=0
                 fi
                 if [ "$_need_sfd" -eq 1 ]; then
-                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/wheels/streaming_form_data-1.16.0-cp38-cp38-linux_mipsel.whl" "$_wheel_dir/sfd.whl" || _wheel_ok=0
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/wheels/streaming_form_data-1.16.0-cp38-cp38-linux_mipsel.whl" "$_wheel_dir/streaming_form_data-1.16.0-cp38-cp38-linux_mipsel.whl" || _wheel_ok=0
                 fi
                 if [ "$_wheel_ok" -eq 1 ]; then
                     /etc/init.d/S56moonraker_service stop 2>/dev/null
@@ -682,6 +800,11 @@ if [ "$_nginx_ok" -eq 1 ] && [ -x /usr/data/nginx/sbin/nginx ]; then
                 /etc/init.d/S50nginx stop 2>/dev/null
                 rm -rf /usr/data/nginx
                 tar xf /tmp/nginx_check.tar.gz -C /usr/data/
+                # The tarball ships its own stock nginx.conf - without
+                # regenerating our own, this silently reverts Mainsail's
+                # proxy config to a bare "listen 80" default and breaks web
+                # UI access entirely (hit for real 2026-07-18).
+                write_nginx_conf
                 /etc/init.d/S50nginx start
                 printf "${green}  [OK] Nginx upgraded to $_nginx_vendored_version (backup at $BACKUP_DIR)${white}\n"
             fi
@@ -757,105 +880,7 @@ esac
 NGINX_INIT_EOF
             chmod +x /etc/init.d/S50nginx
 
-            cat > /usr/data/nginx/nginx/nginx.conf << 'NGINX_CONF_EOF'
-worker_processes  1;
-events { worker_connections 1024; }
-http {
-    include       mime.types;
-    default_type  application/octet-stream;
-    sendfile        on;
-    keepalive_timeout  65;
-    proxy_connect_timeout 1600;
-    proxy_send_timeout 1600;
-    proxy_read_timeout 1600;
-    send_timeout 1600;
-
-    map $http_upgrade $connection_upgrade {
-        default upgrade;
-        '' close;
-    }
-    upstream apiserver {
-        ip_hash;
-        server 127.0.0.1:7125;
-    }
-    upstream mjpgstreamer1 { ip_hash; server 127.0.0.1:8080; keepalive 8; }
-    upstream mjpgstreamer2 { ip_hash; server 127.0.0.1:8081; keepalive 8; }
-    upstream mjpgstreamer3 { ip_hash; server 127.0.0.1:8082; keepalive 8; }
-    upstream mjpgstreamer4 { ip_hash; server 127.0.0.1:8083; keepalive 8; }
-
-    server {
-        listen 4409 default_server;
-        root /usr/data/mainsail;
-        index index.html;
-        server_name _;
-        client_max_body_size 0;
-        proxy_request_buffering off;
-        access_log off;
-        error_log off;
-        gzip on;
-        gzip_vary on;
-        gzip_proxied any;
-        gzip_comp_level 4;
-        gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml;
-
-        location / { try_files $uri $uri/ /index.html; }
-        location = /index.html { add_header Cache-Control "no-store, no-cache, must-revalidate"; }
-
-        location /websocket {
-            proxy_pass http://apiserver/websocket;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection $connection_upgrade;
-            proxy_set_header Host $http_host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_read_timeout 86400;
-        }
-        location ~ ^/(printer|api|access|machine|server)/ {
-            proxy_pass http://apiserver$request_uri;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Host $http_host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Scheme $scheme;
-        }
-        location /webcam/ {
-            postpone_output 0;
-            proxy_buffering off;
-            proxy_ignore_headers X-Accel-Buffering;
-            access_log off; error_log off;
-            proxy_http_version 1.1;
-            proxy_set_header Connection "";
-            proxy_pass http://mjpgstreamer1/;
-        }
-        location /webcam2/ {
-            postpone_output 0; proxy_buffering off;
-            proxy_ignore_headers X-Accel-Buffering;
-            access_log off; error_log off;
-            proxy_http_version 1.1;
-            proxy_set_header Connection "";
-            proxy_pass http://mjpgstreamer2/;
-        }
-        location /webcam3/ {
-            postpone_output 0; proxy_buffering off;
-            proxy_ignore_headers X-Accel-Buffering;
-            access_log off; error_log off;
-            proxy_http_version 1.1;
-            proxy_set_header Connection "";
-            proxy_pass http://mjpgstreamer3/;
-        }
-        location /webcam4/ {
-            postpone_output 0; proxy_buffering off;
-            proxy_ignore_headers X-Accel-Buffering;
-            access_log off; error_log off;
-            proxy_http_version 1.1;
-            proxy_set_header Connection "";
-            proxy_pass http://mjpgstreamer4/;
-        }
-    }
-}
-NGINX_CONF_EOF
+            write_nginx_conf
         fi
 
         if [ "$_mainsail_ok" -eq 0 ]; then
