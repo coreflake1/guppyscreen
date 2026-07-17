@@ -28,8 +28,60 @@ try:
 except OSError as e:
     sys.exit('STOP: cannot read %s (%s)' % (p, e))
 
+# Line 871 of the on-device bed_mesh.py, confirmed via SSH against a real
+# printer. Mainline Klipper guards this exact call with
+# "if self._profile_name is not None:" - this fork never got that guard
+# because it predates upstream's adaptive-mesh feature (which is the only
+# thing that ever sets _profile_name to None) entirely.
+UNGUARDED_SAVE = ('        self.gcode.respond_info("Mesh Bed Leveling Complete")\n'
+                   '        self.bedmesh.save_profile(self._profile_name)\n')
+GUARDED_SAVE = ('        self.gcode.respond_info("Mesh Bed Leveling Complete")\n'
+                '        # Matches mainline Klipper\'s own None-guard here (this fork\'s\n'
+                '        # probe_finalize predates upstream\'s adaptive-mesh feature and\n'
+                '        # never needed one before): an adaptive mesh\'s _profile_name is\n'
+                '        # None (see set_adaptive_mesh below) because it\'s print-specific -\n'
+                '        # it\'s used live for this print but was never meant to be\n'
+                '        # persisted/reloadable by name.\n'
+                '        if self._profile_name is not None:\n'
+                '            self.bedmesh.save_profile(self._profile_name)\n')
+
+# The pre-fix workaround: real user-reported regression (2026-07-18, community
+# feedback via a Discord user testing a custom start-gcode sequence) - see
+# project_adaptive_mesh_profile_name_regression memory for the full story.
+# Giving the adaptive mesh a random synthetic name instead of skipping the
+# save entirely (as mainline intends) meant any leftover "BED_MESH_PROFILE
+# LOAD=default" habit (harmless under the old KAMP macros, which really did
+# always save under "default") now silently discards the fresh adaptive mesh
+# and reloads a stale full-bed one instead - with no error or warning.
+OLD_BUGGY_LINE = '        self._profile_name = "adaptive-%X" % (id(self),)\n'
+NEW_LINE = '        self._profile_name = None\n'
+
 if 'set_adaptive_mesh' in s:
-    print('Already patched — nothing to change.')
+    # Already has the adaptive-mesh method - but that doesn't mean it's the
+    # current, fixed version. Upgrade in place rather than silently leaving a
+    # known-buggy printer on the old behavior forever (the old blanket
+    # "already patched, nothing to do" exit would do exactly that).
+    upgraded = False
+    if OLD_BUGGY_LINE in s:
+        s = s.replace(OLD_BUGGY_LINE, NEW_LINE, 1)
+        upgraded = True
+    if UNGUARDED_SAVE in s:
+        s = s.replace(UNGUARDED_SAVE, GUARDED_SAVE, 1)
+        upgraded = True
+
+    if not upgraded:
+        print('Already patched (current version) — nothing to change.')
+        sys.exit(0)
+
+    open(p, 'w').write(s)
+    try:
+        py_compile.compile(p, doraise=True)
+    except py_compile.PyCompileError as e:
+        sys.exit('STOP: patched bed_mesh.py failed to compile after upgrade (%s). '
+                  'Restore from backup.' % e)
+    print('Upgraded: adaptive mesh is no longer saved under a throwaway profile name '
+          '(matches mainline Klipper - it stays active for the print but is not '
+          'persisted/reloadable by name).')
     sys.exit(0)
 
 # 1. adaptive_margin config option, added at the end of _init_mesh_config.
@@ -142,15 +194,13 @@ graft_2 = '''    def set_adaptive_mesh(self, gcmd):
             self.mesh_max = adjusted_mesh_max
             self.mesh_config["x_count"] = new_x_probe_count
             self.mesh_config["y_count"] = new_y_probe_count
-        # Upstream Klipper sets this to None here - fine on mainline, but this
-        # fork's probe_finalize() unconditionally does
-        # self.bedmesh.save_profile(self._profile_name), and save_profile()
-        # does self.name + " " + prof_name with no None-guard, so a bare None
-        # crashes with "can only concatenate str (not NoneType) to str".
-        # Use a synthetic name instead - keeps the same "don't collide with a
-        # real saved profile" intent without touching the existing "default"
-        # profile or needing a save_profile() change of our own.
-        self._profile_name = "adaptive-%X" % (id(self),)
+        # Matches upstream Klipper exactly: an adaptive mesh is print-specific
+        # (its bounds depend on THIS print's objects), so it's never persisted
+        # as a named, reloadable profile - just used live for the print that
+        # calibrated it. probe_finalize() below is patched with the matching
+        # "if self._profile_name is not None" guard, same as mainline, so this
+        # None never reaches save_profile()/crashes.
+        self._profile_name = None
         return True
 '''
 s = s.replace(ANCHOR_2, graft_2 + ANCHOR_2, 1)
@@ -164,6 +214,15 @@ if s.count(ANCHOR_3) != 1:
              'Apply the edit by hand (see the OpenKE wiki).')
 graft_3 = ANCHOR_3 + "\n        need_cfg_update |= self.set_adaptive_mesh(gcmd)\n"
 s = s.replace(ANCHOR_3, graft_3, 1)
+
+# 4. Guard probe_finalize's save_profile call so a None _profile_name (set by
+# set_adaptive_mesh above) doesn't crash - restores the guard mainline has and
+# this fork is missing (it predates the adaptive-mesh feature, the only thing
+# that ever passed None here before now).
+if s.count(UNGUARDED_SAVE) != 1:
+    sys.exit('STOP: bed_mesh.py differs from the expected layout (anchor 4, '
+             'probe_finalize save_profile call); not patching. Apply the edit by hand.')
+s = s.replace(UNGUARDED_SAVE, GUARDED_SAVE, 1)
 
 open(p, 'w').write(s)
 try:

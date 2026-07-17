@@ -113,6 +113,41 @@ other reason), the adaptive mesh doesn't fail or stop your print — it just pri
 detected! ... Defaulting to regular meshing"* in the console and falls back to a normal full-bed mesh.
 Worst case you lose the "adaptive" speed-up for that one print; nothing breaks.
 
+### Option C — preheat the nozzle during meshing (community-contributed, advanced)
+
+Shared by a community member on Discord. Options A/B both wait until *after* meshing to start heating
+the nozzle. This overlaps the two instead: start warming the nozzle to a "safe" intermediate
+temperature at the same time as the bed, so by the time meshing finishes it only has to climb the last
+stretch to full temp instead of starting from a cold stop. On a typical mesh this can shave real time
+off the print start.
+
+```gcode
+M140 S[bed_temperature_initial_layer_single]        ; start heating bed (don't wait)
+M104 S150                                            ; preheat nozzle to a SAFE temp - tune this, see below
+G28                                                  ; home all axes
+M190 S[bed_temperature_initial_layer_single]         ; wait for bed to reach temp
+ADAPTIVE_BED_MESH_CALIBRATE MARGIN={brim_width + 5}  ; mesh just the print area (nozzle already warm)
+M104 S[nozzle_temperature_initial_layer]             ; ramp to full temp - shorter climb since it's already warm
+SMART_PARK MARGIN={brim_width + 10}
+M109 S[nozzle_temperature_initial_layer]             ; wait for full nozzle temp
+LINE_PURGE MARGIN={brim_width + 10}
+```
+
+> ⚠️ **This needs tuning, it's not a drop-in default.** The `150` above is a placeholder, not a
+> recommendation — it has to sit below your filament's oozing point. PLA/PETG/ABS users have
+> reported anywhere from ~140–180°C working reliably; you'll need to test your own printer and
+> filament rather than trust a fixed number. **Skip this option entirely for TPU/flexibles** — their
+> low melt viscosity means they can ooze even at fairly low temps, well below what's safe for PLA/PETG.
+>
+> **The longer your mesh takes, the more this matters.** A bigger print footprint or a denser mesh
+> (see [Optional — denser mesh](#optional--denser-mesh)) means more probe points, which means the
+> nozzle sits at that warm temp for longer before purging — raising oozing risk on large prints even
+> with an otherwise-safe temperature.
+>
+> The time savings are real; whether a warm-nozzle mesh is also *more accurate* (some probes shift
+> slightly as nearby metal parts warm up) hasn't been independently measured on the KE — treat that
+> as a plausible bonus, not a confirmed one.
+
 ### Using a different slicer (Cura, PrusaSlicer, SuperSlicer)
 
 The G-code above is Orca-flavoured, but none of this cares which slicer sends it — only that **object
