@@ -830,6 +830,19 @@ if [ "$_nginx_ok" -eq 1 ] && [ -x /usr/data/nginx/sbin/nginx ]; then
     fi
     rm -rf "$_nginx_check_dir"
     rm -f /tmp/nginx_check.tar.gz
+
+    # Self-heal: regenerate OpenKE's own nginx.conf unconditionally whenever
+    # nginx is confirmed installed, decoupled from the version check above on
+    # purpose. Found 2026-07-18: coupling config regeneration to "the binary
+    # version just changed" meant a config that got clobbered once (by the
+    # very bug this replaced) stayed broken forever on every later run - once
+    # versions matched, nothing ever re-examined the config file itself again.
+    if ! grep -q "listen 4409" /usr/data/nginx/nginx/nginx.conf 2>/dev/null; then
+        printf "${yellow}  Nginx config doesn't look like OpenKE's Mainsail config - regenerating...${white}\n"
+        write_nginx_conf
+        /etc/init.d/S50nginx restart
+        printf "${green}  [OK] Nginx config regenerated${white}\n"
+    fi
 fi
 
 if [ "$_nginx_ok" -eq 0 ] || [ "$_mainsail_ok" -eq 0 ]; then
