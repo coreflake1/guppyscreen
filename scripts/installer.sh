@@ -1473,6 +1473,16 @@ else
         backup_extra_once bed_mesh.py
         python3 "$MODS_DIR/adaptive_print_setup/patch_bed_mesh.py" "$KLIPPY_EXTRA_DIR/bed_mesh.py" || \
             printf "${yellow}  Adaptive mesh needs bed_mesh.py patched (see above) - patch by hand if your firmware differs (wiki).${white}\n"
+
+        # One-time cleanup of stale [bed_mesh adaptive-XXXXXXXX] profiles left
+        # behind by the pre-2026-07-18 bug (see patch_bed_mesh.py's own history):
+        # these permanently accumulated in printer.cfg's own SAVE_CONFIG block,
+        # one per adaptive print ever done, never reused or cleaned up on their
+        # own. Runs BEFORE the Klipper restart below, since a currently-running
+        # klippy still has any stale profiles in memory and would just rewrite
+        # them right back on the next unrelated SAVE_CONFIG otherwise.
+        cp "$K1_CONFIG_DIR/printer.cfg" "$BACKUP_DIR/printer.cfg.$(date +%Y%m%d-%H%M%S).bak" 2>/dev/null || true
+        python3 "$MODS_DIR/adaptive_print_setup/cleanup_stale_adaptive_profiles.py" "$K1_CONFIG_DIR/printer.cfg" || true
     fi
 
     # --- Axis Twist Compensation: module + cfg + idempotent probe.py patch ---
