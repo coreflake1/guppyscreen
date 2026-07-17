@@ -740,10 +740,10 @@ else
                     # Confirmed via direct testing 2026-07-18: renaming just the
                     # wheel's filename tag (not its actual binary content, which
                     # is unaffected either way) is what pip needs to accept it.
-                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/PLACEHOLDER_SHA/scripts/vendor/wheels/pillow-10.4.0-cp38-cp38-linux_mips.whl" "$_wheel_dir/pillow-10.4.0-cp38-cp38-linux_mips.whl" || _wheel_ok=0
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/d49c2809996fab04ddac4bfbcda70d70bfba3140/scripts/vendor/wheels/pillow-10.4.0-cp38-cp38-linux_mips.whl" "$_wheel_dir/pillow-10.4.0-cp38-cp38-linux_mips.whl" || _wheel_ok=0
                 fi
                 if [ "$_need_sfd" -eq 1 ]; then
-                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/PLACEHOLDER_SHA/scripts/vendor/wheels/streaming_form_data-1.16.0-cp38-cp38-linux_mips.whl" "$_wheel_dir/streaming_form_data-1.16.0-cp38-cp38-linux_mips.whl" || _wheel_ok=0
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/d49c2809996fab04ddac4bfbcda70d70bfba3140/scripts/vendor/wheels/streaming_form_data-1.16.0-cp38-cp38-linux_mips.whl" "$_wheel_dir/streaming_form_data-1.16.0-cp38-cp38-linux_mips.whl" || _wheel_ok=0
                 fi
                 if [ "$_wheel_ok" -eq 1 ]; then
                     /etc/init.d/S56moonraker_service stop 2>/dev/null
