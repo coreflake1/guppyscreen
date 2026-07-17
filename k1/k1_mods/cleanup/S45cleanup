@@ -1,0 +1,10 @@
+#!/bin/sh
+# Fires cleanup-files.sh in the background on boot. Adapted from pellcorp's
+# k1/services/S45cleanup - see cleanup-files.sh's own header for what's
+# different about our version and why.
+
+if [ "$1" = "start" ]; then
+    # does not wait
+    /usr/data/guppyscreen/k1_mods/cleanup/cleanup-files.sh --execute &
+fi
+exit 0

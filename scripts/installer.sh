@@ -137,6 +137,12 @@ uninstall_guppy() {
     rm -f /lib/libeinfo.so.1 /lib/librc.so.1
     printf "${green}Removed respawn symlinks${white}\n"
 
+    # Remove the disk-cleanup service if installed
+    if [ -f /etc/init.d/S45cleanup ]; then
+        rm -f /etc/init.d/S45cleanup
+        printf "${green}Removed disk cleanup service (S45cleanup)${white}\n"
+    fi
+
     # Remove [include GuppyScreen] from printer.cfg
     if [ -f "$K1_CONFIG_DIR_U/printer.cfg" ]; then
         sed -i '/\[include GuppyScreen/d' "$K1_CONFIG_DIR_U/printer.cfg"
@@ -1603,6 +1609,23 @@ else
     printf "${yellow}    Axis Twist: BED_MESH_CLEAR; AXIS_TWIST_COMPENSATION_CALIBRATE SAMPLE_COUNT=5; SAVE_CONFIG\n"
     printf "${yellow}    Adaptive mesh/purge/park: add ADAPTIVE_BED_MESH_CALIBRATE / SMART_PARK / LINE_PURGE to slicer start g-code\n"
     printf "${yellow}    TMC Autotune & Skew: configure on-screen (Tune tab).${white}\n"
+fi
+
+# Recurring disk-cleanup service (adapted from pellcorp's tools/cleanup-files.sh,
+# see k1_mods/cleanup/cleanup-files.sh's own header for what's different and why).
+# Unconditional, not gated behind want() like the optional features above: this
+# isn't a feature with a real tradeoff to opt into, it's background maintenance
+# fixing a real unbounded-growth bug (Klipper's own SAVE_CONFIG backups alone
+# hit 133 files/1MB on a live printer, completely unrotated) - gating it behind
+# a prompt would mean most users never even see the fix it exists to provide.
+# Runs regardless of $FEAT/$MODS_DIR, same as k1_mods/respawn's setup below.
+CLEANUP_DIR="$K1_GUPPY_DIR/k1_mods/cleanup"
+if [ -f "$CLEANUP_DIR/cleanup-files.sh" ]; then
+    chmod +x "$CLEANUP_DIR/cleanup-files.sh" "$CLEANUP_DIR/S45cleanup" 2>/dev/null
+    cp "$CLEANUP_DIR/S45cleanup" /etc/init.d/S45cleanup
+    chmod +x /etc/init.d/S45cleanup
+    /etc/init.d/S45cleanup start
+    printf "${green}Disk cleanup service installed (runs at boot).${white}\n"
 fi
 
 sync
