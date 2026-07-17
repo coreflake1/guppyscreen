@@ -16,6 +16,10 @@ ASSET_NAME="guppyscreen"
 # Vendored + pinned to a commit SHA (not a branch) so this never depends on a
 # third-party repo's unpinned main branch, or on this branch's own history.
 CURL_BOOTSTRAP_URL="https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/curl-mipsel"
+# Checked, not just "does a file already exist at this path" - a /tmp/curl left
+# over from a previous installer run (different OpenKE version, different pin)
+# used to be reused as-is forever, silently masking any curl-mipsel update.
+CURL_BOOTSTRAP_SHA256="3a4d38da3b1a5e3cfff3aa471d5c28533ca204d1eac175690a629933fc47f630"
 
 # Download with retries; only succeeds if the destination ends up non-empty.
 # A silent wget failure (bad network, flaky DNS) used to leave a 0-byte file
@@ -82,7 +86,7 @@ download_file() {   # $1 = url, $2 = dest path, $3 = retries (default 3)
         printf "${yellow}  This host is known to reject this device's wget over TLS — using curl directly...${white}\n"
     fi
 
-    if [ ! -x /tmp/curl ]; then
+    if [ ! -x /tmp/curl ] || [ "$(sha256sum /tmp/curl 2>/dev/null | awk '{print $1}')" != "$CURL_BOOTSTRAP_SHA256" ]; then
         wget -q --no-check-certificate "$CURL_BOOTSTRAP_URL" -O /tmp/curl
         chmod +x /tmp/curl
     fi
@@ -575,6 +579,61 @@ else
             exit 1
         fi
     fi
+
+    # Upgrade path: moonraker.tar.gz's vendored Pillow/streaming-form-data
+    # wheels only ever get picked up during a completely fresh Moonraker
+    # install (the branch above) - an already-installed Moonraker never
+    # re-extracts that tarball, so a newer vendored wheel would otherwise sit
+    # unused forever (found 2026-07-18 - a real device kept PIL 7.0.0 /
+    # streaming-form-data 1.8.1 through multiple reinstalls after this repo
+    # started vendoring 10.4.0/1.16.0). A narrow, in-place pip upgrade of just
+    # these two packages, not a full re-extraction of the Moonraker tree -
+    # that would risk clobbering moonraker.conf/database/other real state.
+    MOONRAKER_PY="$MOONRAKER_INSTALL_DIR/moonraker-env/bin/python"
+    MOONRAKER_PIP="$MOONRAKER_INSTALL_DIR/moonraker-env/bin/pip"
+    PILLOW_TARGET_VERSION="10.4.0"
+    SFD_TARGET_VERSION="1.16.0"
+    if [ -x "$MOONRAKER_PY" ] && [ -x "$MOONRAKER_PIP" ]; then
+        _pillow_installed=$("$MOONRAKER_PY" -c "import PIL; print(PIL.__version__)" 2>/dev/null)
+        _sfd_installed=$("$MOONRAKER_PIP" show streaming-form-data 2>/dev/null | sed -n 's/^Version: //p')
+        _need_pillow=0; _need_sfd=0
+        [ "$_pillow_installed" != "$PILLOW_TARGET_VERSION" ] && _need_pillow=1
+        [ "$_sfd_installed" != "$SFD_TARGET_VERSION" ] && _need_sfd=1
+        if [ "$_need_pillow" -eq 1 ] || [ "$_need_sfd" -eq 1 ]; then
+            _upgrade_msg=""
+            [ "$_need_pillow" -eq 1 ] && _upgrade_msg="Pillow $_pillow_installed -> $PILLOW_TARGET_VERSION"
+            [ "$_need_sfd" -eq 1 ] && _upgrade_msg="${_upgrade_msg:+$_upgrade_msg, }streaming-form-data $_sfd_installed -> $SFD_TARGET_VERSION"
+            printf "${yellow}[UPGRADE AVAILABLE] $_upgrade_msg${white}\n"
+            printf "Upgrade Moonraker's Python dependencies now? [Y/n]: "
+            read confirm_pywheel_upgrade
+            echo
+            if [ "$confirm_pywheel_upgrade" != "n" ] && [ "$confirm_pywheel_upgrade" != "N" ]; then
+                _wheel_dir="/tmp/.ke_wheels.$$"
+                mkdir -p "$_wheel_dir"
+                _wheel_ok=1
+                if [ "$_need_pillow" -eq 1 ]; then
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/wheels/pillow-10.4.0-cp38-cp38-linux_mipsel.whl" "$_wheel_dir/pillow.whl" || _wheel_ok=0
+                fi
+                if [ "$_need_sfd" -eq 1 ]; then
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/wheels/streaming_form_data-1.16.0-cp38-cp38-linux_mipsel.whl" "$_wheel_dir/sfd.whl" || _wheel_ok=0
+                fi
+                if [ "$_wheel_ok" -eq 1 ]; then
+                    /etc/init.d/S56moonraker_service stop 2>/dev/null
+                    "$MOONRAKER_PIP" install --no-index --find-links="$_wheel_dir" "pillow==$PILLOW_TARGET_VERSION" "streaming-form-data==$SFD_TARGET_VERSION"
+                    _pip_rc=$?
+                    /etc/init.d/S56moonraker_service start 2>/dev/null
+                    if [ "$_pip_rc" -eq 0 ]; then
+                        printf "${green}  [OK] Moonraker Python dependencies upgraded${white}\n"
+                    else
+                        printf "${red}  [FAIL] pip install failed - Moonraker restarted with whatever was there before${white}\n"
+                    fi
+                else
+                    printf "${red}  [FAIL] Could not download the updated wheel(s) - check your network and re-run.${white}\n"
+                fi
+                rm -rf "$_wheel_dir"
+            fi
+        fi
+    fi
 fi
 
 # Patch an already-installed Moonraker service that predates the umask fix above.
@@ -599,6 +658,38 @@ MAINSAIL_IDX=/usr/data/mainsail/index.html
 _nginx_ok=1; _mainsail_ok=1
 [ ! -f "$NGINX_INIT" ] && _nginx_ok=0
 [ ! -f "$MAINSAIL_IDX" ] && _mainsail_ok=0
+
+# Upgrade path: the block below only ever fires when nginx is completely
+# missing, so a newer self-built nginx vendored in a later OpenKE release
+# would otherwise sit unused forever on an already-provisioned printer (found
+# 2026-07-18 - a real device kept running 1.17.7 through multiple reinstalls
+# even after this repo started shipping a self-built 1.29.3). Compare
+# versions and offer to swap in the vendored one if it's actually different.
+if [ "$_nginx_ok" -eq 1 ] && [ -x /usr/data/nginx/sbin/nginx ]; then
+    _nginx_installed_version=$(/usr/data/nginx/sbin/nginx -v 2>&1 | sed -n 's#.*nginx/##p')
+    _nginx_check_dir="/tmp/.ke_nginx_check.$$"
+    mkdir -p "$_nginx_check_dir"
+    if download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/8f1167e97ce5dd2d5fc20c315f4cdb9176a2cfdb/scripts/vendor/nginx.tar.gz" /tmp/nginx_check.tar.gz \
+        && tar xf /tmp/nginx_check.tar.gz -C "$_nginx_check_dir" nginx/sbin/nginx 2>/dev/null; then
+        _nginx_vendored_version=$("$_nginx_check_dir/nginx/sbin/nginx" -v 2>&1 | sed -n 's#.*nginx/##p')
+        if [ -n "$_nginx_vendored_version" ] && [ "$_nginx_vendored_version" != "$_nginx_installed_version" ]; then
+            printf "${yellow}[UPGRADE AVAILABLE] Nginx $_nginx_installed_version installed, $_nginx_vendored_version available.${white}\n"
+            printf "Upgrade Nginx now? [Y/n]: "
+            read confirm_nginx_upgrade
+            echo
+            if [ "$confirm_nginx_upgrade" != "n" ] && [ "$confirm_nginx_upgrade" != "N" ]; then
+                cp -r /usr/data/nginx "$BACKUP_DIR/nginx.$(date +%Y%m%d-%H%M%S).bak" 2>/dev/null
+                /etc/init.d/S50nginx stop 2>/dev/null
+                rm -rf /usr/data/nginx
+                tar xf /tmp/nginx_check.tar.gz -C /usr/data/
+                /etc/init.d/S50nginx start
+                printf "${green}  [OK] Nginx upgraded to $_nginx_vendored_version (backup at $BACKUP_DIR)${white}\n"
+            fi
+        fi
+    fi
+    rm -rf "$_nginx_check_dir"
+    rm -f /tmp/nginx_check.tar.gz
+fi
 
 if [ "$_nginx_ok" -eq 0 ] || [ "$_mainsail_ok" -eq 0 ]; then
     _missing_web=""
