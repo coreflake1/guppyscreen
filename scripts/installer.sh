@@ -237,6 +237,32 @@ if [ "$1" = "uninstall" ]; then
     exit 0
 fi
 
+# Preflight disk-space check, ported from pellcorp's k1/installer.sh (Simple AF)
+# after he flagged it to us directly: abort BEFORE writing/downloading anything
+# if any of these partitions is critically low, rather than risk bricking the
+# printer mid-install. Thresholds match his own (25MB for / and /tmp, which are
+# small and shouldn't ever legitimately run this low; 1000MB for /usr/data,
+# where GuppyScreen/Klipper/gcode files actually live). Not gated behind
+# `uninstall` above since freeing space is exactly what someone in this state
+# would want to do.
+REMAINING_ROOT_DISK=$(df -m / | tail -1 | awk '{print $4}')
+if [ "$REMAINING_ROOT_DISK" -lt 25 ]; then
+    printf "${red}CRITICAL: Remaining / space is critically low ($(df -h / | tail -1 | awk '{print $4}') free). Aborting before making any changes.${white}\n"
+    exit 1
+fi
+
+REMAINING_TMP_DISK=$(df -m /tmp | tail -1 | awk '{print $4}')
+if [ "$REMAINING_TMP_DISK" -lt 25 ]; then
+    printf "${red}CRITICAL: Remaining /tmp space is critically low ($(df -h /tmp | tail -1 | awk '{print $4}') free). Aborting before making any changes.${white}\n"
+    exit 1
+fi
+
+REMAINING_DATA_DISK=$(df -m /usr/data | tail -1 | awk '{print $4}')
+if [ "$REMAINING_DATA_DISK" -lt 1000 ]; then
+    printf "${red}CRITICAL: Remaining /usr/data space is critically low ($(df -h /usr/data | tail -1 | awk '{print $4}') free). Aborting before making any changes.${white}\n"
+    exit 1
+fi
+
 if [ "$1" = "zbolt" ]; then
     ASSET_NAME="$ASSET_NAME-zbolt"
 fi

@@ -4,6 +4,29 @@ GUPPY_DIR=$(dirname "$0")
 VERSION_FILE=$GUPPY_DIR/.version
 CUSTOM_UPGRADE_SCRIPT=$GUPPY_DIR/custom_upgrade.sh
 
+# Preflight disk-space check, same as installer.sh's (ported from pellcorp's
+# k1/installer.sh) and for the same reason: abort before downloading/extracting
+# anything if a partition is critically low, rather than risk leaving the
+# install half-overwritten. Thresholds match installer.sh's (25MB for / and
+# /tmp, 1000MB for /usr/data).
+REMAINING_ROOT_DISK=$(df -m / | tail -1 | awk '{print $4}')
+if [ "$REMAINING_ROOT_DISK" -lt 25 ]; then
+    echo "CRITICAL: Remaining / space is critically low ($(df -h / | tail -1 | awk '{print $4}') free). Aborting before making any changes."
+    exit 1
+fi
+
+REMAINING_TMP_DISK=$(df -m /tmp | tail -1 | awk '{print $4}')
+if [ "$REMAINING_TMP_DISK" -lt 25 ]; then
+    echo "CRITICAL: Remaining /tmp space is critically low ($(df -h /tmp | tail -1 | awk '{print $4}') free). Aborting before making any changes."
+    exit 1
+fi
+
+REMAINING_DATA_DISK=$(df -m /usr/data | tail -1 | awk '{print $4}')
+if [ "$REMAINING_DATA_DISK" -lt 1000 ]; then
+    echo "CRITICAL: Remaining /usr/data space is critically low ($(df -h /usr/data | tail -1 | awk '{print $4}') free). Aborting before making any changes."
+    exit 1
+fi
+
 if [ -f $VERSION_FILE ]; then
     CURRENT_VERSION=`cat $VERSION_FILE | jq -r .version`
     THEME=`cat $VERSION_FILE | jq -r .theme`
