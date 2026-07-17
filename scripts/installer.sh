@@ -15,7 +15,7 @@ ASSET_NAME="guppyscreen"
 # raw.githubusercontent.com, fails with "TLS error from peer (alert code 80)").
 # Vendored + pinned to a commit SHA (not a branch) so this never depends on a
 # third-party repo's unpinned main branch, or on this branch's own history.
-CURL_BOOTSTRAP_URL="https://raw.githubusercontent.com/coreflake1/guppyscreen/d5a502942bde7ad04f45d8ce64f1259adf49d9bf/scripts/vendor/curl-mipsel"
+CURL_BOOTSTRAP_URL="https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/curl-mipsel"
 
 # Download with retries; only succeeds if the destination ends up non-empty.
 # A silent wget failure (bad network, flaky DNS) used to leave a 0-byte file
