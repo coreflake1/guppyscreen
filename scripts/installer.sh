@@ -866,7 +866,17 @@ if [ "$_nginx_ok" -eq 1 ] && [ -x /usr/data/nginx/sbin/nginx ]; then
     # version just changed" meant a config that got clobbered once (by the
     # very bug this replaced) stayed broken forever on every later run - once
     # versions matched, nothing ever re-examined the config file itself again.
-    if ! grep -q "listen 4409" /usr/data/nginx/nginx/nginx.conf 2>/dev/null; then
+    #
+    # Checking ONLY for a marker string ("listen 4409") isn't enough either -
+    # found on the very next real test: a config can contain that marker
+    # (proving it was written by this function at some point) while STILL
+    # being invalid for an unrelated reason (the gzip-directive bug this same
+    # commit fixes was already baked into a previous write, and the marker
+    # alone couldn't tell that apart from a healthy config). Test the thing
+    # that actually matters - does nginx accept this exact file - not a
+    # proxy for it.
+    if ! grep -q "listen 4409" /usr/data/nginx/nginx/nginx.conf 2>/dev/null || \
+       ! /usr/data/nginx/sbin/nginx -t -c /usr/data/nginx/nginx/nginx.conf >/dev/null 2>&1; then
         printf "${yellow}  Nginx config doesn't look like OpenKE's Mainsail config - regenerating...${white}\n"
         write_nginx_conf
         /etc/init.d/S50nginx restart
