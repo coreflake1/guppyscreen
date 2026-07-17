@@ -768,7 +768,7 @@ else
                     # "no matching distribution" for smart-open specifically
                     # (hit for real 2026-07-18). Pure Python (py3-none-any) -
                     # no cross-compilation needed, just vendored directly.
-                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/PLACEHOLDER_SHA_2/scripts/vendor/wheels/smart_open-6.0.0-py3-none-any.whl" "$_wheel_dir/smart_open-6.0.0-py3-none-any.whl" || _wheel_ok=0
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/ae5e31105ceffb792f0355352d3c21f9e43e6df4/scripts/vendor/wheels/smart_open-6.0.0-py3-none-any.whl" "$_wheel_dir/smart_open-6.0.0-py3-none-any.whl" || _wheel_ok=0
                 fi
                 if [ "$_wheel_ok" -eq 1 ]; then
                     /etc/init.d/S56moonraker_service stop 2>/dev/null
