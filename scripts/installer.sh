@@ -730,16 +730,34 @@ else
                     # anything and pip reports "no matching distribution"
                     # even though the file downloaded fine (hit for real
                     # 2026-07-18). Must keep the canonical wheel filename.
-                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/wheels/pillow-10.4.0-cp38-cp38-linux_mipsel.whl" "$_wheel_dir/pillow-10.4.0-cp38-cp38-linux_mipsel.whl" || _wheel_ok=0
+                    # Filename's platform tag matters here (pip's --find-links
+                    # resolver filters by it) - this device's pip reports its
+                    # own platform as "linux_mips" (via sysconfig/platform.machine()),
+                    # NOT "linux_mipsel", despite the Python interpreter's own
+                    # C-extension import machinery (EXTENSION_SUFFIXES, used for
+                    # e.g. ft2font) using "mipsel" - the two mechanisms read
+                    # different platform strings and disagree on this device.
+                    # Confirmed via direct testing 2026-07-18: renaming just the
+                    # wheel's filename tag (not its actual binary content, which
+                    # is unaffected either way) is what pip needs to accept it.
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/PLACEHOLDER_SHA/scripts/vendor/wheels/pillow-10.4.0-cp38-cp38-linux_mips.whl" "$_wheel_dir/pillow-10.4.0-cp38-cp38-linux_mips.whl" || _wheel_ok=0
                 fi
                 if [ "$_need_sfd" -eq 1 ]; then
-                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/4bf1ffa2e4ed473199805182c855dd61c1022735/scripts/vendor/wheels/streaming_form_data-1.16.0-cp38-cp38-linux_mipsel.whl" "$_wheel_dir/streaming_form_data-1.16.0-cp38-cp38-linux_mipsel.whl" || _wheel_ok=0
+                    download_file "https://raw.githubusercontent.com/coreflake1/guppyscreen/PLACEHOLDER_SHA/scripts/vendor/wheels/streaming_form_data-1.16.0-cp38-cp38-linux_mips.whl" "$_wheel_dir/streaming_form_data-1.16.0-cp38-cp38-linux_mips.whl" || _wheel_ok=0
                 fi
                 if [ "$_wheel_ok" -eq 1 ]; then
                     /etc/init.d/S56moonraker_service stop 2>/dev/null
                     "$MOONRAKER_PIP" install --no-index --find-links="$_wheel_dir" "pillow==$PILLOW_TARGET_VERSION" "streaming-form-data==$SFD_TARGET_VERSION"
                     _pip_rc=$?
                     /etc/init.d/S56moonraker_service start 2>/dev/null
+                    # Wait for it to actually come back up before continuing -
+                    # later code in this script queries Moonraker's own API to
+                    # resolve klipper_path/config_file, and without this it can
+                    # race ahead of a still-restarting Moonraker and silently
+                    # fall back to hardcoded defaults instead (hit for real
+                    # 2026-07-18 - harmless here since the defaults happened to
+                    # be correct on this device, but not guaranteed elsewhere).
+                    wait_for_moonraker >/dev/null 2>&1
                     if [ "$_pip_rc" -eq 0 ]; then
                         printf "${green}  [OK] Moonraker Python dependencies upgraded${white}\n"
                     else
