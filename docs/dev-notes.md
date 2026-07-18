@@ -1,4 +1,15 @@
-# Developer Notes — ke-advanced-3d-bedmesh
+# Developer Notes — historical snapshot (May 2026, `ke-advanced-3d-bedmesh`)
+
+> **This is a point-in-time snapshot from the initial KE port, not maintained current
+> documentation.** A lot of it is still accurate as mechanism/background reference (font tuning,
+> display rotation, the backup-directory layout, why `S50dropbear`'s start case matters), but
+> some specifics below are superseded — notably the Docker image and Helper Script's role (OpenKE
+> is now fully independent of Helper Script, see [[project_helper_script_independence_audit]] in
+> the project memory, or `git log` for `scripts/installer.sh`). **For current, maintained build/
+> install/vendoring docs, use these instead:**
+> - [Building from Source](../wiki/Building-from-Source.md) — the GuppyScreen binary itself
+> - [`docs/VENDORING.md`](VENDORING.md) — how to build every vendored package OpenKE ships
+> - [Installation](../wiki/Installation.md) / [Releases and Deployment](../wiki/Releases-and-Deployment.md)
 
 Accumulated discoveries from building and packaging this branch for the Ender-3 V3 KE.
 
@@ -36,7 +47,9 @@ ballaswag/guppyscreen          (original)
 ## Binary
 
 - **Build script**: `scripts/build-mips.sh` (handles all library rebuilds automatically)
-- **Docker image**: `ballaswag/guppydev:latest`
+- **Docker image**: `ghcr.io/coreflake1/guppydev:latest` (this repo's own from-source replacement
+  for the upstream `ballaswag/guppydev` image this note originally referenced - see
+  [Building from Source](../wiki/Building-from-Source.md))
 - **Toolchain**: `/toolchains/mips32el--musl--stable-2024.02-1/bin/mipsel-linux-`
 - **Flags**: `GUPPY_SMALL_SCREEN=1` required for 480×544
 - **Output**: `build/bin/guppyscreen`
@@ -63,19 +76,22 @@ ballaswag/guppyscreen          (original)
 - **Wrong installer**: `scripts/installer-deb.sh` — immediately exits with
   `"Found arch mips / Terminating"` on the KE. Do not use on this printer.
 
-**Install**:
+**Install** (current branch is `ke-next`; see [Installation](../wiki/Installation.md) for the
+always-current command, including the `curl` fallback for printers whose `wget` can't complete a
+TLS handshake against GitHub):
 ```sh
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer.sh)"
+sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-next/scripts/installer.sh)"
 ```
 
 **Uninstall**:
 ```sh
-sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-advanced-3d-bedmesh/scripts/installer.sh)" uninstall
+sh -c "$(wget --no-check-certificate -qO - https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-next/scripts/installer.sh)" uninstall
 ```
 
 The installer always fetches from the branch URL (not from the tarball), so it is
-always the latest version of the script. `PINNED_RELEASE="v0.1.0-ke-bedmesh"` in the
-script pins which tarball it downloads.
+always the latest version of the script. `PINNED_RELEASE` in the script pins which tarball it
+downloads — see [Releases and Deployment](../wiki/Releases-and-Deployment.md) for the current tag
+and the `nightly-ke-next` testing flow.
 
 ---
 

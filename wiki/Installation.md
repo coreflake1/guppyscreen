@@ -242,4 +242,4 @@ A reboot is required after uninstall to restore display services.
 > ⚠️ **Caveat:** because the service is supervised, simply `kill`-ing the process will cause it to
 > respawn. Use `/etc/init.d/S99guppyscreen stop` to stop it cleanly.
 
-See **[Known Issues](Known-Issues)** for the current installer version caveats.
+See **[Troubleshooting](Troubleshooting)** for current installer/upgrade caveats.

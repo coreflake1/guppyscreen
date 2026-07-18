@@ -43,8 +43,23 @@ The on-printer installer downloads the matching `*.tar.gz` from the GitHub relea
 
 ## Release tags
 
-The current release baseline is the `v0.1.1-ke-gui-fixes` tag on `main`. Earlier tags
-(`v0.1.0-ke-bedmesh`, `v0.1.0`, the `0.0.x-beta` series) also exist in the repository history.
+Stable releases are tagged `vX.Y.Z-OpenKE` on `main` (e.g. `v1.5.0-OpenKE`) — check the
+[GitHub Releases page](https://github.com/coreflake1/guppyscreen/releases) for the current one
+rather than trusting a version number hardcoded in this doc, since it goes stale fast. Earlier
+pre-rename tags (`v0.1.1-ke-gui-fixes`, `v0.1.0-ke-bedmesh`, the `0.0.x-beta` series) exist further
+back in the repository history from before the `-OpenKE` naming convention.
 
-See **[Known Issues](Known-Issues)** for caveats about which release the installer/updater scripts
-currently point at.
+### Testing an unreleased `ke-next` build
+
+Every push to `ke-next` also publishes a moving `nightly-ke-next` prerelease (same CI, see
+`.github/workflows` for the exact build job name). To try it before it's merged to `main`:
+
+```sh
+PINNED_RELEASE=nightly-ke-next sh -c "$(curl -sL https://raw.githubusercontent.com/coreflake1/guppyscreen/ke-next/scripts/installer.sh)"
+```
+
+(Use `curl`, not the `wget` form shown elsewhere in this wiki, if your printer's `wget` can't
+complete a TLS handshake against GitHub — see [Troubleshooting](Troubleshooting).) Re-run the
+normal install command with no `PINNED_RELEASE` to go back to the latest stable release.
+
+See **[Troubleshooting](Troubleshooting)** for current installer/upgrade caveats.
