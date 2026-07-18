@@ -10,6 +10,12 @@ static lv_style_t style_btn_blue;
 static lv_style_t style_btn_red;
 static lv_style_t style_btn_orange;
 static lv_style_t style_btn_dark_grey;
+// Padding only, deliberately no bg_color: a plain lv_btn already gets the
+// theme's live primary color for free and repaints it on a Settings > Theme
+// Color change - baking in an explicit color (as the others here do on
+// purpose, for their fixed semantic meaning) would go stale the same way
+// b0c0ad8 already fixed elsewhere in the app.
+static lv_style_t style_btn_themed;
 
 PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
   std::mutex &lock,
@@ -164,6 +170,8 @@ PromptPanel::PromptPanel(KWebSocketClient &websocket_client,
   init_btn_style(style_btn_red, lv_palette_main(LV_PALETTE_RED));
   init_btn_style(style_btn_orange, lv_palette_main(LV_PALETTE_ORANGE));
   init_btn_style(style_btn_dark_grey, lv_palette_darken(LV_PALETTE_GREY, 1));
+  lv_style_init(&style_btn_themed);
+  lv_style_set_pad_all(&style_btn_themed, 15);
 
   lv_obj_add_flag(prompt_cont, LV_OBJ_FLAG_HIDDEN);
 
@@ -282,7 +290,7 @@ void PromptPanel::consume(json &j) {
     if (type == "warning")      lv_obj_add_style(b, &style_btn_orange, 0);
     else if (type == "error")   lv_obj_add_style(b, &style_btn_red, 0);
     else if (type == "info")    lv_obj_add_style(b, &style_btn_blue, 0);
-    else if (type == "primary") lv_obj_add_style(b, &style_btn_blue, 0);
+    else if (type == "primary") lv_obj_add_style(b, &style_btn_themed, 0);
     else                        lv_obj_add_style(b, &style_btn_dark_grey, 0);
 
     auto *lbl = lv_label_create(b);
