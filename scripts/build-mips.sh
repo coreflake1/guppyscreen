@@ -1,10 +1,10 @@
 #!/bin/bash
 # Cross-compile guppyscreen for MIPS (Ingenic X2000, K1/KE)
-# Run inside ballaswag/guppydev:latest Docker container
+# Run inside ghcr.io/coreflake1/guppydev:latest Docker container
 set -e
 
 CROSS_COMPILE="${CROSS_COMPILE:-mipsel-linux-}"
-GUPPYSCREEN_VERSION="${GUPPYSCREEN_VERSION:-v1.3.3-OpenKE}"
+GUPPYSCREEN_VERSION="${GUPPYSCREEN_VERSION:-v1.5.0-OpenKE}"
 GUPPY_THEME="${GUPPY_THEME:-blue}"
 JOBS="$(nproc)"
 WORKDIR="$(cd "$(dirname "$0")/.." && pwd)"
