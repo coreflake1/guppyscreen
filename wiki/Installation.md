@@ -89,15 +89,15 @@ What's on offer:
 | **Firmware Retraction** | enables `G10`/`G11` firmware-level retraction commands, if your slicer uses them | — |
 | **Screws Tilt Adjust** | adds the `SCREWS_TILT_CALCULATE` bed-levelling helper | — |
 | **Creality Nebula camera** | image tuning that **sticks across reboots** | [guide](Camera-Image-Tuning) |
-| **Creality macros** | M600 filament change, **Save Z-Offset** (persists z-offset), useful macros (backup/PID/bed-level), Exclude Object | — |
+| **Creality macros** | M600 filament change (shows a Resume/Ignore/Cancel prompt with Unload/Load/Purge More options — errors from any of its buttons now surface as an on-screen message instead of silently doing nothing), **Save Z-Offset** (persists z-offset), useful macros (backup/PID/bed-level), Exclude Object | — |
 | **E-Steps Calibration** | guided mark-extrude-measure rotation-distance wizard | [guide](Calibration-Explained) |
-| **Pause/Resume layer-shift fix** | stops the bed crashing into the rail on resume (`y_park` 222→220) | [guide](Pause-Park-Layer-Shift-Fix) |
+| **Pause/Resume/Cancel layer-shift fix** | stops the bed crashing into the rail on resume or cancel (`y_park` 222→220 in both `PAUSE` and `CANCEL_PRINT`, which each hardcode their own copy) | [Troubleshooting](Troubleshooting) |
 
 > Some of these still need a **one-time calibration / slicer setup** afterward (the installer can't do the
 > physical part) — each guide walks you through it. Axis Twist is the only one that edits a Klipper core
 > file (`probe.py`); the installer backs it up first and the edit is reversible. The layer-shift fix
-> edits `gcode_macro.cfg` (backed up first, and skipped automatically if your config doesn't have the
-> stock `y_park = 222`).
+> edits `gcode_macro.cfg` (backed up first, and skipped automatically for either PAUSE or CANCEL_PRINT
+> if your config doesn't have that macro's own stock `Y222` value).
 
 > **About the Creality macros:** these used to come from the Creality Helper Script. **Save Z-Offset**,
 > **M600**, **useful macros**, and **E-Steps Calibration** redefine sections a stock or Helper-Script
