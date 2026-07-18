@@ -17,7 +17,11 @@ This is a KE-focused fork, so CI builds **only the Ender-3 V3 KE asset**:
 | `guppyscreen-smallscreen.tar.gz` | `mipsel-buildroot-linux-musl-` | material | **yes** | **The Ender-3 V3 KE asset** |
 
 - Non-tag pushes set `GUPPYSCREEN_VERSION=nightly-<sha>` and publish a `nightly` prerelease.
-- Tag pushes set `GUPPYSCREEN_VERSION=<tag>` and publish a stable release with generated notes.
+- Tag pushes set `GUPPYSCREEN_VERSION=<tag>` and publish a stable release. **The CI-generated notes
+  are just GitHub's bare auto-generated commit list + a changelog link — genuinely written,
+  plain-language release notes (the style every past release actually has) are a manual step, not
+  something CI does.** See "Writing the release notes" below - don't skip this, it's easy to miss
+  since the release exists and looks published either way.
 
 > The toolchain image still ships an aarch64 cross-compiler, so other targets (standard-screen K1,
 > Z-Bolt icons, aarch64) can be built manually if ever needed — they're just not released.
@@ -63,3 +67,24 @@ complete a TLS handshake against GitHub — see [Troubleshooting](Troubleshootin
 normal install command with no `PINNED_RELEASE` to go back to the latest stable release.
 
 See **[Troubleshooting](Troubleshooting)** for current installer/upgrade caveats.
+
+## Writing the release notes (manual step, every stable release)
+
+CI publishes the tag with bare auto-generated notes (a commit list + changelog link) — fine for
+developers, not for end users, most of whom are not developers. **After the tag build succeeds,
+replace the notes** (`gh release edit <tag> --notes-file <file>` or the GitHub web UI) with real,
+plain-language writing in the established house style — look at any past release
+(e.g. `gh release view v1.4.2-OpenKE --json body`) for the exact tone to match:
+
+- A one-line `## What's new in vX.Y.Z` title, then a short plain-English summary sentence.
+- If the update needs the **full installer** (not just the in-app "Update Guppy" button) - e.g. it
+  touches Klipper macros/config, not just the GuppyScreen binary - say so up front with a `⚠️`
+  callout, since "Update Guppy" alone silently won't apply those parts.
+- One `###` section per real change, in plain language: what a user would have actually noticed
+  going wrong (not the internal root cause), and what's different now. No jargon, no file names,
+  no internal code identifiers - a non-developer should be able to read every line.
+- End with the upgrade command and a `**Full Changelog**:` compare link (same two things CI's
+  bare notes already have, just keep them).
+
+Skipping this is easy to miss precisely because the release already looks published and complete
+without it - it isn't done until the notes are rewritten.
