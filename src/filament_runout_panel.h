@@ -33,6 +33,13 @@ class FilamentRunoutPanel : public NotifyConsumer {
   void handle_mbox(lv_event_t *e);
   static void _mbox_cb(lv_event_t *e) { ((FilamentRunoutPanel*)e->user_data)->handle_mbox(e); }
 
+  // Set once by InitPanel from the raw, unfiltered objects/list response -
+  // gcode_macro objects are deliberately excluded from this panel's own
+  // printer_state subscription (see main app subscribe logic), so this
+  // panel has no way to discover M600's presence itself. Must be called
+  // before the first runout, or it defaults to "not installed".
+  void set_has_m600_macro(bool present) { has_m600_macro = present; }
+
 #ifdef SIMULATOR
   void sim_show() { show(); }
 #endif
@@ -59,10 +66,13 @@ class FilamentRunoutPanel : public NotifyConsumer {
   std::string fil_key;               // "filament_switch_sensor <name>" or ""
   bool last_detected;
 
-  // M600 hand-off: set true if a "gcode_macro M600" object exists at baseline
-  // (see class comment above). While true, a runout sets pending_m600_fallback
-  // instead of showing immediately, and consume() only shows this panel's own
-  // dialog if M600's own prompt genuinely never shows up.
+  // M600 hand-off: true if a "gcode_macro M600" object exists, set via
+  // set_has_m600_macro() (see class comment above) - NOT discoverable from
+  // this panel's own baseline scan, since gcode_macro objects are excluded
+  // from its printer_state subscription entirely. While true, a runout sets
+  // pending_m600_fallback instead of showing immediately, and consume()
+  // only shows this panel's own dialog if M600's own prompt genuinely never
+  // shows up.
   bool has_m600_macro = false;
   bool pending_m600_fallback = false;
   std::function<bool()> is_prompt_visible_fn;

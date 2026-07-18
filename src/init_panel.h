@@ -6,12 +6,13 @@
 #include "main_panel.h"
 #include "bedmesh_panel.h"
 #include "print_status_panel.h"
+#include "filament_runout_panel.h"
 
 #include <mutex>
 
 class InitPanel {
  public:
-  InitPanel(MainPanel &mp, BedMeshPanel &bmp, std::mutex &l);
+  InitPanel(MainPanel &mp, BedMeshPanel &bmp, FilamentRunoutPanel &frp, std::mutex &l);
   ~InitPanel();
 
   void connected(KWebSocketClient &ws);
@@ -27,6 +28,7 @@ class InitPanel {
   lv_obj_t *label;
   MainPanel &main_panel;
   BedMeshPanel &bedmesh_panel;
+  FilamentRunoutPanel &filament_runout_panel;
   std::mutex &lv_lock;
 };
 

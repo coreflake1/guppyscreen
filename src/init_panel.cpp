@@ -7,11 +7,12 @@
 #include <algorithm>
 #include <cstdio>
 
-InitPanel::InitPanel(MainPanel &mp, BedMeshPanel &bmp, std::mutex& l)
+InitPanel::InitPanel(MainPanel &mp, BedMeshPanel &bmp, FilamentRunoutPanel &frp, std::mutex& l)
   : cont(lv_obj_create(lv_scr_act()))
   , label(lv_label_create(cont))
   , main_panel(mp)
   , bedmesh_panel(bmp)
+  , filament_runout_panel(frp)
   , lv_lock(l)
 {
   lv_obj_set_size(cont, LV_PCT(55), LV_SIZE_CONTENT);
@@ -97,12 +98,23 @@ void InitPanel::connected(KWebSocketClient &ws) {
 	auto objs = d["/result/objects"_json_pointer];
 	if (!objs.is_null()) {
 	  json sub_objs;
+	  bool has_m600_macro = false;
 	  for (auto &obj : objs) {
 	    std::string obj_name = obj.template get<std::string>();
 	    if (obj_name.rfind("gcode_macro ", 0 ) != 0) {
 	      sub_objs[obj_name] = nullptr;
+	    } else if (obj_name == "gcode_macro M600") {
+	      // gcode_macro objects are deliberately excluded from the live
+	      // subscription above, so FilamentRunoutPanel can never discover
+	      // this itself from printer_state (found for real on-device
+	      // 2026-07-18 - it silently showed its own dialog on every
+	      // runout regardless of M600 being installed, since printer_state
+	      // never contains a "gcode_macro M600" key at all). This is the
+	      // one place that ever sees the real, unfiltered object list.
+	      has_m600_macro = true;
 	    }
 	  }
+	  filament_runout_panel.set_has_m600_macro(has_m600_macro);
 
 	  sub_objs["tmcstatus"] = nullptr;
 

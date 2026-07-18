@@ -191,8 +191,13 @@ void FilamentRunoutPanel::consume(json &j) {
   }
 
   if (!baselined) {
-    // discover the sensor + its current reading, and whether M600 is
-    // installed (see class comment in the header), from full state.
+    // discover the sensor + its current reading from full state. NOT where
+    // has_m600_macro comes from - printer_state never contains gcode_macro
+    // objects at all (they're deliberately excluded from this app's
+    // subscription), so that used to always leave has_m600_macro false
+    // regardless of whether M600 was actually installed (found for real on
+    // a live device 2026-07-18 - the native dialog fired on every runout,
+    // stacking with M600's own prompt every time). See set_has_m600_macro().
     auto ps = State::get_instance()->get_data("/printer_state"_json_pointer);
     if (ps.is_object()) {
       for (auto &el : ps.items()) {
@@ -202,8 +207,6 @@ void FilamentRunoutPanel::consume(json &j) {
           if (el.value()["filament_detected"].is_boolean()) {
             last_detected = el.value()["filament_detected"].template get<bool>();
           }
-        } else if (el.key() == "gcode_macro M600") {
-          has_m600_macro = true;
         }
       }
     }
